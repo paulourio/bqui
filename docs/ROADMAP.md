@@ -172,6 +172,13 @@ The Dataset tab shows location, default expiration, labels, access and table cou
 
 ### M4 — SQL editor: Monaco in WKWebView, powered by bqls
 
+**Status: done.**
+- **LSP client:** Monaco 0.57 ships its own `monaco.lsp.MonacoLspClient`. The page hands it a Worker-shaped transport (`createTransportToWorker`), so the planned ~600-line hand-written adapter was not needed. `bqui-editor.js` is ~300 lines: transport, themes, key bindings, run requests and a smoke self-test.
+- **Go side:** Go relays LSP frames, intercepts `bqls/queryCost`, and issues its own `bqls/statements` requests in a private ID space.
+- **Size:** assets are 2.0 MiB gzipped (the TypeScript, CSS and HTML workers are excluded).
+- **Smoke (VM):** Monaco is ready in under 1 s with no GPU; completion, diagnostics, semantic colors and run-at-cursor are verified end to end.
+- **Risk:** Monaco's AMD build is deprecated upstream. If a future release drops it, bundle the ESM build with esbuild's Go API inside `tools/fetchmonaco` (still no Node).
+
 The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebView`. Monaco gives us multi-cursor, folding, minimap, bracket colorization, find/replace, the command palette, and the completion/hover/signature UI for free. Everything else in the window stays native AppKit. The WebView is still driven from Go through purego, so there is still no cgo.
 
 **Assets**

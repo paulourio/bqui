@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/paulourio/bqui/internal/appkit"
@@ -24,7 +25,16 @@ const (
 	filePerm = 0o600
 
 	maxDispatchDelay = 2 * time.Second
+
+	editorReadyTimeout = 45 * time.Second // no GPU in the QEMU VM: Monaco boots slowly
+	selfTestTimeout    = 20 * time.Second
+	runTimeout         = 10 * time.Second
+	pollInterval       = 100 * time.Millisecond
 )
+
+// selfTestSQL has a valid statement, a syntax error, and a cursor position
+// (line 3, column 8) right after "SELECT " where completion must offer items.
+const selfTestSQL = "SELECT 1 AS one;\nSELEC broken;\nSELECT \n"
 
 // ErrChecksFailed is returned when at least one smoke check fails.
 var ErrChecksFailed = errors.New("smoke: checks failed")
@@ -63,10 +73,26 @@ func (r *Report) skip(name, format string, args ...any) {
 	r.Checks = append(r.Checks, Check{Name: name, OK: true, Skipped: true, Detail: fmt.Sprintf(format, args...)})
 }
 
-// Start must be called from a worker goroutine. It hops to the main thread
-// (exercising objc.Main), runs the smoke test, then calls done with the
-// result on the main thread.
+// Start must be called from a worker goroutine. It waits for the Monaco
+// editor, runs its self-test, hops to the main thread (exercising
+// objc.Main), runs the remaining checks, then calls done on the main thread.
 func Start(s *ui.Shell, dir, version string, done func(error)) {
+	bootStart := time.Now()
+	ready := s.Editor.WaitReady(editorReadyTimeout)
+	bootTime := time.Since(bootStart)
+
+	var (
+		selfTest json.RawMessage
+		stErr    error
+	)
+
+	var runStatus string
+
+	if ready {
+		selfTest, stErr = s.Editor.RunSelfTest(selfTestSQL, 3, 8, selfTestTimeout)
+		runStatus = runAtCursor(s)
+	}
+
 	queued := time.Now()
 
 	objc.Main(func() {
@@ -76,6 +102,14 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 			Arch:          runtime.GOARCH,
 			OSVersion:     appkit.OSVersion(),
 			DispatchDelay: time.Since(queued),
+		}
+
+		editorChecks(s, rep, ready, bootTime, selfTest, stErr)
+
+		if ready {
+			// Cursor is on line 3 ("SELECT "), the third statement.
+			ok := strings.Contains(runStatus, "statement") && strings.Contains(runStatus, ": SELECT")
+			rep.check("editor-run-at-cursor", ok, "status: %q", runStatus)
 		}
 
 		if err := run(s, dir, rep, done); err != nil {
@@ -136,18 +170,80 @@ func structuralChecks(s *ui.Shell, rep *Report) {
 
 	rows := objc.Send[int64](s.Sidebar.View, "numberOfRows")
 	rep.check("sidebar-rows", rows >= 6, "%d visible outline rows", rows)
+}
 
-	rep.check("textkit2", s.Editor.UsesTextKit2(), "editor uses NSTextLayoutManager: %v", s.Editor.UsesTextKit2())
+// runAtCursor triggers "Run Statement at Cursor" (page → Go → bqls
+// statements → shell) and waits for the results status to change.
+func runAtCursor(s *ui.Shell) string {
+	statusCh := make(chan string, 1)
+	read := func() string {
+		objc.Main(func() { statusCh <- s.Status() })
 
-	text := s.Editor.String()
-	rep.check("editor-text", len(text) > 0, "%d bytes of SQL", len(text))
+		return <-statusCh
+	}
+
+	before := read()
+
+	objc.Main(func() { s.Editor.RequestRun(true) })
+
+	deadline := time.Now().Add(runTimeout)
+	for time.Now().Before(deadline) {
+		if st := read(); st != before {
+			return st
+		}
+
+		time.Sleep(pollInterval)
+	}
+
+	return before
+}
+
+func editorChecks(s *ui.Shell, rep *Report, ready bool, boot time.Duration, selfTest json.RawMessage, stErr error) {
+	consoleErrs, bootErr := s.Editor.Diagnostics()
+
+	rep.check("editor-ready", ready, "Monaco ready after %v (boot error: %q)", boot.Round(time.Millisecond), bootErr)
+
+	if !ready {
+		return
+	}
+
+	var st struct {
+		Suggestions int      `json:"suggestions"`
+		Labels      []string `json:"labels"`
+		Markers     int      `json:"markers"`
+		FirstMarker string   `json:"firstMarker"`
+		Spans       int      `json:"spans"`
+	}
+
+	if stErr == nil {
+		stErr = json.Unmarshal(selfTest, &st)
+	}
+
+	rep.check("editor-selftest", stErr == nil, "self-test: %v", errText(stErr))
+	rep.check("editor-completion", st.Suggestions > 0, "%d suggestions, first: %s", st.Suggestions, strings.Join(st.Labels, " | "))
+	rep.check("editor-diagnostics", st.Markers > 0, "%d markers, first: %q", st.Markers, st.FirstMarker)
+	rep.check("editor-tokens", st.Spans > 0, "%d colored token spans", st.Spans)
+
+	first := ""
+	if len(consoleErrs) > 0 {
+		first = consoleErrs[0]
+	}
+
+	rep.check("editor-console", len(consoleErrs) == 0, "%d console errors; first: %q", len(consoleErrs), first)
 }
 
 func accessibilityChecks(ax *appkit.AXNode, rep *Report) {
-	for _, role := range []string{"AXOutline", "AXTextArea", "AXSplitGroup", "AXToolbar"} {
+	for _, role := range []string{"AXOutline", "AXSplitGroup", "AXToolbar"} {
 		found := ax.Find(func(n *appkit.AXNode) bool { return n.Role == role }) != nil
 		rep.check("ax-"+role, found, "role %s present: %v", role, found)
 	}
+
+	// The editor WKWebView is an AXGroup host as the first pane of the inner
+	// (editor | results) split; its web content lives in WebKit's process.
+	inner := ax.Find(func(n *appkit.AXNode) bool {
+		return n.Role == "AXSplitGroup" && len(n.Children) > 0 && n.Children[0].Role == "AXGroup"
+	})
+	rep.check("ax-editor-host", inner != nil, "editor web view host present: %v", inner != nil)
 }
 
 // screenshots captures the window per appearance. The WindowServer capture

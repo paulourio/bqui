@@ -12,7 +12,7 @@ SSH       := ssh -p $(VM_PORT) -o BatchMode=yes $(VM_HOST)
 
 export CGO_ENABLED := 0
 
-.PHONY: all test vet lint build-linux vm-deploy vm-run vm-smoke vm-screen vm-test clean
+.PHONY: all test vet lint generate build-linux vm-deploy vm-run vm-smoke vm-screen vm-test clean
 
 all: test build-darwin-arm64 build-darwin-amd64
 
@@ -32,7 +32,11 @@ lint:
 build-linux:
 	go build -o $(DIST)/linux/ ./cmd/...
 
-build-darwin-%: FORCE
+# Fetch/verify the pinned Monaco assets (no-op when already present).
+generate:
+	go generate ./internal/editor
+
+build-darwin-%: generate FORCE
 	GOOS=darwin GOARCH=$* go build -trimpath -ldflags '$(LDFLAGS)' -o $(DIST)/darwin-$*/bqui ./cmd/bqui
 
 bundle-%: build-darwin-%

@@ -24,6 +24,7 @@ func init() {
 
 func main() {
 	smokeDir := flag.String("smoke-test", "", "render the UI offscreen into PNGs, ax.json and report.json in this directory, then exit")
+	inspect := flag.Bool("inspect", version == "dev", "enable the Safari Web Inspector for the editor")
 	flag.Parse()
 
 	if err := objc.Load(); err != nil {
@@ -32,7 +33,11 @@ func main() {
 	}
 
 	objc.WithPool(func() {
-		shell := ui.NewShell(ui.Options{Deterministic: *smokeDir != ""})
+		shell, err := ui.NewShell(ui.Options{Deterministic: *smokeDir != "", Inspectable: *inspect})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 
 		appkit.SetDelegate(shell.App, &appkit.AppDelegate{
 			DidFinishLaunching: func() {

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src bqui: 'unsafe-inline'; img-src bqui: data:; font-src bqui: data:; worker-src bqui: blob:; connect-src bqui:">
+<title>bqui editor</title>
+<link rel="stylesheet" href="monaco/vs/editor/editor.main.css">
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
+  #editor { position: absolute; inset: 0; }
+  #boot-error { display: none; font: 13px -apple-system, sans-serif; padding: 16px; color: #c00; }
+</style>
+</head>
+<body>
+<div id="editor"></div>
+<div id="boot-error"></div>
+<script src="monaco/vs/loader.js"></script>
+<script src="bqui-editor.js"></script>
+</body>
+</html>

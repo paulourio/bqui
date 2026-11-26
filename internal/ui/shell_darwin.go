@@ -6,7 +6,10 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"strings"
+
+	"github.com/paulourio/bqlang/bqconfig"
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
@@ -17,7 +20,6 @@ import (
 const AppName = "bqui"
 
 const (
-	editorFontSize   = 13
 	defaultWidth     = 1280
 	defaultHeight    = 800
 	sidebarMin       = 220
@@ -36,6 +38,8 @@ const (
 type Options struct {
 	// Deterministic disables frame/split autosave so screenshots are stable.
 	Deterministic bool
+	// Inspectable enables the Safari Web Inspector for the editor.
+	Inspectable bool
 }
 
 // Shell is the main window and its panes.
@@ -44,7 +48,8 @@ type Shell struct {
 	Window  objc.ID
 	Split   objc.ID // outer NSSplitViewController (sidebar | content | inspector)
 	Sidebar *appkit.Outline
-	Editor  *appkit.CodeEditor
+	Editor  *EditorPane
+	Cost    objc.ID // toolbar cost estimate label
 	Results objc.ID // results placeholder label
 	Detail  objc.ID // inspector label
 
@@ -52,15 +57,31 @@ type Shell struct {
 }
 
 // NewShell builds the application menu, main window, toolbar and panes.
-func NewShell(opts Options) *Shell {
+func NewShell(opts Options) (*Shell, error) {
 	s := &Shell{App: appkit.SharedApplication(), tree: demoTree()}
 
 	appkit.SetMainMenu(s.App, s.menus())
 
 	s.Sidebar = appkit.NewOutline(treeSource{s.tree}, s.onSelect)
-	s.Editor = appkit.NewCodeEditor(editorFontSize)
+
+	ed, err := NewEditorPane(EditorOptions{
+		LSP:         lspOptions(),
+		Inspectable: opts.Inspectable,
+		OnRun:       s.onRun,
+		OnCost:      s.onCost,
+		OnConsole: func(level, msg string) {
+			if level == "error" || level == "warn" {
+				fmt.Fprintf(os.Stderr, "bqui editor [%s] %s\n", level, msg)
+			}
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.Editor = ed
 	s.Editor.SetText(sampleSQL)
-	appkit.SetIdentifier(s.Editor.Text, "editor")
+	appkit.SetIdentifier(s.Editor.Web.View, "editor")
 
 	s.Results = appkit.Label("Run a query with ⌘↩ to see results here.", 0)
 	objc.Msg(s.Results, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
@@ -82,7 +103,7 @@ func NewShell(opts Options) *Shell {
 	appkit.AddCentered(inspectorView, s.Detail)
 
 	content := appkit.SplitViewController(false, autosave("BQUIEditorResults"), []appkit.SplitItem{
-		{Controller: appkit.ViewController(s.Editor.Scroll), MinThickness: editorMin, HoldingWeight: editorHolding},
+		{Controller: appkit.ViewController(s.Editor.Web.View), MinThickness: editorMin, HoldingWeight: editorHolding},
 		{Controller: appkit.ViewController(resultsView), MinThickness: resultsMin, HoldingWeight: resultsHolding},
 	})
 
@@ -113,9 +134,20 @@ func NewShell(opts Options) *Shell {
 	s.Sidebar.Expand(0, true)
 
 	objc.Msg(s.Window, "makeKeyAndOrderFront:", objc.Nil)
-	objc.Msg(s.Window, "makeFirstResponder:", s.Editor.Text)
+	objc.Msg(s.Window, "makeFirstResponder:", s.Editor.Web.View)
 
-	return s
+	return s, nil
+}
+
+// lspOptions configures the embedded bqls. Live BigQuery metadata and dry
+// runs use bqlang's ADC/gcloud credentials; without them bqls degrades to
+// offline analysis.
+func lspOptions() *bqconfig.LSPOptions {
+	o := bqconfig.DefaultLSPOptions()
+	o.DefaultProject = os.Getenv("GOOGLE_CLOUD_PROJECT")
+	o.BigQueryAPIEnabled = o.DefaultProject != ""
+
+	return o
 }
 
 // Tree exposes the explorer model (for tests and smoke checks).
@@ -162,10 +194,11 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Enter Full Screen", Action: "toggleFullScreen:", Key: "f", Mods: cmd | ctrl},
 		}},
 		{Title: "Query", Items: []appkit.MenuItem{
-			{Title: "Run", Key: "\r", Run: s.runQuery},
+			{Title: "Run", Key: "\r", Run: func() { s.Editor.RequestRun(false) }},
+			{Title: "Run Statement at Cursor", Key: "\r", Mods: cmd | shift, Run: func() { s.Editor.RequestRun(true) }},
 			{Title: "Stop", Key: ".", Run: func() { s.status("Nothing is running.") }},
 			{},
-			{Title: "Format", Key: "f", Mods: cmd | shift, Run: func() { s.status("Formatting arrives with bqls (M4).") }},
+			{Title: "Format", Key: "f", Mods: cmd | shift, Run: func() { s.Editor.Format() }},
 		}},
 		{Role: appkit.MenuWindows, Title: "Window", Items: []appkit.MenuItem{
 			{Title: "Minimize", Action: "performMiniaturize:", Key: "m"},
@@ -192,18 +225,19 @@ func (s *Shell) toolbarItems() []*appkit.ToolbarItem {
 	objc.Msg(projects, "addItemsWithTitles:", objc.Array(objc.String("bigquery-public-data"), objc.String("my-sandbox-project")))
 	objc.Msg(projects, "setToolTip:", objc.String("Billing project for queries"))
 
-	cost := appkit.Label("≈ 1.2 GB", 0)
+	cost := appkit.Label("—", 0)
 	objc.Msg(cost, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
-	objc.Msg(cost, "setToolTip:", objc.String("Estimated bytes processed (dry run)"))
+	objc.Msg(cost, "setToolTip:", objc.String("Estimated bytes processed (bqls dry run)"))
+	s.Cost = cost
 
 	return []*appkit.ToolbarItem{
 		{Kind: appkit.ToolbarToggleSidebar},
 		{Kind: appkit.ToolbarSidebarSeparator},
 		{ID: "project", Kind: appkit.ToolbarCustomView, Label: "Project", View: projects},
 		{Kind: appkit.ToolbarFlexibleSpace},
-		{ID: "run", Kind: appkit.ToolbarButton, Label: "Run", Symbol: "play.fill", ToolTip: "Run (⌘↩)", Run: s.runQuery},
+		{ID: "run", Kind: appkit.ToolbarButton, Label: "Run", Symbol: "play.fill", ToolTip: "Run (⌘↩)", Run: func() { s.Editor.RequestRun(false) }},
 		{ID: "stop", Kind: appkit.ToolbarButton, Label: "Stop", Symbol: "stop.fill", ToolTip: "Stop (⌘.)", Run: func() { s.status("Nothing is running.") }},
-		{ID: "format", Kind: appkit.ToolbarButton, Label: "Format", Symbol: "text.alignleft", ToolTip: "Format SQL (⇧⌘F)", Run: func() { s.status("Formatting arrives with bqls (M4).") }},
+		{ID: "format", Kind: appkit.ToolbarButton, Label: "Format", Symbol: "text.alignleft", ToolTip: "Format SQL (⇧⌘F)", Run: func() { s.Editor.Format() }},
 		{ID: "cost", Kind: appkit.ToolbarCustomView, Label: "Estimate", View: cost},
 		{ID: "search", Kind: appkit.ToolbarSearch, Label: "Search"},
 		{Kind: appkit.ToolbarInspectorSeparator},
@@ -211,15 +245,40 @@ func (s *Shell) toolbarItems() []*appkit.ToolbarItem {
 	}
 }
 
-func (s *Shell) runQuery() {
-	sql := strings.TrimSpace(s.Editor.String())
+// onRun receives the SQL the editor resolved (selection, statement at the
+// cursor, or whole script). Execution and the results grid arrive in M5.
+func (s *Shell) onRun(req RunRequest) {
+	sql := strings.TrimSpace(req.SQL)
 	if sql == "" {
 		s.status("Nothing to run.")
 
 		return
 	}
 
-	s.status(fmt.Sprintf("Would run %d characters. Query execution arrives in M2/M5.", len(sql)))
+	what := "script"
+
+	switch {
+	case req.Selection != "":
+		what = "selection"
+	case req.Kind != "":
+		what = req.Kind + " statement"
+	}
+
+	first, _, _ := strings.Cut(sql, "\n")
+	s.status(fmt.Sprintf("Would run %s (%d chars): %s", what, len(sql), first))
+}
+
+// Status returns the results-pane status text. Main thread only.
+func (s *Shell) Status() string {
+	return objc.GoString(objc.Msg(s.Results, "stringValue"))
+}
+
+func (s *Shell) onCost(summary string) {
+	if summary == "" {
+		summary = "—"
+	}
+
+	appkit.SetString(s.Cost, summary)
 }
 
 func (s *Shell) status(msg string) {

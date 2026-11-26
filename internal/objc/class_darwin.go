@@ -45,8 +45,30 @@ func RegisterClass(name, super string, protocols []string, methods []Method) (Cl
 	return cls, nil
 }
 
+// HasProtocol reports whether the runtime knows protocol name. Protocols are
+// only registered when some loaded binary references them.
+func HasProtocol(name string) bool {
+	return pobjc.GetProtocol(name) != nil
+}
+
+// AvailableProtocols filters names down to the protocols the runtime knows.
+// Conformance is advisory for the delegate protocols bqui implements: AppKit
+// and WebKit dispatch by selector.
+func AvailableProtocols(names ...string) []string {
+	out := make([]string, 0, len(names))
+
+	for _, n := range names {
+		if HasProtocol(n) {
+			out = append(out, n)
+		}
+	}
+
+	return out
+}
+
 // LazyClass registers a class on first use and returns it on every call.
-// Registration failure is a programming error and panics.
+// Protocols the runtime does not know at that moment are skipped (see
+// AvailableProtocols). Registration failure is a programming error and panics.
 func LazyClass(name, super string, protocols []string, methods func() []Method) func() ID {
 	var (
 		once sync.Once
@@ -55,7 +77,7 @@ func LazyClass(name, super string, protocols []string, methods func() []Method) 
 
 	return func() ID {
 		once.Do(func() {
-			c, err := RegisterClass(name, super, protocols, methods())
+			c, err := RegisterClass(name, super, AvailableProtocols(protocols...), methods())
 			if err != nil {
 				panic(err)
 			}
