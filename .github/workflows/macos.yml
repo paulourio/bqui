@@ -1,0 +1,47 @@
+name: macos
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: '0'
+
+jobs:
+  arm64:
+    # Apple silicon runner; macos-26 is Tahoe. Fall back to macos-15 if unavailable.
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test (native arm64, includes darwin-only objc/appkit tests)
+        run: go test ./...
+
+      - name: Build bundle
+        run: make bundle-arm64
+
+      - name: Smoke test (offscreen render, no TCC permission needed)
+        run: |
+          open -W -n --stdout "$PWD/dist/smoke.log" --stderr "$PWD/dist/smoke.log" \
+            dist/darwin-arm64/bqui.app --args --smoke-test="$PWD/dist/smoke"
+          cat dist/smoke.log
+          cat dist/smoke/report.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-arm64
+          path: |
+            dist/smoke/
+            dist/smoke.log
+          if-no-files-found: warn
