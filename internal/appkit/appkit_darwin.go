@@ -1,26 +1,30 @@
 //go:build darwin
 
 // Package appkit holds hand-written AppKit bindings: only the classes,
-// selectors and constants bqui uses.
+// selectors and constants bqui uses. All functions must be called on the
+// main thread.
 package appkit
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/paulourio/bqui/internal/objc"
 )
 
 // Point mirrors CGPoint.
-type Point struct{ X, Y float64 }
+type Point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
 
 // Size mirrors CGSize.
-type Size struct{ Width, Height float64 }
+type Size struct {
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
+}
 
 // Rect mirrors CGRect/NSRect.
 type Rect struct {
-	Origin Point
-	Size   Size
+	Origin Point `json:"origin"`
+	Size   Size  `json:"size"`
 }
 
 // MakeRect builds a Rect.
@@ -28,121 +32,95 @@ func MakeRect(x, y, w, h float64) Rect {
 	return Rect{Origin: Point{X: x, Y: y}, Size: Size{Width: w, Height: h}}
 }
 
-// NSWindowStyleMask values.
+// NSTextAlignment values.
 const (
-	WindowStyleTitled                 uint64 = 1 << 0
-	WindowStyleClosable               uint64 = 1 << 1
-	WindowStyleMiniaturizable         uint64 = 1 << 2
-	WindowStyleResizable              uint64 = 1 << 3
-	WindowStyleUnifiedTitleAndToolbar uint64 = 1 << 12
-	WindowStyleFullSizeContentView    uint64 = 1 << 15
+	TextAlignmentLeft   int64 = 0
+	TextAlignmentCenter int64 = 1
 )
 
-const (
-	backingStoreBuffered         uint64 = 2
-	activationPolicyRegular      int64  = 0
-	bitmapImageFileTypePNG       uint64 = 4
-	textAlignmentCenter          int64  = 1
-	autoresizeFlexibleMargins uint64 = 1<<0 | 1<<2 | 1<<3 | 1<<5 // NSViewMinX/MaxX/MinY/MaxYMargin
-)
+const lineBreakByTruncatingTail uint64 = 4
 
-var errWriteFailed = errors.New("appkit: write failed")
-
-// SharedApplication returns NSApp configured as a regular (Dock) application.
-func SharedApplication() objc.ID {
-	app := objc.Msg(objc.Cls("NSApplication"), "sharedApplication")
-	objc.Send[bool](app, "setActivationPolicy:", activationPolicyRegular)
-
-	return app
-}
-
-// NewWindow creates a titled, resizable window with a full-size content view.
-func NewWindow(title string, frame Rect) objc.ID {
-	style := WindowStyleTitled | WindowStyleClosable | WindowStyleMiniaturizable |
-		WindowStyleResizable | WindowStyleFullSizeContentView
-
-	w := objc.Msg(objc.Msg(objc.Cls("NSWindow"), "alloc"),
-		"initWithContentRect:styleMask:backing:defer:", frame, style, backingStoreBuffered, false)
-	objc.Msg(w, "setTitle:", objc.String(title))
-	objc.Msg(w, "setReleasedWhenClosed:", false)
-
-	return w
-}
-
-// NewLabel creates a non-editable, centered NSTextField label.
-func NewLabel(text string, pointSize float64) objc.ID {
+// Label creates a non-editable NSTextField label using the system font.
+func Label(text string, pointSize float64) objc.ID {
 	l := objc.Msg(objc.Cls("NSTextField"), "labelWithString:", objc.String(text))
-	objc.Msg(l, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", pointSize))
-	objc.Msg(l, "setAlignment:", textAlignmentCenter)
+	if pointSize > 0 {
+		objc.Msg(l, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", pointSize))
+	}
+
+	objc.Msg(l, "setLineBreakMode:", lineBreakByTruncatingTail)
 
 	return l
 }
 
-// CenterIn sizes view to fit, centers it in parent and keeps it centered on resize.
-func CenterIn(view, parent objc.ID) {
-	objc.Msg(view, "sizeToFit")
-	vs := objc.Send[Rect](view, "frame").Size
-	pb := objc.Send[Rect](parent, "bounds").Size
-	objc.Msg(view, "setFrame:", MakeRect((pb.Width-vs.Width)/2, (pb.Height-vs.Height)/2, vs.Width, vs.Height))
-	objc.Msg(view, "setAutoresizingMask:", autoresizeFlexibleMargins)
-	objc.Msg(parent, "addSubview:", view)
+// SetString sets the stringValue of a control.
+func SetString(control objc.ID, s string) {
+	objc.Msg(control, "setStringValue:", objc.String(s))
 }
 
-// MenuItem describes one item of an application menu.
-type MenuItem struct {
-	Title  string
-	Action string // selector sent to the first responder; "" adds a separator
-	Key    string
+// SymbolImage returns an SF Symbols image, or nil when the symbol is unknown.
+func SymbolImage(name, description string) objc.ID {
+	return objc.Msg(objc.Cls("NSImage"), "imageWithSystemSymbolName:accessibilityDescription:",
+		objc.String(name), objc.String(description))
 }
 
-// SetMainMenu installs a main menu whose first (application) menu holds items.
-func SetMainMenu(app objc.ID, appName string, items []MenuItem) {
-	mainMenu := objc.Msg(objc.Msg(objc.Cls("NSMenu"), "alloc"), "initWithTitle:", objc.String(""))
-	appItem := objc.Msg(objc.Msg(objc.Cls("NSMenuItem"), "alloc"), "init")
-	objc.Msg(mainMenu, "addItem:", appItem)
+// NewView returns an empty NSView that uses Auto Layout.
+func NewView() objc.ID {
+	v := objc.New("NSView")
+	UseAutoLayout(v)
 
-	appMenu := objc.Msg(objc.Msg(objc.Cls("NSMenu"), "alloc"), "initWithTitle:", objc.String(appName))
-
-	for _, it := range items {
-		if it.Action == "" {
-			objc.Msg(appMenu, "addItem:", objc.Msg(objc.Cls("NSMenuItem"), "separatorItem"))
-
-			continue
-		}
-
-		mi := objc.Msg(objc.Msg(objc.Cls("NSMenuItem"), "alloc"),
-			"initWithTitle:action:keyEquivalent:",
-			objc.String(it.Title), objc.Sel(it.Action), objc.String(it.Key))
-		objc.Msg(appMenu, "addItem:", mi)
-	}
-
-	objc.Msg(appItem, "setSubmenu:", appMenu)
-	objc.Msg(app, "setMainMenu:", mainMenu)
+	return v
 }
 
-// WritePNG renders view (including subviews) offscreen and writes a PNG to
-// path. It needs no screen-recording permission.
-func WritePNG(view objc.ID, path string) error {
-	bounds := objc.Send[Rect](view, "bounds")
+// UseAutoLayout disables autoresizing-mask constraint translation.
+func UseAutoLayout(v objc.ID) {
+	objc.Msg(v, "setTranslatesAutoresizingMaskIntoConstraints:", false)
+}
 
-	rep := objc.Msg(view, "bitmapImageRepForCachingDisplayInRect:", bounds)
-	if rep == objc.Nil {
-		return fmt.Errorf("appkit: no bitmap rep for view bounds %+v", bounds)
-	}
+// Anchor returns a layout anchor of v, e.g. "leadingAnchor".
+func Anchor(v objc.ID, name string) objc.ID {
+	return objc.Msg(v, name)
+}
 
-	objc.Msg(view, "cacheDisplayInRect:toBitmapImageRep:", bounds, rep)
+// Equal returns an inactive constraint a == b + constant.
+func Equal(a, b objc.ID, constant float64) objc.ID {
+	return objc.Msg(a, "constraintEqualToAnchor:constant:", b, constant)
+}
 
-	data := objc.Msg(rep, "representationUsingType:properties:",
-		bitmapImageFileTypePNG, objc.Msg(objc.Cls("NSDictionary"), "dictionary"))
-	if data == objc.Nil {
-		return fmt.Errorf("appkit: PNG encoding failed")
-	}
+// EqualConst returns an inactive constraint dimension == constant.
+func EqualConst(dim objc.ID, constant float64) objc.ID {
+	return objc.Msg(dim, "constraintEqualToConstant:", constant)
+}
 
-	if !objc.Send[bool](data, "writeToFile:atomically:", objc.String(path), true) {
-		return fmt.Errorf("%w: %s", errWriteFailed, path)
-	}
+// Activate activates constraints.
+func Activate(constraints ...objc.ID) {
+	objc.Msg(objc.Cls("NSLayoutConstraint"), "activateConstraints:", objc.Array(constraints...))
+}
 
-	return nil
+// AddFilling adds child to parent pinned to all edges with an inset.
+func AddFilling(parent, child objc.ID, inset float64) {
+	UseAutoLayout(child)
+	objc.Msg(parent, "addSubview:", child)
+	Activate(
+		Equal(Anchor(child, "leadingAnchor"), Anchor(parent, "leadingAnchor"), inset),
+		Equal(Anchor(child, "trailingAnchor"), Anchor(parent, "trailingAnchor"), -inset),
+		Equal(Anchor(child, "topAnchor"), Anchor(parent, "topAnchor"), inset),
+		Equal(Anchor(child, "bottomAnchor"), Anchor(parent, "bottomAnchor"), -inset),
+	)
+}
+
+// AddCentered adds child to parent, centered in both axes.
+func AddCentered(parent, child objc.ID) {
+	UseAutoLayout(child)
+	objc.Msg(parent, "addSubview:", child)
+	Activate(
+		Equal(Anchor(child, "centerXAnchor"), Anchor(parent, "centerXAnchor"), 0),
+		Equal(Anchor(child, "centerYAnchor"), Anchor(parent, "centerYAnchor"), 0),
+	)
+}
+
+// SetIdentifier sets the NSUserInterfaceItemIdentifier of a view or item.
+func SetIdentifier(v objc.ID, id string) {
+	objc.Msg(v, "setIdentifier:", objc.String(id))
 }
 
 // OSVersion returns NSProcessInfo's human-readable OS version string.
@@ -150,4 +128,14 @@ func OSVersion() string {
 	pi := objc.Msg(objc.Cls("NSProcessInfo"), "processInfo")
 
 	return objc.GoString(objc.Msg(pi, "operatingSystemVersionString"))
+}
+
+// constant reads an exported AppKit NSString constant, falling back to its
+// documented value when the symbol is missing (older OS versions).
+func constant(name, fallback string) objc.ID {
+	if id, err := objc.Const(objc.AppKit, name); err == nil && id != objc.Nil {
+		return id
+	}
+
+	return objc.String(fallback)
 }

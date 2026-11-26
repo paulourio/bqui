@@ -12,7 +12,7 @@ SSH       := ssh -p $(VM_PORT) -o BatchMode=yes $(VM_HOST)
 
 export CGO_ENABLED := 0
 
-.PHONY: all test vet build-linux vm-deploy vm-run vm-smoke clean
+.PHONY: all test vet lint build-linux vm-deploy vm-run vm-smoke vm-screen vm-test clean
 
 all: test build-darwin-arm64 build-darwin-amd64
 
@@ -23,6 +23,11 @@ vet:
 	go vet ./...
 	GOOS=darwin GOARCH=arm64 go vet ./...
 	GOOS=darwin GOARCH=amd64 go vet ./...
+
+lint:
+	golangci-lint run ./...
+	GOOS=darwin GOARCH=arm64 golangci-lint run ./...
+	GOOS=darwin GOARCH=amd64 golangci-lint run ./...
 
 build-linux:
 	go build -o $(DIST)/linux/ ./cmd/...
@@ -48,6 +53,24 @@ vm-smoke: vm-deploy
 		$(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/smoke; rc=$$?; cat $(VM_DIR)/smoke.log; exit $$rc'
 	rm -rf $(DIST)/smoke-vm && scp -q -P $(VM_PORT) -r $(VM_HOST):$(VM_DIR)/smoke $(DIST)/smoke-vm
 	cat $(DIST)/smoke-vm/report.json
+
+# Cross-compile every package's tests for darwin/amd64 and run them in the VM.
+VMTEST := $(DIST)/vmtest
+vm-test:
+	mkdir -p $(VMTEST)
+	for p in $$(GOOS=darwin go list ./...); do \
+		GOOS=darwin GOARCH=amd64 go test -c -o $(VMTEST)/$$(echo $$p | tr / _).test $$p || exit 1; \
+	done
+	$(SSH) 'mkdir -p $(VM_DIR)/vmtest'
+	scp -q -P $(VM_PORT) $(VMTEST)/*.test $(VM_HOST):$(VM_DIR)/vmtest/
+	$(SSH) 'cd $(VM_DIR)/vmtest && rc=0; for t in *.test; do echo "== $$t"; ./$$t -test.count=1 || rc=1; done; exit $$rc'
+
+# Real on-screen capture (Liquid Glass included). Needs Screen Recording
+# permission for /usr/libexec/sshd-keygen-wrapper in the VM (one-time, GUI).
+vm-screen: vm-deploy
+	$(SSH) 'pkill -x bqui; open -n $(VM_DIR)/bqui.app; sleep 3; screencapture -x $(VM_DIR)/screen.png; rc=$$?; pkill -x bqui; exit $$rc'
+	scp -q -P $(VM_PORT) $(VM_HOST):$(VM_DIR)/screen.png $(DIST)/screen-vm.png
+	@echo "wrote $(DIST)/screen-vm.png"
 
 clean:
 	rm -rf $(DIST)

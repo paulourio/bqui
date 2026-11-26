@@ -94,5 +94,6 @@ func build(bin, out string, info bundleInfo) error {
 		return err
 	}
 
+	//nolint:gosec // G703: build tool; the output path comes from the developer's own -o flag.
 	return os.WriteFile(filepath.Join(contents, "MacOS", info.Exe), exe, exePerm)
 }

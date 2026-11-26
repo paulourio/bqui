@@ -22,7 +22,7 @@ var (
 )
 
 func initDispatch() error {
-	lib, err := purego.Dlopen(libSystemPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	lib, err := purego.Dlopen(LibSystem, purego.RTLD_NOW|purego.RTLD_GLOBAL)
 	if err != nil {
 		return fmt.Errorf("objc: dlopen libSystem: %w", err)
 	}
