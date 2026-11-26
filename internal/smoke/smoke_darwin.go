@@ -17,6 +17,7 @@ import (
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
+	"github.com/paulourio/bqui/internal/editor"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/ui"
 )
@@ -37,7 +38,7 @@ const (
 
 // selfTestSQL has a valid statement, a syntax error, and a cursor position
 // (line 3, column 8) right after "SELECT " where completion must offer items.
-const selfTestSQL = "SELECT 1 AS one;\nSELEC broken;\nSELECT \n"
+const selfTestSQL = "SELECT 1 AS one;\nSELEC broken;\nSELECT \n-- ligatures: -> => != <= >= <> :: || ==\n"
 
 // ErrChecksFailed is returned when at least one smoke check fails.
 var ErrChecksFailed = errors.New("smoke: checks failed")
@@ -376,6 +377,9 @@ func editorChecks(s *ui.Shell, rep *Report, ready bool, boot time.Duration, self
 		Markers     int      `json:"markers"`
 		FirstMarker string   `json:"firstMarker"`
 		Spans       int      `json:"spans"`
+		FontLoaded  bool     `json:"fontLoaded"`
+		FontFamily  string   `json:"fontFamily"`
+		Features    string   `json:"fontFeatures"`
 	}
 
 	if stErr == nil {
@@ -386,6 +390,8 @@ func editorChecks(s *ui.Shell, rep *Report, ready bool, boot time.Duration, self
 	rep.check("editor-completion", st.Suggestions > 0, "%d suggestions, first: %s", st.Suggestions, strings.Join(st.Labels, " | "))
 	rep.check("editor-diagnostics", st.Markers > 0, "%d markers, first: %q", st.Markers, st.FirstMarker)
 	rep.check("editor-tokens", st.Spans > 0, "%d colored token spans", st.Spans)
+	rep.check("editor-font", st.FontLoaded && strings.Contains(st.FontFamily, "bqui mono") && strings.Contains(st.Features, "calt"),
+		"embedded font %s loaded=%v; family %q; features %q", editor.FontVersion(), st.FontLoaded, st.FontFamily, st.Features)
 
 	first := ""
 	if len(consoleErrs) > 0 {

@@ -47,6 +47,7 @@ type bundleInfo struct {
 func main() {
 	bin := flag.String("bin", "", "path to the darwin bqui executable")
 	out := flag.String("o", "dist/bqui.app", "output .app directory")
+	notices := flag.String("notices", "THIRD_PARTY_NOTICES.md", "third-party notices copied into Contents/Resources ('' to skip)")
 	info := bundleInfo{Name: "bqui", Exe: "bqui"}
 	flag.StringVar(&info.ID, "id", "io.github.paulourio.bqui", "CFBundleIdentifier")
 	flag.StringVar(&info.Version, "version", "0.0.0", "bundle version")
@@ -58,13 +59,13 @@ func main() {
 		os.Exit(2)
 	}
 
-	if err := build(*bin, *out, info); err != nil {
+	if err := build(*bin, *out, *notices, info); err != nil {
 		fmt.Fprintln(os.Stderr, "bundle:", err)
 		os.Exit(1)
 	}
 }
 
-func build(bin, out string, info bundleInfo) error {
+func build(bin, out, notices string, info bundleInfo) error {
 	exe, err := os.ReadFile(bin)
 	if err != nil {
 		return err
@@ -92,6 +93,18 @@ func build(bin, out string, info bundleInfo) error {
 
 	if err := os.WriteFile(filepath.Join(contents, "PkgInfo"), []byte("APPL????"), filePerm); err != nil {
 		return err
+	}
+
+	if notices != "" {
+		text, err := os.ReadFile(notices)
+		if err != nil {
+			return err
+		}
+
+		//nolint:gosec // G703: build tool; paths come from the developer's own flags.
+		if err := os.WriteFile(filepath.Join(contents, "Resources", filepath.Base(notices)), text, filePerm); err != nil {
+			return err
+		}
 	}
 
 	//nolint:gosec // G703: build tool; the output path comes from the developer's own -o flag.

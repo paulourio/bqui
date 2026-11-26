@@ -8,6 +8,22 @@
 <title>bqui editor</title>
 <link rel="stylesheet" href="monaco/vs/editor/editor.main.css">
 <style>
+  /* Embedded FiraCode Nerd Font Mono (SIL OFL 1.1; see fonts/LICENSE), under
+     a private family name so a locally installed copy never shadows it. */
+  @font-face {
+    font-family: "bqui mono";
+    src: url("fonts/FiraCodeNerdFontMono-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "bqui mono";
+    src: url("fonts/FiraCodeNerdFontMono-Bold.ttf") format("truetype");
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+  }
   :root { color-scheme: light dark; }
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
   #editor { position: absolute; inset: 0; }

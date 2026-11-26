@@ -388,6 +388,17 @@ func TestOpenAssets(t *testing.T) {
 		t.Skip("monaco assets not generated; run go generate ./internal/editor")
 	}
 
+	for _, name := range []string{"/monaco/LICENSE", "/fonts/LICENSE", "/fonts/NERD_FONTS_README.md"} {
+		if lic, lerr := Open(name); lerr != nil || len(lic.Body) < 500 {
+			t.Errorf("license %s missing: %v", name, lerr)
+		}
+	}
+
+	font, ferr := Open("/fonts/FiraCodeNerdFontMono-Regular.ttf")
+	if ferr != nil || font.ContentType != "font/ttf" || len(font.Body) < 1<<20 || string(font.Body[:4]) != "\x00\x01\x00\x00" {
+		t.Fatalf("font: %v %q %d", ferr, font.ContentType, len(font.Body))
+	}
+
 	loader, err := Open("/monaco/vs/loader.js")
 	if err != nil || len(loader.Body) < 1000 || !strings.HasPrefix(loader.ContentType, "text/javascript") {
 		t.Fatalf("loader: %v %d %q", err, len(loader.Body), loader.ContentType)

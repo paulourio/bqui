@@ -9,6 +9,21 @@
 
   var handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bqui;
   var DEFAULT_URI = 'file:///bqui/tab-1.sql';
+  var FONT_FAMILY = '"bqui mono", ui-monospace, Menlo, monospace';
+  var FONT_LOAD_TIMEOUT_MS = 3000;
+
+  // loadFonts resolves once the embedded font is usable (or after a timeout,
+  // falling back to system monospace) so Monaco measures the right metrics.
+  function loadFonts() {
+    var load = Promise.all([
+      document.fonts.load('400 13px "bqui mono"'),
+      document.fonts.load('700 13px "bqui mono"'),
+    ]);
+    var timeout = new Promise(function (resolve) { setTimeout(resolve, FONT_LOAD_TIMEOUT_MS); });
+    return Promise.race([load, timeout]).catch(function (err) {
+      console.warn('bqui: editor font failed to load', fmt(err));
+    });
+  }
 
   function post(env) {
     if (handler) handler.postMessage(JSON.stringify(env));
@@ -152,12 +167,17 @@
           var labels = Array.prototype.slice.call(rows, 0, 5).map(function (r) { return r.getAttribute('aria-label') || r.textContent; });
           var markers = monaco.editor.getModelMarkers({ resource: model.uri });
           var semantic = document.querySelectorAll('.view-lines span[class*="mtk"]').length;
+          var lines = document.querySelector('.view-lines');
+          var style = lines ? getComputedStyle(lines) : null;
           app('selftest', {
             suggestions: rows.length,
             labels: labels,
             markers: markers.length,
             firstMarker: markers.length ? markers[0].message : '',
             spans: semantic,
+            fontLoaded: document.fonts.check('400 13px "bqui mono"'),
+            fontFamily: style ? style.fontFamily : '',
+            fontFeatures: style ? style.fontFeatureSettings : '',
           });
           ed.trigger('selftest', 'hideSuggestWidget', {});
         }, 2500);
@@ -233,6 +253,12 @@
 
   require.config({ paths: { vs: 'monaco/vs' } });
   require(['vs/editor/editor.main'], function () {
+    loadFonts().then(function () { start(); });
+  }, function (err) {
+    bootError(fmt(err));
+  });
+
+  function start() {
     defineThemes();
 
     var dark = window.matchMedia('(prefers-color-scheme: dark)');
@@ -241,8 +267,9 @@
       model: model,
       theme: dark.matches ? 'bqui-dark' : 'bqui-light',
       automaticLayout: true,
-      fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+      fontFamily: FONT_FAMILY,
       fontSize: 13,
+      fontLigatures: true, // Fira Code ligatures live in "calt"; Monaco enables liga + calt
       tabSize: 2,
       insertSpaces: true,
       minimap: { enabled: true },
@@ -272,8 +299,9 @@
       app('dirty', { uri: modelURI(model), version: model.getVersionId() });
     });
 
+    // In case the font finished loading after layout (timeout path).
+    document.fonts.ready.then(function () { monaco.editor.remeasureFonts(); });
+
     app('ready', { uri: modelURI(model) });
-  }, function (err) {
-    bootError(fmt(err));
-  });
+  }
 })();

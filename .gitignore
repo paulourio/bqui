@@ -3,3 +3,4 @@
 *.out
 .DS_Store
 /internal/editor/web/monaco/
+/internal/editor/web/fonts/
