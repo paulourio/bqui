@@ -24,9 +24,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Fetch pinned Monaco assets
-        run: go generate ./internal/editor
-
       - name: Test (native arm64, includes darwin-only objc/appkit tests)
         run: go test ./...
 

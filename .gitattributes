@@ -1,0 +1,3 @@
+# Vendored third-party web assets (gzip-compressed); see THIRD_PARTY_NOTICES.md.
+internal/editor/web/monaco/** binary -diff linguist-vendored
+internal/editor/web/fonts/** binary -diff linguist-vendored

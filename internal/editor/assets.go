@@ -16,10 +16,10 @@ import (
 	"strings"
 )
 
-//go:generate go run ../../tools/fetchassets -web web
-
-// web holds index.html, bqui-editor.js, and (after go generate) the
-// gzip-compressed Monaco build under monaco/ and the editor font under fonts/.
+// web holds index.html, bqui-editor.js, the gzip-compressed Monaco build
+// under monaco/ and the editor font under fonts/. The third-party files are
+// vendored (committed) so builds never download anything outside GOPROXY;
+// `make update-assets` refreshes them deliberately (see tools/fetchassets).
 //
 //go:embed all:web
 var web embed.FS
@@ -58,8 +58,8 @@ func Open(urlPath string) (Asset, error) {
 	return Asset{Body: body, ContentType: contentType(p)}, nil
 }
 
-// MonacoVersion returns the embedded Monaco version stamp, or "" when the
-// assets have not been generated (run `go generate ./internal/editor`).
+// MonacoVersion returns the vendored Monaco version stamp, or "" if the
+// assets are missing.
 func MonacoVersion() string { return stamp("web/monaco/VERSION") }
 
 // FontVersion returns the embedded editor font stamp, or "".

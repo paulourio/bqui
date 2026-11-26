@@ -1,6 +1,11 @@
-// Command fetchassets downloads the pinned third-party web assets that
-// internal/editor embeds, verifies their published digests, and writes the
-// needed files gzip-compressed. It needs no Node.js.
+// Command fetchassets refreshes the vendored third-party web assets that
+// internal/editor embeds: it downloads the pinned releases, verifies their
+// published digests, and writes the needed files gzip-compressed. It needs no
+// Node.js.
+//
+// It is a maintainer tool (`make update-assets`). Builds and CI never run it:
+// the output is committed, so building bqui makes no network calls outside
+// GOPROXY.
 //
 //   - Monaco editor (MIT): the AMD "min/vs" build. Language services bqui
 //     never uses (TypeScript, CSS, HTML workers) are skipped; Monaco only
@@ -33,8 +38,8 @@ import (
 	"time"
 )
 
-// asset is one pinned download. Bump version, url and digest together, then
-// run `go generate ./internal/editor`.
+// asset is one pinned download. Bump version, url and digest together, run
+// `make update-assets`, then review and commit internal/editor/web.
 type asset struct {
 	name    string
 	version string

@@ -12,7 +12,7 @@ SSH       := ssh -p $(VM_PORT) -o BatchMode=yes $(VM_HOST)
 
 export CGO_ENABLED := 0
 
-.PHONY: all test vet lint generate build-linux vm-deploy vm-run vm-smoke vm-screen vm-test clean
+.PHONY: all test vet lint update-assets build-linux vm-deploy vm-run vm-smoke vm-screen vm-test clean
 
 all: test build-darwin-arm64 build-darwin-amd64
 
@@ -32,11 +32,13 @@ lint:
 build-linux:
 	go build -o $(DIST)/linux/ ./cmd/...
 
-# Fetch/verify the pinned Monaco assets (no-op when already present).
-generate:
-	go generate ./internal/editor
+# Maintainer-only: download the pinned Monaco and font releases directly
+# (npm, GitHub), verify their digests and rewrite the vendored files under
+# internal/editor/web. Never run by builds or CI; review and commit the result.
+update-assets:
+	go run ./tools/fetchassets -web internal/editor/web
 
-build-darwin-%: generate FORCE
+build-darwin-%: FORCE
 	GOOS=darwin GOARCH=$* go build -trimpath -ldflags '$(LDFLAGS)' -o $(DIST)/darwin-$*/bqui ./cmd/bqui
 
 bundle-%: build-darwin-%

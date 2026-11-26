@@ -384,8 +384,8 @@ func TestOpenAssets(t *testing.T) {
 		t.Errorf("traversal: %v", terr)
 	}
 
-	if MonacoVersion() == "" {
-		t.Skip("monaco assets not generated; run go generate ./internal/editor")
+	if MonacoVersion() == "" || FontVersion() == "" {
+		t.Fatal("vendored assets missing under internal/editor/web (see make update-assets)")
 	}
 
 	for _, name := range []string{"/monaco/LICENSE", "/fonts/LICENSE", "/fonts/NERD_FONTS_README.md"} {

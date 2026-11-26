@@ -1,9 +1,10 @@
 # Third-party notices
 
-bqui embeds the following third-party assets in its binary. They are fetched,
-verified against pinned digests and compressed by `tools/fetchassets`
-(`go generate ./internal/editor`). The full license texts are embedded
-alongside them and served to the editor page at the paths noted.
+bqui embeds the following third-party assets in its binary. They are vendored
+in this repository under `internal/editor/web` (gzip-compressed) and refreshed
+only by maintainers with `make update-assets` (`tools/fetchassets`), which
+verifies each release against a pinned digest. Builds never download them. The
+full license texts are vendored alongside the assets.
 
 ## Monaco Editor 0.57.0
 
