@@ -16,7 +16,8 @@
 ### Decisions made with the user
 | Topic | Decision |
 |---|---|
-| UI stack | Real **AppKit through `github.com/ebitengine/purego` + `purego/objc`** (no cgo, no WebView for content) |
+| UI stack | Real **AppKit through `github.com/ebitengine/purego` + `purego/objc`** (no cgo). The only web content is the SQL editor |
+| Editor | **Monaco** in a `WKWebView` (assets embedded, served via a custom `bqui://` scheme). Go only relays LSP frames between Monaco and the in-process bqls |
 | bqlang reuse | **Promote public packages in bqlang** (`lsp`, `catalog`, `bqconfig`). bqui runs bqls **in-process** over `io.Pipe`, so there is a single binary |
 | Auth | ADC first, with gcloud fallback (bqlang's existing chain), plus a `cloud-platform` scope option for Dataform |
 | Dev and test | Develop on Gentoo (i9-13900K) and cross-compile. **QEMU macOS Tahoe x86_64 VM** for interactive UI work (no GPU acceleration, so no perf or visual-polish judgments there). **Private GitHub mirror + GitHub Actions arm64 macOS runner** for the arm64 ABI and smoke screenshots |
@@ -42,12 +43,14 @@ bqui/
     results/           result store (Arrow IPC spill), schema flattener, sub-row layout engine, value formatter, JSON renderer
     plan/              query plan model, DAG layout (Sugiyama), timeline model
     export/            CSV / NDJSON / Parquet / Arrow IPC writers, parallel streams, progress
-    lspclient/         in-process LSP client to bqlang/lsp (JSON-RPC over io.Pipe)
+    webkit/            WKWebView, URL scheme handler, script message handler, JS evaluation (darwin)
+    editor/            Monaco host: embedded assets (web/), JS↔Go bridge, LSP relay to in-process bqls (UI-agnostic core)
     store/             SQLite schema/migrations (history, sessions, tabs, links), saved-query folder, settings
     dataform/          BigQuery Studio saved-query sync (Dataform API)
     theme/             theme model, TOML load/save, VS Code theme import, appearance resolution
     smoke/             --smoke-test harness: scripted UI walk, offscreen PNG capture, AX tree dump
   tools/bundle/        Go program: builds bqui.app (Info.plist, .icns, ad-hoc signing via rcodesign), zips artifact
+  tools/fetchmonaco/   Go program: downloads the pinned monaco-editor npm tarball, checks sha512, extracts min/vs
   .github/workflows/macos.yml
   Makefile             build-darwin-arm64, build-darwin-amd64 (QEMU), bundle, vm-deploy, test
 ```
@@ -63,6 +66,7 @@ bqui/
 - `github.com/apache/arrow-go/v18` (ipc, array)
 - `github.com/parquet-go/parquet-go` or `arrow-go/parquet/pqarrow`
 - `modernc.org/sqlite` (already used by bqlang)
+- `monaco-editor@0.57.0` (MIT; static JS/CSS assets embedded with `go:embed`, not a Go dependency)
 - `github.com/BurntSushi/toml`
 - `google.golang.org/api/dataform/v1`
 - `github.com/paulourio/bqlang` v1.2.0 (public `lsp`, `catalog`, `bqconfig`)
@@ -99,6 +103,8 @@ Each milestone lists deliverables, then tests, then the exit criteria (**Exit**)
 **Exit:** bqui imports `bqlang/lsp`. `CGO_ENABLED=0 GOOS=darwin GOARCH={arm64,amd64} go build` succeeds. CI is green on a hello-world.
 
 ### M1 — AppKit binding layer + app shell
+
+**Status: done.** The editor pane is a plain `NSTextView` placeholder until M4 replaces it with Monaco.
 
 **`internal/objc`**
 - `Send[T]` typed msgSend wrappers.
@@ -164,34 +170,53 @@ The Dataset tab shows location, default expiration, labels, access and table cou
 
 **Exit:** you can browse a real project with about 1k tables, and the tree stays responsive with no blocking on the main thread.
 
-### M4 — SQL editor (bqls-powered)
+### M4 — SQL editor: Monaco in WKWebView, powered by bqls
 
-**Text view and gutter**
-- `NSTextView` with **TextKit 2** (`NSTextLayoutManager`), using a monospace font from the theme.
-- Line-number gutter (custom `NSRulerView`), current-line highlight, bracket matching, auto-indent and auto-close pairs.
-- Cmd-/ toggles comments. Duplicate line and move line up/down.
-- Multiple selections (`setSelectedRanges:` + custom multi-caret insertion).
-- Find and replace through `NSTextFinder`.
+The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebView`. Monaco gives us multi-cursor, folding, minimap, bracket colorization, find/replace, the command palette, and the completion/hover/signature UI for free. Everything else in the window stays native AppKit. The WebView is still driven from Go through purego, so there is still no cgo.
 
-**LSP client (`internal/lspclient`)**
-- `didOpen` and `didChange` (incremental), `semanticTokens/full/delta` mapped to theme token colors (including the `partitioned`, `clustered` and `pseudo` modifiers).
-- `publishDiagnostics` shown as squiggles plus a gutter marker and hover message.
-- `completion` in a custom `NSPanel` + `NSTableView` popup with details.
-- `hover` in `NSPopover` with Markdown rendered to an `NSAttributedString` subset.
-- `signatureHelp`.
-- `definition`: table references open the table tab, and CTEs or variables jump within the document.
-- `documentSymbol` feeds an outline.
-- `formatting` (Cmd-Shift-F, which runs bqfmt).
-- `bqls/queryCost` feeds the toolbar cost label, and `codeLens` cost appears as inline annotations above statements.
+**Assets**
+- `tools/fetchmonaco` downloads `monaco-editor@0.57.0` from the npm registry, verifies its pinned sha512 integrity hash, and extracts `min/vs/**` plus the SQL basic language into `internal/editor/web/monaco/`. That directory is git-ignored and regenerated by `go generate` (CI runs this). No Node.js is needed.
+- Assets are embedded with `go:embed` and served to the WebView by a Go `WKURLSchemeHandler` on `bqui://editor/...`. Nothing is extracted to disk, and nothing loads from the network: the CSP is `default-src bqui:`.
+- Monaco's web workers are created from same-origin `bqui://` URLs via `MonacoEnvironment.getWorkerUrl`. The editor falls back to main-thread mode if workers are unavailable.
+- Only the languages we need are kept (SQL tokenizer as a fallback, plus JSON), to keep the binary small.
 
-**Run semantics**
-- Cmd-Enter runs the selection or the whole script.
-- Cmd-Shift-Enter runs the statement at the cursor (through `bqls/statements`).
-- Esc or Cmd-. cancels.
+**WebKit bindings (`internal/webkit`, darwin)**
+- `WKWebView` and `WKWebViewConfiguration`, plus the URL scheme handler (a Go class implementing `webView:startURLSchemeTask:` / `stopURLSchemeTask:`).
+- `WKScriptMessageHandler` (a Go class) for JS → Go messages, and `evaluateJavaScript:completionHandler:` (a purego ObjC block) for Go → JS.
+- Navigation is locked down: no external URLs, links open in the default browser, Web Inspector is enabled only in debug builds (`isInspectable`).
 
-**Tests:** the `lspclient` round-trip runs on Linux against the in-process bqls. Text-edit to LSP-delta conversion gets table tests (UTF-16 offsets).
+**Bridge (`internal/editor`, UI-agnostic, tested on Linux)**
+- Go is only a **transport**. The page's JS adapter speaks LSP JSON-RPC, and Go forwards those frames unchanged to the in-process bqls (`bqlang/lsp` over `io.Pipe`) and back. No LSP types are re-modelled in Go.
+- App-level messages share the same channel with their own method namespace (`bqui/run`, `bqui/runStatement`, `bqui/cancel`, `bqui/cursor`, `bqui/dirty`, `bqui/setTheme`, `bqui/setText`, `bqui/focus`).
+- Go → JS messages are batched per run-loop turn, so a burst of diagnostics or semantic tokens becomes one `evaluateJavaScript` call.
 
-**Exit:** editing a 5k-line script has no visible lag in the VM. Completion and hover work offline (with `schema_dirs`) and online.
+**JS adapter (`internal/editor/web/bqui-editor.js`, ~600 lines, no bundler)**
+- Maps LSP ↔ Monaco:
+  - `didOpen` and incremental `didChange` from Monaco content-change events (UTF-16 offsets map directly)
+  - `publishDiagnostics` → `setModelMarkers`
+  - `completion` → `CompletionItemProvider`, `hover` → `HoverProvider` (Markdown rendered natively by Monaco), `signatureHelp` → `SignatureHelpProvider`
+  - `definition` → `DefinitionProvider`; table references are intercepted and open the table tab in the native UI
+  - `documentSymbol` → outline
+  - `formatting` → `DocumentFormattingEditProvider` (bqfmt)
+  - `codeLens` → `CodeLensProvider` (cost per statement)
+  - `semanticTokens/full/delta` → `DocumentSemanticTokensProvider`, with the bqls legend including the `partitioned`, `clustered` and `pseudo` modifiers
+  - `bqls/queryCost` → a `bqui/cost` message to the toolbar label
+- Monaco `addCommand` bindings:
+  - ⌘↩ runs the selection or the whole script
+  - ⇧⌘↩ runs the statement at the cursor (`bqls/statements`)
+  - ⌘. cancels
+  - ⇧⌘F formats
+
+  Native menu items with the same shortcuts call the same bridge, so menus and keys stay consistent.
+- Editor options come from settings and theme: font, ligatures, minimap, word wrap, rulers. Vim mode (`monaco-vim`) is deferred to M13.
+
+**Tabs:** one Monaco instance per window with **one model per query tab**. Switching tabs swaps the model and keeps view state, so it's cheap and preserves undo history.
+
+**Tests**
+- Linux: bridge routing and batching tests, plus an end-to-end LSP round trip through the bridge against the in-process bqls (`initialize` → `didOpen` → `completion`).
+- macOS smoke: the harness loads the editor, waits for `bqui/ready`, types via `evaluateJavaScript`, asserts that diagnostics and completion items come back, and screenshots the editor.
+
+**Exit:** a 5k-line script edits without visible lag in the VM. Completion, hover, diagnostics, semantic colors, formatting and cost lenses work, both offline (with `schema_dirs`) and online. The binary grows by ≤ 8 MB.
 
 ### M5 — Query results: store + console-style grid
 
@@ -332,7 +357,7 @@ The Dataset tab shows location, default expiration, labels, access and table cou
 
 **Theme model**
 - App appearance: system, light or dark; accent; vibrancy on or off.
-- Editor: background, foreground, selection, caret, gutter, and a color for each semantic token type plus modifier.
+- Editor: background, foreground, selection, caret, gutter, and a color for each semantic token type plus modifier. The theme compiles to a Monaco theme (`monaco.editor.defineTheme`, applied through `bqui/setTheme`), so editor colors switch live together with the native UI.
 - Grid: header, borders, sub-line dividers, null style, selection, number alignment.
 - JSON view colors and plan heat palette.
 - Fonts: editor, grid, UI size.
@@ -340,7 +365,7 @@ The Dataset tab shows location, default expiration, labels, access and table cou
 
 **Storage:** TOML at `~/Library/Application Support/bqui/themes/*.toml`. A preferences window offers live preview, duplicate, save as, import and export.
 
-**Import** VS Code `.json` themes (tokenColors and semanticTokenColors mapped to bqls token types). Ship 3–4 built-ins.
+**Import** VS Code `.json` themes. Monaco uses the same token-rule model, so `tokenColors` and `semanticTokenColors` map almost directly; `colors` map to the native UI's palette. Ship 3–4 built-ins.
 
 **Exit:** switching themes restyles the editor, grid, JSON and graph live without a restart.
 
@@ -351,7 +376,7 @@ The Dataset tab shows location, default expiration, labels, access and table cou
 - Preferences: projects, default location, maximum bytes billed guard, cache sizes, LSP options (mapped to `bqconfig.LSPOptions`), keybindings.
 - Crash and log collection to `~/Library/Logs/bqui`.
 - Packaging: ad-hoc signed zip by default. *(Optional)* Developer ID signing and notarization through `rcodesign notary-submit` if you get an Apple Developer account. *(Optional)* update checks against Gitea releases.
-- Optional extras, not committed: a charts tab, a lineage view, Vim keybindings.
+- Optional extras, not committed: a charts tab, a lineage view, Vim keybindings (`monaco-vim`), Monaco upgrade cadence (bump the pin in `tools/fetchmonaco` per release, after a smoke run).
 
 ---
 
@@ -362,7 +387,7 @@ The Dataset tab shows location, default expiration, labels, access and table cou
   - `internal/catalog/{bqrest.go,store.go,model.go,discovery.go}` moves to `catalog/`
   - `internal/bqconfig/config.go` moves to `bqconfig/`
   - `cmd/bqls/main.go` and the tests get updated imports
-- **bqui (new):** `internal/objc/*`, `internal/results/{flatten,layout,format}.go`, `internal/ui/grid/*`, `internal/plan/layout.go`, `internal/lspclient/*`, `internal/bqstorage/*`, `tools/bundle/main.go`, `.github/workflows/macos.yml`, `Makefile`
+- **bqui (new):** `internal/objc/*`, `internal/results/{flatten,layout,format}.go`, `internal/ui/grid/*`, `internal/plan/layout.go`, `internal/webkit/*`, `internal/editor/{bridge.go,web/bqui-editor.js}`, `internal/bqstorage/*`, `tools/bundle/main.go`, `tools/fetchmonaco/main.go`, `.github/workflows/macos.yml`, `Makefile`
 
 ## Code from bqlang to reuse
 
@@ -375,7 +400,7 @@ The Dataset tab shows location, default expiration, labels, access and table cou
 
 ## Verification
 
-- **Linux (every change):** `CGO_ENABLED=0 go test ./...` across `app`, `bq`, `results`, `plan`, `export`, `store`, `lspclient`, `theme`, plus `golangci-lint run`, and `GOOS=darwin GOARCH=arm64` and `amd64` builds to catch build-tag breakage.
+- **Linux (every change):** `CGO_ENABLED=0 go test ./...` across `app`, `bq`, `bqstorage`, `results`, `plan`, `export`, `store`, `editor` (bridge + LSP relay), `theme`, plus `golangci-lint run`, and `GOOS=darwin GOARCH=arm64` and `amd64` builds to catch build-tag breakage.
 - **bquictl against a sandbox GCP project:** `bquictl query`, `export`, `plan --layout-json`, `layout --bench`.
 - **QEMU Tahoe VM:** `make vm-deploy`, then hands-on UI checks per milestone. It also runs `bqui --smoke-test` and `leaks`.
 - **GitHub Actions arm64 (macos-26):** objc ABI tests, the smoke test producing PNG and AX artifacts, and memory benchmarks.
