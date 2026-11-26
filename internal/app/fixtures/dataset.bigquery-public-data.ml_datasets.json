@@ -1,0 +1,19 @@
+{
+ "creationTime": "1553208775542",
+ "datasetReference": {
+  "datasetId": "ml_datasets",
+  "projectId": "bigquery-public-data"
+ },
+ "description": " ",
+ "friendlyName": "",
+ "kind": "bigquery#dataset",
+ "labels": {
+  "dg_data_confidentiality": "public",
+  "dg_data_context": "metadata",
+  "dg_data_source": "public"
+ },
+ "lastModifiedTime": "1791958724693",
+ "location": "US",
+ "maxTimeTravelHours": "168",
+ "type": "DEFAULT"
+}

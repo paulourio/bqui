@@ -1,0 +1,64 @@
+{
+ "clustering": {
+  "fields": [
+   "wiki",
+   "title"
+  ]
+ },
+ "creationTime": "1704077985192",
+ "description": "Wikipedia pageviews from http://dumps.wikimedia.your.org/other/pageviews/, partitioned by date, clustered by (wiki, title)",
+ "kind": "bigquery#table",
+ "lastModifiedTime": "1735734142964",
+ "location": "US",
+ "numActiveLogicalBytes": "0",
+ "numActivePhysicalBytes": "0",
+ "numBytes": "2655163457803",
+ "numCurrentPhysicalBytes": "587960429000",
+ "numLongTermBytes": "2655163457803",
+ "numLongTermLogicalBytes": "2655163457803",
+ "numLongTermPhysicalBytes": "587960429000",
+ "numPartitions": "366",
+ "numRows": "58731276424",
+ "numTimeTravelPhysicalBytes": "0",
+ "numTotalLogicalBytes": "2655163457803",
+ "numTotalPhysicalBytes": "587960429000",
+ "partitionDefinition": {
+  "partitionedColumn": [
+   {
+    "field": "datehour"
+   }
+  ]
+ },
+ "requirePartitionFilter": true,
+ "schema": {
+  "fields": [
+   {
+    "name": "datehour",
+    "type": "TIMESTAMP"
+   },
+   {
+    "name": "wiki",
+    "type": "STRING"
+   },
+   {
+    "name": "title",
+    "type": "STRING"
+   },
+   {
+    "name": "views",
+    "type": "INTEGER"
+   }
+  ]
+ },
+ "tableReference": {
+  "datasetId": "wikipedia",
+  "projectId": "bigquery-public-data",
+  "tableId": "pageviews_2024"
+ },
+ "timePartitioning": {
+  "field": "datehour",
+  "requirePartitionFilter": true,
+  "type": "DAY"
+ },
+ "type": "TABLE"
+}

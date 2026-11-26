@@ -1,0 +1,21 @@
+{
+ "creationTime": "1457975794805",
+ "datasetReference": {
+  "datasetId": "samples",
+  "projectId": "bigquery-public-data"
+ },
+ "description": "Data Updated On : 2020-12-02\nA collection of tables that are subset of larger datasets.  These tables are suited for testing queries and learning BigQuery.",
+ "kind": "bigquery#dataset",
+ "labels": {
+  "dataplex-data-documentation-published-location": "us-central1",
+  "dataplex-data-documentation-published-project": "bigquery-public-data",
+  "dataplex-data-documentation-published-scan": "a9bb275bd-2f20-4e05-9a3d-486ab8fbf6fb",
+  "dg_data_confidentiality": "public",
+  "dg_data_context": "metadata",
+  "dg_data_source": "public"
+ },
+ "lastModifiedTime": "1773065902215",
+ "location": "US",
+ "maxTimeTravelHours": "168",
+ "type": "DEFAULT"
+}

@@ -1,0 +1,3694 @@
+{
+ "tables": [
+  {
+   "creationTime": "1755905117559",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "Google-ecommerce-dataset-table"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1754524857843",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "daily_total_visits"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1756162645758",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "daily_visits"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522253706433",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160801"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522253739710",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160802"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522253779805",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160803"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522260609285",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160804"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522260661479",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160805"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522260687775",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160806"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522260736113",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160807"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522260812631",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160808"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522282463497",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160809"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522282495945",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160810"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522282544754",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160811"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311207886",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160812"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311232186",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160813"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311260976",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160814"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311321542",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160815"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311357118",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160816"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311405697",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160817"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311485818",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160818"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311518515",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160819"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311564243",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160820"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311600417",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160821"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311633254",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160822"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311660134",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160823"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311727342",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160824"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522311772036",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160825"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333430958",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160826"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333470464",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160827"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333512247",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160828"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333565385",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160829"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333605241",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160830"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333658768",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160831"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333701668",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160901"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333732440",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160902"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333800164",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160903"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333826753",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160904"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333851858",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160905"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333907022",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160906"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522333974044",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160907"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522334012123",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160908"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522342172528",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160909"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522342202734",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160910"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344344328",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160911"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344371172",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160912"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344400594",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160913"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344422321",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160914"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344445045",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160915"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344479127",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160916"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344507589",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160917"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344540312",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160918"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344560746",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160919"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344585706",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160920"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522344612564",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160921"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522363942165",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160922"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522363975432",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160923"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364014536",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160924"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364063398",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160925"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364134511",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160926"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364163095",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160927"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364194179",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160928"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364227509",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160929"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364279816",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20160930"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364312940",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161001"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364359961",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161002"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364385244",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161003"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364414456",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161004"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364453048",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161005"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364482284",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161006"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364506065",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161007"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364531554",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161008"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364569329",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161009"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364598091",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161010"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364618753",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161011"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364647862",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161012"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364669465",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161013"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364703391",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161014"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522364740269",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161015"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522386185977",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161016"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522386231779",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161017"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522386282948",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161018"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522386331025",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161019"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522407303487",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161020"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522407319697",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161021"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522407343331",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161022"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522407374519",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161023"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522407418248",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161024"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522407446593",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161025"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522407471034",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161026"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409033480",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161027"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409476540",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161028"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409514273",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161029"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409541012",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161030"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409571013",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161031"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409596706",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161101"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409621245",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161102"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522409643755",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161103"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522410269781",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161104"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522410317557",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161105"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522410343033",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161106"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411422795",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161107"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411458095",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161108"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411492927",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161109"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411534470",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161110"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411589059",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161111"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411631705",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161112"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411669983",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161113"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411724806",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161114"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411746884",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161115"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411795472",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161116"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411836583",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161117"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411877914",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161118"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411906385",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161119"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411934376",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161120"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522411982090",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161121"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522412019062",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161122"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522412073989",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161123"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522412103207",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161124"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522412158107",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161125"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522412179258",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161126"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414649343",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161127"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414698826",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161128"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414738524",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161129"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414786242",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161130"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414841038",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161201"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414878839",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161202"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414921324",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161203"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522414966271",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161204"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522415021095",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161205"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522415075563",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161206"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522415107835",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161207"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522415145969",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161208"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522415188648",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161209"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522415231208",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161210"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419352956",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161211"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419373557",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161212"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419395707",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161213"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419413714",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161214"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419437323",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161215"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419456356",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161216"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419480088",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161217"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419499524",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161218"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419541639",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161219"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419563615",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161220"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419591888",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161221"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419612716",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161222"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419644349",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161223"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419671262",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161224"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419695857",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161225"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522419720264",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161226"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522421789536",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161227"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522421821209",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161228"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522421863677",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161229"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522421914762",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161230"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522421945060",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20161231"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522421982492",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170101"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422034812",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170102"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422081592",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170103"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422111269",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170104"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422158333",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170105"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422216454",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170106"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422262991",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170107"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422306199",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170108"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422346767",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170109"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422397723",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170110"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422445100",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170111"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422504762",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170112"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422537063",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170113"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422577469",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170114"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422613953",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170115"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422670368",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170116"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422713902",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170117"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422747992",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170118"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422791170",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170119"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522422839010",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170120"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522423194415",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170121"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522423228557",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170122"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522423618898",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170123"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522424007870",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170124"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522424140967",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170125"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522424188654",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170126"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522424563225",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170127"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522424597612",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170128"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522424979484",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170129"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522425034550",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170130"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522425083407",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170131"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522425469750",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170201"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522425667474",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170202"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522425718845",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170203"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522425916782",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170204"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522425965797",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170205"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426030998",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170206"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426086577",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170207"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426126643",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170208"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426324607",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170209"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426541552",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170210"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426576103",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170211"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426632974",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170212"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522426830809",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170213"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522427042547",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170214"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522427240480",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170215"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522427440265",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170216"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522427653761",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170217"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522427697041",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170218"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522427745168",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170219"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522427957482",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170220"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428004269",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170221"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428057695",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170222"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428111259",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170223"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428182212",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170224"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428217943",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170225"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428824703",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170226"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428858670",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170227"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428891032",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170228"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428917041",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170301"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428954485",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170302"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522428984350",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170303"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429006660",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170304"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429037094",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170305"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429071004",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170306"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429114165",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170307"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429136551",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170308"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429168363",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170309"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429199476",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170310"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429231134",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170311"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429264244",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170312"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429483896",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170313"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522429537534",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170314"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430171739",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170315"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430225636",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170316"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430263419",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170317"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430330460",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170318"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430537557",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170319"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430582350",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170320"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430633640",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170321"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430687097",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170322"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430739705",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170323"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430780113",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170324"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430816174",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170325"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430884249",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170326"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430927515",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170327"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522430991513",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170328"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432121263",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170329"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432145079",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170330"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432187511",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170331"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432220707",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170401"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432296257",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170402"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432321758",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170403"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432353897",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170404"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432387155",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170405"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432409081",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170406"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432437265",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170407"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432827284",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170408"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432879723",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170409"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432933071",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170410"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522432971514",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170411"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522433020556",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170412"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522433060905",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170413"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522434260578",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170414"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522436886793",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170415"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522436940386",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170416"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522436984338",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170417"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522437200376",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170418"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522437420006",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170419"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522437635754",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170420"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522437856546",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170421"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522437901019",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170422"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522437948462",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170423"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522438163080",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170424"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522438380052",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170425"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522438452382",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170426"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522438663063",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170427"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522438902701",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170428"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522438948160",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170429"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522438997380",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170430"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522439217481",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170501"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522439418238",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170502"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522439651112",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170503"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522439860518",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170504"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522440084724",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170505"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522440137852",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170506"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522440343388",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170507"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522440555223",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170508"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522440791115",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170509"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522441035214",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170510"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522441270666",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170511"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522441481277",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170512"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522441695777",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170513"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522441919264",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170514"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442126803",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170515"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442194672",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170516"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442427508",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170517"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442495666",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170518"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442709065",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170519"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442764482",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170520"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442824024",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170521"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442859923",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170522"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522442914906",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170523"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443124238",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170524"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443182966",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170525"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443244030",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170526"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443281888",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170527"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443344459",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170528"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443575309",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170529"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443631416",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170530"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443689274",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170531"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443762146",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170601"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443828019",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170602"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443881173",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170603"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443953408",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170604"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522443998774",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170605"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444061918",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170606"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444123070",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170607"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444180797",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170608"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444235703",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170609"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444275404",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170610"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444334862",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170611"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444404288",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170612"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444460385",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170613"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444535419",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170614"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444567066",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170615"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444646344",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170616"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444687827",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170617"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444756908",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170618"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444816688",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170619"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444868171",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170620"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444926145",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170621"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522444982840",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170622"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445056173",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170623"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445107338",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170624"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445169228",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170625"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445237659",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170626"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445298809",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170627"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445362724",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170628"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445590457",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170629"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445654495",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170630"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445721041",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170701"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522445785309",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170702"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522446020797",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170703"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522446073675",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170704"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522446944643",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170705"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522446963545",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170706"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522446986882",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170707"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522447009215",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170708"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522447034357",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170709"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522447057824",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170710"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522447085896",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170711"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457060144",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170712"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457087988",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170713"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457110769",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170714"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457145376",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170715"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457178932",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170716"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457204606",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170717"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457243744",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170718"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457263273",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170719"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457310439",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170720"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457332877",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170721"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457351458",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170722"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457375022",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170723"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457406239",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170724"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457434178",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170725"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457450939",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170726"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522457472800",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170727"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522458239130",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170728"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522458262486",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170729"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522458289031",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170730"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522458317061",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170731"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1522458332134",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data",
+    "tableId": "ga_sessions_20170801"
+   },
+   "type": "TABLE"
+  }
+ ]
+}

@@ -1,0 +1,79 @@
+{
+ "tables": [
+  {
+   "creationTime": "1457975804113",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data",
+    "tableId": "github_nested"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1457975805074",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data",
+    "tableId": "github_timeline"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1457975806075",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data",
+    "tableId": "gsod"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1457975807183",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data",
+    "tableId": "natality"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1457975805856",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data",
+    "tableId": "shakespeare"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1457975810399",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data",
+    "tableId": "trigrams"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1457975807908",
+   "kind": "bigquery#table",
+   "labels": {
+    "dataplex-dp-published-location": "us-central1",
+    "dataplex-dp-published-project": "daui-storage",
+    "dataplex-dp-published-scan": "af83fd049-871e-486e-86bb-406eb82a794d"
+   },
+   "tableReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data",
+    "tableId": "wikipedia"
+   },
+   "type": "TABLE"
+  }
+ ]
+}

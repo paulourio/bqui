@@ -1,0 +1,18 @@
+{
+ "creationTime": "1568683802642",
+ "datasetReference": {
+  "datasetId": "persistent_udfs",
+  "projectId": "bigquery-public-data"
+ },
+ "description": "A collection of persistent user-defined functions (UDFs) that can help you work through your analysis faster instead of having to write them from scratch",
+ "kind": "bigquery#dataset",
+ "labels": {
+  "dg_data_confidentiality": "public",
+  "dg_data_context": "metadata",
+  "dg_data_source": "public"
+ },
+ "lastModifiedTime": "1752477860814",
+ "location": "US",
+ "maxTimeTravelHours": "168",
+ "type": "DEFAULT"
+}

@@ -1,0 +1,63 @@
+{
+ "creationTime": "1725525310184",
+ "description": "This table contains holiday and special event data used to train time series forecasting models (ARIMA_PLUS & ARIMA_PLUS_XREG). The data is not comprehensive and does not cover all geographic regions. Within the supported regions, it also may not include all the known holidays.",
+ "externalDataConfiguration": {
+  "autodetect": true,
+  "compression": "NONE",
+  "connectionId": "bigquery-public-data.us.1e501519-576e-4815-9328-7621dff96664",
+  "sourceFormat": "CSV",
+  "sourceUris": [
+   "gs://ml-datasets-csv/holidays_and_events_for_forecasting.csv"
+  ]
+ },
+ "kind": "bigquery#table",
+ "lastModifiedTime": "1730991729187",
+ "location": "US",
+ "numActiveLogicalBytes": "0",
+ "numActivePhysicalBytes": "0",
+ "numBytes": "0",
+ "numCurrentPhysicalBytes": "0",
+ "numLongTermBytes": "0",
+ "numLongTermLogicalBytes": "0",
+ "numLongTermPhysicalBytes": "0",
+ "numRows": "0",
+ "numTimeTravelPhysicalBytes": "0",
+ "numTotalLogicalBytes": "0",
+ "numTotalPhysicalBytes": "0",
+ "requirePartitionFilter": false,
+ "schema": {
+  "fields": [
+   {
+    "mode": "NULLABLE",
+    "name": "region",
+    "type": "STRING"
+   },
+   {
+    "mode": "NULLABLE",
+    "name": "holiday_name",
+    "type": "STRING"
+   },
+   {
+    "mode": "NULLABLE",
+    "name": "primary_date",
+    "type": "DATE"
+   },
+   {
+    "mode": "NULLABLE",
+    "name": "preholiday_days",
+    "type": "INTEGER"
+   },
+   {
+    "mode": "NULLABLE",
+    "name": "postholiday_days",
+    "type": "INTEGER"
+   }
+  ]
+ },
+ "tableReference": {
+  "datasetId": "ml_datasets",
+  "projectId": "bigquery-public-data",
+  "tableId": "holidays_and_events_for_forecasting"
+ },
+ "type": "EXTERNAL"
+}

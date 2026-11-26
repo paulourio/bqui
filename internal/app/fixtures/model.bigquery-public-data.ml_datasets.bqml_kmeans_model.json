@@ -1,0 +1,107 @@
+{
+ "creationTime": "1756313374245",
+ "featureColumns": [
+  {
+   "name": "age",
+   "type": {
+    "typeKind": "INT64"
+   }
+  },
+  {
+   "name": "workclass",
+   "type": {
+    "typeKind": "STRING"
+   }
+  },
+  {
+   "name": "education",
+   "type": {
+    "typeKind": "STRING"
+   }
+  },
+  {
+   "name": "education_num",
+   "type": {
+    "typeKind": "INT64"
+   }
+  },
+  {
+   "name": "marital_status",
+   "type": {
+    "typeKind": "STRING"
+   }
+  },
+  {
+   "name": "occupation",
+   "type": {
+    "typeKind": "STRING"
+   }
+  },
+  {
+   "name": "relationship",
+   "type": {
+    "typeKind": "STRING"
+   }
+  },
+  {
+   "name": "race",
+   "type": {
+    "typeKind": "STRING"
+   }
+  },
+  {
+   "name": "sex",
+   "type": {
+    "typeKind": "STRING"
+   }
+  },
+  {
+   "name": "capital_gain",
+   "type": {
+    "typeKind": "INT64"
+   }
+  },
+  {
+   "name": "capital_loss",
+   "type": {
+    "typeKind": "INT64"
+   }
+  },
+  {
+   "name": "hours_per_week",
+   "type": {
+    "typeKind": "INT64"
+   }
+  },
+  {
+   "name": "native_country",
+   "type": {
+    "typeKind": "STRING"
+   }
+  }
+ ],
+ "lastModifiedTime": "1756313374332",
+ "location": "US",
+ "modelReference": {
+  "datasetId": "ml_datasets",
+  "modelId": "bqml_kmeans_model",
+  "projectId": "bigquery-public-data"
+ },
+ "modelType": "KMEANS",
+ "trainingRuns": [
+  {
+   "startTime": "2025-08-27T16:48:27.989Z",
+   "trainingOptions": {
+    "distanceType": "EUCLIDEAN",
+    "earlyStop": true,
+    "kmeansInitializationMethod": "RANDOM",
+    "maxIterations": "20",
+    "minRelativeProgress": 0.01,
+    "numClusters": "3",
+    "standardizeFeatures": true,
+    "warmStart": false
+   },
+   "trainingStartTime": "1756313307989"
+  }
+ ]
+}

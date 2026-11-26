@@ -1,0 +1,23 @@
+{
+ "creationTime": "1789541875269",
+ "datasetReference": {
+  "datasetId": "crypto_bitcoin",
+  "projectId": "bigquery-public-data"
+ },
+ "description": "Comprehensive dataset of Bitcoin blockchain data, maintained by Google\n\nSource listing: [Bitcoin Blockchain - Preview](/bigquery;cameo=analyticshub;pageName=listing-detail;pageResource=267067226573.us.cw3_public_datasets_exchange.bitcoin_blockchain_preview_1a01f674a34)",
+ "friendlyName": "",
+ "kind": "bigquery#dataset",
+ "lastModifiedTime": "1790057137362",
+ "linkedDatasetMetadata": {
+  "linkState": "LINKED"
+ },
+ "linkedDatasetSource": {
+  "sourceDataset": {
+   "datasetId": "bitcoin_us",
+   "projectId": "267067226573"
+  }
+ },
+ "location": "US",
+ "maxTimeTravelHours": "168",
+ "type": "LINKED"
+}

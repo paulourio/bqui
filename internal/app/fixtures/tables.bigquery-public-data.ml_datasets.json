@@ -1,0 +1,94 @@
+{
+ "tables": [
+  {
+   "creationTime": "1792216987447",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "bike_sharing_daily"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1792214878031",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "bike_sharing_hourly"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1557939876515",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "census_adult_income"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1757110453999",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "census_adult_income_kmeans_predictions"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1553878314307",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "credit_card_default"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1725525310184",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "holidays_and_events_for_forecasting"
+   },
+   "type": "EXTERNAL"
+  },
+  {
+   "creationTime": "1553208911426",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "iris"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1619804743188",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "penguins"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1553208928339",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data",
+    "tableId": "ulb_fraud_detection"
+   },
+   "type": "TABLE"
+  }
+ ]
+}

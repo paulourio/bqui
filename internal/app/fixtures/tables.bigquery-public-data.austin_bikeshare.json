@@ -1,0 +1,77 @@
+{
+ "tables": [
+  {
+   "creationTime": "1495683814344",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "austin_bikeshare",
+    "projectId": "bigquery-public-data",
+    "tableId": "bikeshare_stations"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1689612093433",
+   "kind": "bigquery#table",
+   "labels": {
+    "dataplex-data-documentation-published-location": "us-central1",
+    "dataplex-data-documentation-published-project": "shirleyfu-01",
+    "dataplex-data-documentation-published-scan": "aa8ee09c8-2f5c-47a6-a2e0-c70b0136b16a",
+    "dataplex-dp-published-location": "us-central1",
+    "dataplex-dp-published-project": "anaconda-200016",
+    "dataplex-dp-published-scan": "a7c7bc6b1-5e5b-4491-b6ee-bb2a706699d3"
+   },
+   "tableReference": {
+    "datasetId": "austin_bikeshare",
+    "projectId": "bigquery-public-data",
+    "tableId": "bikeshare_trips"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1760673058446",
+   "kind": "bigquery#table",
+   "labels": {
+    "dataplex-data-documentation-published-location": "us-central2",
+    "dataplex-data-documentation-published-project": "sn-demo-hackathon",
+    "dataplex-data-documentation-published-scan": "aa7d72c5f-e8ae-40b6-ab1c-0d39bb2eaa2c"
+   },
+   "tableReference": {
+    "datasetId": "austin_bikeshare",
+    "projectId": "bigquery-public-data",
+    "tableId": "bikeshare_trips_daily_counts"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1771866723841",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "austin_bikeshare",
+    "projectId": "bigquery-public-data",
+    "tableId": "daily_bikeshare_trips"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1762491590213",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "austin_bikeshare",
+    "projectId": "bigquery-public-data",
+    "tableId": "daily_ride_counts"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1763483272072",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "austin_bikeshare",
+    "projectId": "bigquery-public-data",
+    "tableId": "daily_trip_counts"
+   },
+   "type": "TABLE"
+  }
+ ]
+}

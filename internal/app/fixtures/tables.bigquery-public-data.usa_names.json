@@ -1,0 +1,29 @@
+{
+ "tables": [
+  {
+   "creationTime": "1457744542425",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "usa_names",
+    "projectId": "bigquery-public-data",
+    "tableId": "usa_1910_2013"
+   },
+   "type": "TABLE"
+  },
+  {
+   "creationTime": "1488231345458",
+   "kind": "bigquery#table",
+   "labels": {
+    "dataplex-data-documentation-published-location": "us-central1",
+    "dataplex-data-documentation-published-project": "rraypmdemoproject",
+    "dataplex-data-documentation-published-scan": "a3f78f58e-0571-4492-8075-0e35804132fb"
+   },
+   "tableReference": {
+    "datasetId": "usa_names",
+    "projectId": "bigquery-public-data",
+    "tableId": "usa_1910_current"
+   },
+   "type": "TABLE"
+  }
+ ]
+}

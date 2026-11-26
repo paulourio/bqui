@@ -136,9 +136,34 @@ func (p *EditorPane) SetText(text string) {
 	_ = p.Bridge.SendApp("setText", map[string]string{"text": text})
 }
 
+// InsertText inserts text at the cursor (replacing the selection).
+func (p *EditorPane) InsertText(text string) {
+	_ = p.Bridge.SendApp("insertText", map[string]string{"text": text})
+}
+
+// AppendText appends a statement at the end of the buffer and selects it.
+func (p *EditorPane) AppendText(text string) {
+	_ = p.Bridge.SendApp("appendText", map[string]string{"text": text})
+}
+
+// SetDefaultProject points bqls (completion, dry runs) at a project.
+func (p *EditorPane) SetDefaultProject(project string, apiEnabled bool) {
+	_ = p.Bridge.Notify("workspace/didChangeConfiguration", map[string]any{
+		"settings": map[string]any{"bqls": map[string]any{
+			"default_project": project, "bigquery_api_enabled": apiEnabled,
+		}},
+	})
+}
+
 // RequestRun asks the page for the current text/selection and triggers OnRun.
 func (p *EditorPane) RequestRun(atCursor bool) {
 	p.Web.Eval(fmt.Sprintf("window.bqui&&window.bqui.requestRun(%t)", atCursor))
+}
+
+// Action runs a Monaco editor action by ID (e.g. "actions.find").
+func (p *EditorPane) Action(id string) {
+	p.Focus()
+	p.Web.Eval("window.bqui&&window.bqui.action(" + mustJSON(id) + ")")
 }
 
 // Format formats the document through bqls (bqfmt).

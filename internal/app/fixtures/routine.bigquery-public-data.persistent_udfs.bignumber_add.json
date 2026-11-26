@@ -1,0 +1,33 @@
+{
+ "arguments": [
+  {
+   "dataType": {
+    "typeKind": "STRING"
+   },
+   "name": "first"
+  },
+  {
+   "dataType": {
+    "typeKind": "STRING"
+   },
+   "name": "second"
+  }
+ ],
+ "creationTime": "1768947154908",
+ "definitionBody": "\n  if (first === null || second === null || first === \"\" || second === \"\") {\n      return null;\n  }\n  var a = new bn_js.BN(first, 10);\n  var b = new bn_js.BN(second, 10);\n  return a.add(b).toString(10);\n",
+ "description": "Safely allows mathematical addition on numbers of any magnitude.",
+ "importedLibraries": [
+  "gs://bqutil-lib/bq_js_libs/bn.js-v5.2.1.min.js"
+ ],
+ "language": "JAVASCRIPT",
+ "lastModifiedTime": "1768947154908",
+ "returnType": {
+  "typeKind": "STRING"
+ },
+ "routineReference": {
+  "datasetId": "persistent_udfs",
+  "projectId": "bigquery-public-data",
+  "routineId": "bignumber_add"
+ },
+ "routineType": "SCALAR_FUNCTION"
+}

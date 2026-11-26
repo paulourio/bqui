@@ -1,0 +1,51 @@
+{
+ "creationTime": "1457975805856",
+ "kind": "bigquery#table",
+ "lastModifiedTime": "1457975805856",
+ "location": "US",
+ "numActiveLogicalBytes": "0",
+ "numActivePhysicalBytes": "0",
+ "numBytes": "6432064",
+ "numCurrentPhysicalBytes": "485656",
+ "numLongTermBytes": "6432064",
+ "numLongTermLogicalBytes": "6432064",
+ "numLongTermPhysicalBytes": "485656",
+ "numRows": "164656",
+ "numTimeTravelPhysicalBytes": "0",
+ "numTotalLogicalBytes": "6432064",
+ "numTotalPhysicalBytes": "485656",
+ "schema": {
+  "fields": [
+   {
+    "description": "A single unique word (where whitespace is the delimiter) extracted from a corpus.",
+    "mode": "REQUIRED",
+    "name": "word",
+    "type": "STRING"
+   },
+   {
+    "description": "The number of times this word appears in this corpus.",
+    "mode": "REQUIRED",
+    "name": "word_count",
+    "type": "INTEGER"
+   },
+   {
+    "description": "The work from which this word was extracted.",
+    "mode": "REQUIRED",
+    "name": "corpus",
+    "type": "STRING"
+   },
+   {
+    "description": "The year in which this corpus was published.",
+    "mode": "REQUIRED",
+    "name": "corpus_date",
+    "type": "INTEGER"
+   }
+  ]
+ },
+ "tableReference": {
+  "datasetId": "samples",
+  "projectId": "bigquery-public-data",
+  "tableId": "shakespeare"
+ },
+ "type": "TABLE"
+}

@@ -1,0 +1,967 @@
+{
+ "creationTime": "1457975804113",
+ "kind": "bigquery#table",
+ "lastModifiedTime": "1457975804113",
+ "location": "US",
+ "numActiveLogicalBytes": "0",
+ "numActivePhysicalBytes": "0",
+ "numBytes": "1694950811",
+ "numCurrentPhysicalBytes": "494699020",
+ "numLongTermBytes": "1694950811",
+ "numLongTermLogicalBytes": "1694950811",
+ "numLongTermPhysicalBytes": "494699020",
+ "numRows": "2541639",
+ "numTimeTravelPhysicalBytes": "0",
+ "numTotalLogicalBytes": "1694950811",
+ "numTotalPhysicalBytes": "494699020",
+ "schema": {
+  "fields": [
+   {
+    "fields": [
+     {
+      "name": "url",
+      "type": "STRING"
+     },
+     {
+      "name": "has_downloads",
+      "type": "BOOLEAN"
+     },
+     {
+      "name": "created_at",
+      "type": "STRING"
+     },
+     {
+      "name": "has_issues",
+      "type": "BOOLEAN"
+     },
+     {
+      "name": "description",
+      "type": "STRING"
+     },
+     {
+      "name": "forks",
+      "type": "INTEGER"
+     },
+     {
+      "name": "fork",
+      "type": "BOOLEAN"
+     },
+     {
+      "name": "has_wiki",
+      "type": "BOOLEAN"
+     },
+     {
+      "name": "homepage",
+      "type": "STRING"
+     },
+     {
+      "name": "integrate_branch",
+      "type": "STRING"
+     },
+     {
+      "name": "master_branch",
+      "type": "STRING"
+     },
+     {
+      "name": "size",
+      "type": "INTEGER"
+     },
+     {
+      "name": "private",
+      "type": "BOOLEAN"
+     },
+     {
+      "name": "name",
+      "type": "STRING"
+     },
+     {
+      "name": "organization",
+      "type": "STRING"
+     },
+     {
+      "name": "owner",
+      "type": "STRING"
+     },
+     {
+      "name": "open_issues",
+      "type": "INTEGER"
+     },
+     {
+      "name": "watchers",
+      "type": "INTEGER"
+     },
+     {
+      "name": "pushed_at",
+      "type": "STRING"
+     },
+     {
+      "name": "language",
+      "type": "STRING"
+     }
+    ],
+    "name": "repository",
+    "type": "RECORD"
+   },
+   {
+    "fields": [
+     {
+      "name": "blog",
+      "type": "STRING"
+     },
+     {
+      "name": "company",
+      "type": "STRING"
+     },
+     {
+      "name": "email",
+      "type": "STRING"
+     },
+     {
+      "name": "gravatar_id",
+      "type": "STRING"
+     },
+     {
+      "name": "location",
+      "type": "STRING"
+     },
+     {
+      "name": "login",
+      "type": "STRING"
+     },
+     {
+      "name": "name",
+      "type": "STRING"
+     },
+     {
+      "name": "type",
+      "type": "STRING"
+     }
+    ],
+    "name": "actor_attributes",
+    "type": "RECORD"
+   },
+   {
+    "name": "created_at",
+    "type": "STRING"
+   },
+   {
+    "name": "public",
+    "type": "BOOLEAN"
+   },
+   {
+    "name": "actor",
+    "type": "STRING"
+   },
+   {
+    "fields": [
+     {
+      "name": "action",
+      "type": "STRING"
+     },
+     {
+      "name": "after",
+      "type": "STRING"
+     },
+     {
+      "name": "before",
+      "type": "STRING"
+     },
+     {
+      "name": "commit",
+      "type": "STRING"
+     },
+     {
+      "fields": [
+       {
+        "name": "commit_id",
+        "type": "STRING"
+       },
+       {
+        "name": "body",
+        "type": "STRING"
+       },
+       {
+        "name": "created_at",
+        "type": "STRING"
+       },
+       {
+        "name": "id",
+        "type": "INTEGER"
+       },
+       {
+        "name": "original_commit_id",
+        "type": "STRING"
+       },
+       {
+        "name": "original_position",
+        "type": "INTEGER"
+       },
+       {
+        "name": "path",
+        "type": "STRING"
+       },
+       {
+        "name": "position",
+        "type": "INTEGER"
+       },
+       {
+        "name": "updated_at",
+        "type": "STRING"
+       },
+       {
+        "fields": [
+         {
+          "name": "id",
+          "type": "INTEGER"
+         },
+         {
+          "name": "gravatar_id",
+          "type": "STRING"
+         },
+         {
+          "name": "avatar_url",
+          "type": "STRING"
+         },
+         {
+          "name": "login",
+          "type": "STRING"
+         },
+         {
+          "name": "url",
+          "type": "STRING"
+         }
+        ],
+        "name": "user",
+        "type": "RECORD"
+       },
+       {
+        "name": "url",
+        "type": "STRING"
+       }
+      ],
+      "name": "comment",
+      "type": "RECORD"
+     },
+     {
+      "name": "comment_id",
+      "type": "INTEGER"
+     },
+     {
+      "name": "desc",
+      "type": "STRING"
+     },
+     {
+      "name": "description",
+      "type": "STRING"
+     },
+     {
+      "name": "head",
+      "type": "STRING"
+     },
+     {
+      "name": "id",
+      "type": "INTEGER"
+     },
+     {
+      "name": "issue",
+      "type": "INTEGER"
+     },
+     {
+      "name": "issue_id",
+      "type": "INTEGER"
+     },
+     {
+      "name": "master_branch",
+      "type": "STRING"
+     },
+     {
+      "name": "master",
+      "type": "STRING"
+     },
+     {
+      "fields": [
+       {
+        "name": "id",
+        "type": "INTEGER"
+       },
+       {
+        "name": "gravatar_id",
+        "type": "STRING"
+       },
+       {
+        "name": "avatar_url",
+        "type": "STRING"
+       },
+       {
+        "name": "login",
+        "type": "STRING"
+       },
+       {
+        "name": "url",
+        "type": "STRING"
+       }
+      ],
+      "name": "member",
+      "type": "RECORD"
+     },
+     {
+      "name": "name",
+      "type": "STRING"
+     },
+     {
+      "name": "number",
+      "type": "INTEGER"
+     },
+     {
+      "fields": [
+       {
+        "name": "action",
+        "type": "STRING"
+       },
+       {
+        "name": "html_url",
+        "type": "STRING"
+       },
+       {
+        "name": "page_name",
+        "type": "STRING"
+       },
+       {
+        "name": "sha",
+        "type": "STRING"
+       },
+       {
+        "name": "summary",
+        "type": "STRING"
+       },
+       {
+        "name": "title",
+        "type": "STRING"
+       }
+      ],
+      "mode": "REPEATED",
+      "name": "pages",
+      "type": "RECORD"
+     },
+     {
+      "fields": [
+       {
+        "name": "additions",
+        "type": "INTEGER"
+       },
+       {
+        "fields": [
+         {
+          "fields": [
+           {
+            "name": "clone_url",
+            "type": "STRING"
+           },
+           {
+            "name": "created_at",
+            "type": "STRING"
+           },
+           {
+            "name": "description",
+            "type": "STRING"
+           },
+           {
+            "name": "fork",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "forks",
+            "type": "INTEGER"
+           },
+           {
+            "name": "git_url",
+            "type": "STRING"
+           },
+           {
+            "name": "has_downloads",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "has_issues",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "has_wiki",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "homepage",
+            "type": "STRING"
+           },
+           {
+            "name": "html_url",
+            "type": "STRING"
+           },
+           {
+            "name": "id",
+            "type": "INTEGER"
+           },
+           {
+            "name": "language",
+            "type": "STRING"
+           },
+           {
+            "name": "master_branch",
+            "type": "STRING"
+           },
+           {
+            "name": "name",
+            "type": "STRING"
+           },
+           {
+            "name": "open_issues",
+            "type": "INTEGER"
+           },
+           {
+            "fields": [
+             {
+              "name": "id",
+              "type": "INTEGER"
+             },
+             {
+              "name": "gravatar_id",
+              "type": "STRING"
+             },
+             {
+              "name": "avatar_url",
+              "type": "STRING"
+             },
+             {
+              "name": "login",
+              "type": "STRING"
+             },
+             {
+              "name": "url",
+              "type": "STRING"
+             }
+            ],
+            "name": "owner",
+            "type": "RECORD"
+           },
+           {
+            "name": "private",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "pushed_at",
+            "type": "STRING"
+           },
+           {
+            "name": "size",
+            "type": "INTEGER"
+           },
+           {
+            "name": "ssh_url",
+            "type": "STRING"
+           },
+           {
+            "name": "svn_url",
+            "type": "STRING"
+           },
+           {
+            "name": "updated_at",
+            "type": "STRING"
+           },
+           {
+            "name": "watchers",
+            "type": "INTEGER"
+           },
+           {
+            "name": "url",
+            "type": "STRING"
+           }
+          ],
+          "name": "repo",
+          "type": "RECORD"
+         },
+         {
+          "name": "sha",
+          "type": "STRING"
+         },
+         {
+          "name": "ref",
+          "type": "STRING"
+         },
+         {
+          "fields": [
+           {
+            "name": "id",
+            "type": "INTEGER"
+           },
+           {
+            "name": "gravatar_id",
+            "type": "STRING"
+           },
+           {
+            "name": "avatar_url",
+            "type": "STRING"
+           },
+           {
+            "name": "login",
+            "type": "STRING"
+           },
+           {
+            "name": "url",
+            "type": "STRING"
+           }
+          ],
+          "name": "user",
+          "type": "RECORD"
+         },
+         {
+          "name": "label",
+          "type": "STRING"
+         }
+        ],
+        "name": "base",
+        "type": "RECORD"
+       },
+       {
+        "name": "body",
+        "type": "STRING"
+       },
+       {
+        "name": "changed_files",
+        "type": "INTEGER"
+       },
+       {
+        "name": "closed_at",
+        "type": "STRING"
+       },
+       {
+        "name": "comments",
+        "type": "INTEGER"
+       },
+       {
+        "name": "commits",
+        "type": "INTEGER"
+       },
+       {
+        "name": "created_at",
+        "type": "STRING"
+       },
+       {
+        "name": "deletions",
+        "type": "INTEGER"
+       },
+       {
+        "name": "diff_url",
+        "type": "STRING"
+       },
+       {
+        "fields": [
+         {
+          "fields": [
+           {
+            "name": "clone_url",
+            "type": "STRING"
+           },
+           {
+            "name": "created_at",
+            "type": "STRING"
+           },
+           {
+            "name": "description",
+            "type": "STRING"
+           },
+           {
+            "name": "fork",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "forks",
+            "type": "INTEGER"
+           },
+           {
+            "name": "git_url",
+            "type": "STRING"
+           },
+           {
+            "name": "has_downloads",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "has_issues",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "has_wiki",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "homepage",
+            "type": "STRING"
+           },
+           {
+            "name": "html_url",
+            "type": "STRING"
+           },
+           {
+            "name": "id",
+            "type": "INTEGER"
+           },
+           {
+            "name": "language",
+            "type": "STRING"
+           },
+           {
+            "name": "master_branch",
+            "type": "STRING"
+           },
+           {
+            "name": "name",
+            "type": "STRING"
+           },
+           {
+            "name": "open_issues",
+            "type": "INTEGER"
+           },
+           {
+            "fields": [
+             {
+              "name": "id",
+              "type": "INTEGER"
+             },
+             {
+              "name": "gravatar_id",
+              "type": "STRING"
+             },
+             {
+              "name": "avatar_url",
+              "type": "STRING"
+             },
+             {
+              "name": "login",
+              "type": "STRING"
+             },
+             {
+              "name": "url",
+              "type": "STRING"
+             }
+            ],
+            "name": "owner",
+            "type": "RECORD"
+           },
+           {
+            "name": "private",
+            "type": "BOOLEAN"
+           },
+           {
+            "name": "pushed_at",
+            "type": "STRING"
+           },
+           {
+            "name": "size",
+            "type": "INTEGER"
+           },
+           {
+            "name": "ssh_url",
+            "type": "STRING"
+           },
+           {
+            "name": "svn_url",
+            "type": "STRING"
+           },
+           {
+            "name": "updated_at",
+            "type": "STRING"
+           },
+           {
+            "name": "watchers",
+            "type": "INTEGER"
+           },
+           {
+            "name": "url",
+            "type": "STRING"
+           }
+          ],
+          "name": "repo",
+          "type": "RECORD"
+         },
+         {
+          "name": "sha",
+          "type": "STRING"
+         },
+         {
+          "name": "ref",
+          "type": "STRING"
+         },
+         {
+          "fields": [
+           {
+            "name": "id",
+            "type": "INTEGER"
+           },
+           {
+            "name": "gravatar_id",
+            "type": "STRING"
+           },
+           {
+            "name": "avatar_url",
+            "type": "STRING"
+           },
+           {
+            "name": "login",
+            "type": "STRING"
+           },
+           {
+            "name": "url",
+            "type": "STRING"
+           }
+          ],
+          "name": "user",
+          "type": "RECORD"
+         },
+         {
+          "name": "label",
+          "type": "STRING"
+         }
+        ],
+        "name": "head",
+        "type": "RECORD"
+       },
+       {
+        "name": "html_url",
+        "type": "STRING"
+       },
+       {
+        "name": "issue_url",
+        "type": "STRING"
+       },
+       {
+        "name": "id",
+        "type": "INTEGER"
+       },
+       {
+        "fields": [
+         {
+          "fields": [
+           {
+            "name": "href",
+            "type": "STRING"
+           }
+          ],
+          "name": "self",
+          "type": "RECORD"
+         },
+         {
+          "fields": [
+           {
+            "name": "href",
+            "type": "STRING"
+           }
+          ],
+          "name": "html",
+          "type": "RECORD"
+         },
+         {
+          "fields": [
+           {
+            "name": "href",
+            "type": "STRING"
+           }
+          ],
+          "name": "review_comments",
+          "type": "RECORD"
+         },
+         {
+          "fields": [
+           {
+            "name": "href",
+            "type": "STRING"
+           }
+          ],
+          "name": "comments",
+          "type": "RECORD"
+         }
+        ],
+        "name": "_links",
+        "type": "RECORD"
+       },
+       {
+        "name": "mergeable",
+        "type": "BOOLEAN"
+       },
+       {
+        "name": "merged",
+        "type": "BOOLEAN"
+       },
+       {
+        "name": "merged_at",
+        "type": "STRING"
+       },
+       {
+        "fields": [
+         {
+          "name": "id",
+          "type": "INTEGER"
+         },
+         {
+          "name": "gravatar_id",
+          "type": "STRING"
+         },
+         {
+          "name": "avatar_url",
+          "type": "STRING"
+         },
+         {
+          "name": "login",
+          "type": "STRING"
+         },
+         {
+          "name": "url",
+          "type": "STRING"
+         }
+        ],
+        "name": "merged_by",
+        "type": "RECORD"
+       },
+       {
+        "name": "number",
+        "type": "INTEGER"
+       },
+       {
+        "name": "patch_url",
+        "type": "STRING"
+       },
+       {
+        "name": "review_comments",
+        "type": "INTEGER"
+       },
+       {
+        "name": "state",
+        "type": "STRING"
+       },
+       {
+        "name": "title",
+        "type": "STRING"
+       },
+       {
+        "name": "updated_at",
+        "type": "STRING"
+       },
+       {
+        "name": "url",
+        "type": "STRING"
+       },
+       {
+        "fields": [
+         {
+          "name": "id",
+          "type": "INTEGER"
+         },
+         {
+          "name": "gravatar_id",
+          "type": "STRING"
+         },
+         {
+          "name": "avatar_url",
+          "type": "STRING"
+         },
+         {
+          "name": "login",
+          "type": "STRING"
+         },
+         {
+          "name": "url",
+          "type": "STRING"
+         }
+        ],
+        "name": "user",
+        "type": "RECORD"
+       }
+      ],
+      "name": "pull_request",
+      "type": "RECORD"
+     },
+     {
+      "name": "ref",
+      "type": "STRING"
+     },
+     {
+      "name": "ref_type",
+      "type": "STRING"
+     },
+     {
+      "name": "size",
+      "type": "INTEGER"
+     },
+     {
+      "fields": [
+       {
+        "name": "encoded",
+        "type": "STRING"
+       },
+       {
+        "name": "actor_email",
+        "type": "STRING"
+       },
+       {
+        "name": "message",
+        "type": "STRING"
+       },
+       {
+        "name": "actor_login",
+        "type": "STRING"
+       }
+      ],
+      "mode": "REPEATED",
+      "name": "shas",
+      "type": "RECORD"
+     },
+     {
+      "fields": [
+       {
+        "name": "login",
+        "type": "STRING"
+       },
+       {
+        "name": "repos",
+        "type": "INTEGER"
+       },
+       {
+        "name": "followers",
+        "type": "INTEGER"
+       },
+       {
+        "name": "id",
+        "type": "INTEGER"
+       },
+       {
+        "name": "gravatar_id",
+        "type": "STRING"
+       }
+      ],
+      "name": "target",
+      "type": "RECORD"
+     },
+     {
+      "name": "url",
+      "type": "STRING"
+     }
+    ],
+    "name": "payload",
+    "type": "RECORD"
+   },
+   {
+    "name": "url",
+    "type": "STRING"
+   },
+   {
+    "name": "type",
+    "type": "STRING"
+   }
+  ]
+ },
+ "tableReference": {
+  "datasetId": "samples",
+  "projectId": "bigquery-public-data",
+  "tableId": "github_nested"
+ },
+ "type": "TABLE"
+}

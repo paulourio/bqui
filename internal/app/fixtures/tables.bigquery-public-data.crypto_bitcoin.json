@@ -1,0 +1,50 @@
+{
+ "tables": [
+  {
+   "creationTime": "1786049584941",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "crypto_bitcoin",
+    "projectId": "bigquery-public-data",
+    "tableId": "blocks"
+   },
+   "type": "VIEW",
+   "view": {
+    "privacyPolicy": {}
+   }
+  },
+  {
+   "creationTime": "1786049592584",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "crypto_bitcoin",
+    "projectId": "bigquery-public-data",
+    "tableId": "inputs"
+   },
+   "type": "VIEW"
+  },
+  {
+   "creationTime": "1786049600155",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "crypto_bitcoin",
+    "projectId": "bigquery-public-data",
+    "tableId": "outputs"
+   },
+   "type": "VIEW"
+  },
+  {
+   "creationTime": "1786049607772",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "crypto_bitcoin",
+    "projectId": "bigquery-public-data",
+    "tableId": "transactions"
+   },
+   "type": "VIEW",
+   "view": {
+    "privacyPolicy": {}
+   }
+  }
+ ]
+}

@@ -159,3 +159,26 @@ func (c *Client) ListModels(ctx context.Context, ds DatasetRef) ([]*bigquery.Mod
 
 	return out, nil
 }
+
+// ObjectRef identifies a dataset-scoped object (table, view, routine, model).
+type ObjectRef = TableRef
+
+// GetRoutine returns full routine metadata (arguments, body, return type).
+func (c *Client) GetRoutine(ctx context.Context, ref ObjectRef) (*bigquery.Routine, error) {
+	r, err := c.svc.Routines.Get(ref.Project, ref.Dataset, ref.Table).Context(ctx).Do()
+	if err != nil {
+		return nil, fmt.Errorf("bq: get routine %s: %w", ref, err)
+	}
+
+	return r, nil
+}
+
+// GetModel returns full BigQuery ML model metadata.
+func (c *Client) GetModel(ctx context.Context, ref ObjectRef) (*bigquery.Model, error) {
+	m, err := c.svc.Models.Get(ref.Project, ref.Dataset, ref.Table).Context(ctx).Do()
+	if err != nil {
+		return nil, fmt.Errorf("bq: get model %s: %w", ref, err)
+	}
+
+	return m, nil
+}

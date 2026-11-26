@@ -23,6 +23,7 @@ const (
 	KindRoutine
 	KindModel
 	KindPlaceholder // "Loading…", errors, empty markers
+	KindShardGroup  // date-sharded tables (events_20240101, ...) shown as one node
 )
 
 var kindNames = [...]string{
@@ -38,6 +39,7 @@ var kindNames = [...]string{
 	KindRoutine:          "routine",
 	KindModel:            "model",
 	KindPlaceholder:      "placeholder",
+	KindShardGroup:       "sharded table",
 }
 
 func (k NodeKind) String() string {
@@ -51,7 +53,7 @@ func (k NodeKind) String() string {
 // Container reports whether nodes of this kind can have children.
 func (k NodeKind) Container() bool {
 	switch k {
-	case KindRoot, KindSection, KindProject, KindDataset:
+	case KindRoot, KindSection, KindProject, KindDataset, KindShardGroup:
 		return true
 	case KindTable, KindView, KindMaterializedView, KindExternalTable,
 		KindSnapshot, KindRoutine, KindModel, KindPlaceholder:
@@ -165,6 +167,16 @@ func (t *Tree) Children(id uint64) []uint64 {
 	}
 
 	return append([]uint64(nil), n.Children...)
+}
+
+// SetTitle changes a node's title and detail.
+func (t *Tree) SetTitle(id uint64, title, detail string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if n, ok := t.nodes[id]; ok {
+		n.Title, n.Detail = title, detail
+	}
 }
 
 // Path returns the titles from the top-level ancestor down to id.

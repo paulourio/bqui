@@ -1,0 +1,555 @@
+{
+ "nextPageToken": "cw_mode_boolean",
+ "routines": [
+  {
+   "creationTime": "1768947154892",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154892",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "azimuth_to_geog_point"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154908",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154908",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_add"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154943",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154943",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_avg"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154899",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154899",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_div"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154922",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154922",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_eq"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155086",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155086",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_gt"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154993",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154993",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_gte"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154947",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154947",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_lt"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154990",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154990",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_lte"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154930",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154930",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_mul"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154971",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154971",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_sub"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154930",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154930",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "bignumber_sum"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155079",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155079",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "chisquare_cdf"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154969",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154969",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "corr_pvalue"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947160615",
+   "language": "SQL",
+   "lastModifiedTime": "1768947160615",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "csv_to_struct"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154960",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154960",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_array_compact"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154969",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154969",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_array_distinct"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154974",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154974",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_array_max"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154962",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154962",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_array_median"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154964",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154964",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_array_min"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155026",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155026",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_array_overlap"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154952",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154952",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_array_stable_distinct"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947160582",
+   "language": "SQL",
+   "lastModifiedTime": "1768947160582",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_comparable_format_bigint"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155013",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155013",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_comparable_format_bigint_t"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947160604",
+   "language": "SQL",
+   "lastModifiedTime": "1768947160604",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_comparable_format_varchar"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155021",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155021",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_comparable_format_varchar_t"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154986",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154986",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_convert_base"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154969",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154969",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_csvld"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154993",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154993",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_disjoint_all_partitions_by_regexp"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154984",
+   "language": "SQL",
+   "lastModifiedTime": "1768947154984",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_disjoint_partition_by_regexp"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154996",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154996",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_editdistance"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155020",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155020",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_error_number"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947154972",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947154972",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_error_severity"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155606",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155606",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_error_state"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155594",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155594",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_find_in_list"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155615",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155615",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_from_base"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155589",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155589",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_getbit"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155997",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155997",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_getbit_binary"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155612",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155612",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_initcap"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155633",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155633",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_instr4"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155605",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155605",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_json_array_contains_bool"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155634",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155634",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_json_array_contains_num"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155648",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155648",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_json_array_contains_str"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155592",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155592",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_json_array_get"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155596",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155596",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_json_array_length"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155586",
+   "language": "JAVASCRIPT",
+   "lastModifiedTime": "1768947155586",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_json_enumerate_array"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155603",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155603",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_lower_case_ascii_only"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947156025",
+   "language": "SQL",
+   "lastModifiedTime": "1768947156025",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_map_create"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155605",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155605",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_map_get"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  },
+  {
+   "creationTime": "1768947155644",
+   "language": "SQL",
+   "lastModifiedTime": "1768947155644",
+   "routineReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data",
+    "routineId": "cw_map_parse"
+   },
+   "routineType": "SCALAR_FUNCTION"
+  }
+ ]
+}

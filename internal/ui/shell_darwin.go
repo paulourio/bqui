@@ -5,15 +5,20 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/paulourio/bqlang/bqconfig"
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
+	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/objc"
+	"github.com/paulourio/bqui/internal/store"
 )
 
 // AppName is the user-visible application name.
@@ -23,15 +28,18 @@ const (
 	defaultWidth     = 1280
 	defaultHeight    = 800
 	sidebarMin       = 220
-	sidebarMax       = 420
-	inspectorMin     = 240
-	inspectorMax     = 400
+	sidebarMax       = 480
+	inspectorMin     = 300
+	inspectorMax     = 720
+	inspectorWidth   = 440
 	editorMin        = 120
 	resultsMin       = 120
 	resultsHolding   = 240 // results pane gives space before the editor
 	editorHolding    = 260
 	windowAutosaveID = "BQUIMainWindow"
 	editorShare      = 0.55
+	projectsTimeout  = 30 * time.Second
+	projectPickerW   = 220
 )
 
 // Options configures the shell.
@@ -40,32 +48,44 @@ type Options struct {
 	Deterministic bool
 	// Inspectable enables the Safari Web Inspector for the editor.
 	Inspectable bool
+	// Backend serves BigQuery metadata (real client or fixtures).
+	Backend app.Backend
+	// Live is true when Backend talks to BigQuery (enables bqls API access).
+	Live bool
+	// Settings and SettingsPath persist pinned projects and the billing project.
+	Settings     *store.Settings
+	SettingsPath string
 }
 
 // Shell is the main window and its panes.
 type Shell struct {
-	App     objc.ID
-	Window  objc.ID
-	Split   objc.ID // outer NSSplitViewController (sidebar | content | inspector)
-	Sidebar *appkit.Outline
-	Editor  *EditorPane
-	Cost    objc.ID // toolbar cost estimate label
-	Results objc.ID // results placeholder label
-	Detail  objc.ID // inspector label
+	App       objc.ID
+	Window    objc.ID
+	Split     objc.ID // outer NSSplitViewController (sidebar | content | inspector)
+	Explorer  *ExplorerPane
+	Inspector *InspectorPane
+	Editor    *EditorPane
+	Cost      objc.ID // toolbar cost estimate label
+	Results   objc.ID // results placeholder label
 
-	tree *app.Tree
+	opts     Options
+	settings *store.Settings
+	projects objc.ID // toolbar project picker (NSPopUpButton)
+	all      []string
 }
 
 // NewShell builds the application menu, main window, toolbar and panes.
 func NewShell(opts Options) (*Shell, error) {
-	s := &Shell{App: appkit.SharedApplication(), tree: demoTree()}
+	if opts.Settings == nil {
+		opts.Settings = &store.Settings{PinnedProjects: []string{store.DefaultPinned}}
+	}
+
+	s := &Shell{App: appkit.SharedApplication(), opts: opts, settings: opts.Settings}
 
 	appkit.SetMainMenu(s.App, s.menus())
 
-	s.Sidebar = appkit.NewOutline(treeSource{s.tree}, s.onSelect)
-
 	ed, err := NewEditorPane(EditorOptions{
-		LSP:         lspOptions(),
+		LSP:         s.lspOptions(),
 		Inspectable: opts.Inspectable,
 		OnRun:       s.onRun,
 		OnCost:      s.onCost,
@@ -83,10 +103,10 @@ func NewShell(opts Options) (*Shell, error) {
 	s.Editor.SetText(sampleSQL)
 	appkit.SetIdentifier(s.Editor.Web.View, "editor")
 
-	s.Results = appkit.Label("Run a query with ⌘↩ to see results here.", 0)
-	objc.Msg(s.Results, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
-	s.Detail = appkit.Label("No selection", 0)
-	objc.Msg(s.Detail, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
+	s.Inspector = newInspectorPane(s, opts.Backend)
+	s.Explorer = newExplorerPane(s, opts.Backend)
+
+	s.Results = appkit.SecondaryLabel("Run a query with ⌘↩ to see results here.")
 
 	autosave := func(name string) string {
 		if opts.Deterministic {
@@ -99,18 +119,15 @@ func NewShell(opts Options) (*Shell, error) {
 	resultsView := appkit.NewView()
 	appkit.AddCentered(resultsView, s.Results)
 
-	inspectorView := appkit.NewView()
-	appkit.AddCentered(inspectorView, s.Detail)
-
 	content := appkit.SplitViewController(false, autosave("BQUIEditorResults"), []appkit.SplitItem{
 		{Controller: appkit.ViewController(s.Editor.Web.View), MinThickness: editorMin, HoldingWeight: editorHolding},
 		{Controller: appkit.ViewController(resultsView), MinThickness: resultsMin, HoldingWeight: resultsHolding},
 	})
 
 	s.Split = appkit.SplitViewController(true, autosave("BQUIMainSplit"), []appkit.SplitItem{
-		{Kind: appkit.SplitSidebar, Controller: appkit.ViewController(s.Sidebar.Scroll), MinThickness: sidebarMin, MaxThickness: sidebarMax},
+		{Kind: appkit.SplitSidebar, Controller: appkit.ViewController(s.Explorer.View), MinThickness: sidebarMin, MaxThickness: sidebarMax},
 		{Kind: appkit.SplitContent, Controller: content},
-		{Kind: appkit.SplitInspector, Controller: appkit.ViewController(inspectorView), MinThickness: inspectorMin, MaxThickness: inspectorMax},
+		{Kind: appkit.SplitInspector, Controller: appkit.ViewController(s.Inspector.View), MinThickness: inspectorMin, MaxThickness: inspectorMax},
 	})
 
 	s.Window = appkit.NewWindow(AppName, appkit.MakeRect(0, 0, defaultWidth, defaultHeight))
@@ -126,12 +143,18 @@ func NewShell(opts Options) (*Shell, error) {
 	h := objc.Send[appkit.Rect](innerSplit, "bounds").Size.Height
 	objc.Msg(innerSplit, "setPosition:ofDividerAtIndex:", h*editorShare, int64(0))
 
+	// Inspector starts wide enough for a schema (divider 1: content | inspector).
+	outer := objc.Msg(s.Split, "splitView")
+	w := objc.Send[appkit.Rect](outer, "bounds").Size.Width
+	objc.Msg(outer, "setPosition:ofDividerAtIndex:", w-inspectorWidth, int64(1))
+
 	if !opts.Deterministic {
 		objc.Send[bool](s.Window, "setFrameAutosaveName:", objc.String(windowAutosaveID))
 	}
 
-	s.Sidebar.Reload(0)
-	s.Sidebar.Expand(0, true)
+	s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
+	s.rebuildProjectPicker()
+	s.loadProjects()
 
 	objc.Msg(s.Window, "makeKeyAndOrderFront:", objc.Nil)
 	objc.Msg(s.Window, "makeFirstResponder:", s.Editor.Web.View)
@@ -140,18 +163,128 @@ func NewShell(opts Options) (*Shell, error) {
 }
 
 // lspOptions configures the embedded bqls. Live BigQuery metadata and dry
-// runs use bqlang's ADC/gcloud credentials; without them bqls degrades to
-// offline analysis.
-func lspOptions() *bqconfig.LSPOptions {
+// runs use bqlang's ADC/gcloud credentials; with the fake backend bqls stays
+// offline.
+func (s *Shell) lspOptions() *bqconfig.LSPOptions {
 	o := bqconfig.DefaultLSPOptions()
-	o.DefaultProject = os.Getenv("GOOGLE_CLOUD_PROJECT")
-	o.BigQueryAPIEnabled = o.DefaultProject != ""
+	o.DefaultProject = s.settings.BillingProject
+	o.BigQueryAPIEnabled = s.opts.Live && o.DefaultProject != ""
 
 	return o
 }
 
-// Tree exposes the explorer model (for tests and smoke checks).
-func (s *Shell) Tree() *app.Tree { return s.tree }
+// BillingProject returns the project jobs run in.
+func (s *Shell) BillingProject() string { return s.settings.BillingProject }
+
+// SetBillingProject switches the billing project, pins it, retargets bqls
+// and persists the choice.
+func (s *Shell) SetBillingProject(project string) {
+	if project == "" {
+		return
+	}
+
+	s.settings.BillingProject = project
+	if s.settings.Pin(project) {
+		s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
+	}
+
+	s.Editor.SetDefaultProject(project, s.opts.Live)
+	s.rebuildProjectPicker()
+	s.saveSettings()
+}
+
+// UnpinProject removes a project from the explorer.
+func (s *Shell) UnpinProject(project string) {
+	if s.settings.Unpin(project) {
+		s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
+		s.rebuildProjectPicker()
+		s.saveSettings()
+	}
+}
+
+func (s *Shell) saveSettings() {
+	if s.opts.SettingsPath == "" {
+		return
+	}
+
+	if err := s.settings.Save(s.opts.SettingsPath); err != nil {
+		fmt.Fprintln(os.Stderr, "bqui:", err)
+	}
+}
+
+// loadProjects lists all accessible projects in the background for the picker.
+func (s *Shell) loadProjects() {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), projectsTimeout)
+		defer cancel()
+
+		ps, err := s.opts.Backend.ListProjects(ctx)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "bqui: list projects:", err)
+
+			return
+		}
+
+		ids := make([]string, 0, len(ps))
+		for _, p := range ps {
+			ids = append(ids, p.ID)
+		}
+
+		slices.Sort(ids)
+
+		objc.Main(func() {
+			s.all = ids
+			s.rebuildProjectPicker()
+		})
+	}()
+}
+
+// rebuildProjectPicker lists pinned projects first, then every other
+// accessible project; the selection is the billing project.
+func (s *Shell) rebuildProjectPicker() {
+	if s.projects == objc.Nil {
+		return
+	}
+
+	objc.Msg(s.projects, "removeAllItems")
+	menu := objc.Msg(s.projects, "menu")
+
+	add := func(title string, enabled bool) {
+		item := objc.Msg(menu, "addItemWithTitle:action:keyEquivalent:", objc.String(title), objc.SEL(0), objc.String(""))
+		objc.Msg(item, "setEnabled:", enabled)
+	}
+
+	if s.settings.BillingProject == "" {
+		add("Choose billing project…", true)
+	}
+
+	for _, p := range s.settings.PinnedProjects {
+		add(p, true)
+	}
+
+	others := slices.DeleteFunc(slices.Clone(s.all), func(p string) bool { return slices.Contains(s.settings.PinnedProjects, p) })
+	if len(others) > 0 {
+		objc.Msg(menu, "addItem:", objc.Msg(objc.Cls("NSMenuItem"), "separatorItem"))
+		add("Other projects", false)
+
+		for _, p := range others {
+			add(p, true)
+		}
+	}
+
+	if s.settings.BillingProject != "" {
+		objc.Msg(s.projects, "selectItemWithTitle:", objc.String(s.settings.BillingProject))
+	}
+}
+
+func (s *Shell) onProjectPicked() {
+	title := objc.GoString(objc.Msg(s.projects, "titleOfSelectedItem"))
+	if title == "" || strings.HasSuffix(title, "…") {
+		return
+	}
+
+	s.SetBillingProject(title)
+}
 
 func (s *Shell) menus() []appkit.Menu {
 	cmd, shift, ctrl, opt := appkit.ModCommand, appkit.ModShift, appkit.ModControl, appkit.ModOption
@@ -182,10 +315,13 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Paste", Action: "paste:", Key: "v"},
 			{Title: "Select All", Action: "selectAll:", Key: "a"},
 			{},
-			{Title: "Find…", Action: "performTextFinderAction:", Key: "f", Tag: textFinderShowFind},
-			{Title: "Find and Replace…", Action: "performTextFinderAction:", Key: "f", Mods: cmd | opt, Tag: textFinderShowReplace},
-			{Title: "Find Next", Action: "performTextFinderAction:", Key: "g", Tag: textFinderNext},
-			{Title: "Find Previous", Action: "performTextFinderAction:", Key: "g", Mods: cmd | shift, Tag: textFinderPrevious},
+			// Monaco handles these keys itself; the menu items cover mouse use.
+			{Title: "Find…", Key: "f", Run: func() { s.Editor.Action("actions.find") }},
+			{Title: "Find and Replace…", Key: "f", Mods: cmd | opt, Run: func() { s.Editor.Action("editor.action.startFindReplaceAction") }},
+			{Title: "Find Next", Key: "g", Run: func() { s.Editor.Action("editor.action.nextMatchFindAction") }},
+			{Title: "Find Previous", Key: "g", Mods: cmd | shift, Run: func() { s.Editor.Action("editor.action.previousMatchFindAction") }},
+			{},
+			{Title: "Command Palette…", Key: "p", Mods: cmd | shift, Run: func() { s.Editor.Action("editor.action.quickCommand") }},
 		}},
 		{Title: "View", Items: []appkit.MenuItem{
 			{Title: "Toggle Sidebar", Action: "toggleSidebar:", Key: "s", Mods: cmd | ctrl},
@@ -212,28 +348,21 @@ func (s *Shell) menus() []appkit.Menu {
 	}
 }
 
-// NSTextFinderAction tags.
-const (
-	textFinderShowFind    = 1
-	textFinderNext        = 2
-	textFinderPrevious    = 3
-	textFinderShowReplace = 12
-)
-
 func (s *Shell) toolbarItems() []*appkit.ToolbarItem {
-	projects := objc.Msg(objc.Msg(objc.Cls("NSPopUpButton"), "alloc"), "initWithFrame:pullsDown:", appkit.MakeRect(0, 0, 220, 24), false)
-	objc.Msg(projects, "addItemsWithTitles:", objc.Array(objc.String("bigquery-public-data"), objc.String("my-sandbox-project")))
-	objc.Msg(projects, "setToolTip:", objc.String("Billing project for queries"))
+	s.projects = objc.Msg(objc.Msg(objc.Cls("NSPopUpButton"), "alloc"), "initWithFrame:pullsDown:", appkit.MakeRect(0, 0, projectPickerW, 24), false)
+	objc.Msg(s.projects, "setToolTip:", objc.String("Billing project for queries (also bqls' default project)"))
+	objc.Msg(s.projects, "setAutoenablesItems:", false)
+	objc.Msg(s.projects, "setTarget:", objc.NewTarget(func(objc.ID) { s.onProjectPicked() }))
+	objc.Msg(s.projects, "setAction:", objc.Sel(objc.ActionSelector))
 
-	cost := appkit.Label("—", 0)
-	objc.Msg(cost, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
+	cost := appkit.SecondaryLabel("—")
 	objc.Msg(cost, "setToolTip:", objc.String("Estimated bytes processed (bqls dry run)"))
 	s.Cost = cost
 
 	return []*appkit.ToolbarItem{
 		{Kind: appkit.ToolbarToggleSidebar},
 		{Kind: appkit.ToolbarSidebarSeparator},
-		{ID: "project", Kind: appkit.ToolbarCustomView, Label: "Project", View: projects},
+		{ID: "project", Kind: appkit.ToolbarCustomView, Label: "Project", View: s.projects},
 		{Kind: appkit.ToolbarFlexibleSpace},
 		{ID: "run", Kind: appkit.ToolbarButton, Label: "Run", Symbol: "play.fill", ToolTip: "Run (⌘↩)", Run: func() { s.Editor.RequestRun(false) }},
 		{ID: "stop", Kind: appkit.ToolbarButton, Label: "Stop", Symbol: "stop.fill", ToolTip: "Stop (⌘.)", Run: func() { s.status("Nothing is running.") }},
@@ -285,76 +414,25 @@ func (s *Shell) status(msg string) {
 	appkit.SetString(s.Results, msg)
 }
 
-func (s *Shell) onSelect(id uint64) {
-	n, ok := s.tree.Node(id)
-	if !ok {
-		appkit.SetString(s.Detail, "No selection")
-
+// ResolveBillingProject fills in the billing project from gcloud/env when
+// none is saved yet (runs gcloud off the main thread).
+func (s *Shell) ResolveBillingProject() {
+	if s.settings.BillingProject != "" || !s.opts.Live {
 		return
 	}
 
-	appkit.SetString(s.Detail, fmt.Sprintf("%s\n%s", strings.Join(s.tree.Path(id), "."), n.Kind))
-}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), projectsTimeout)
+		defer cancel()
 
-// treeSource adapts app.Tree to appkit.OutlineSource.
-type treeSource struct{ t *app.Tree }
-
-func (ts treeSource) Children(parent uint64) []uint64 { return ts.t.Children(parent) }
-
-func (ts treeSource) Expandable(item uint64) bool {
-	n, ok := ts.t.Node(item)
-
-	return ok && n.Kind.Container() && len(n.Children) > 0
-}
-
-func (ts treeSource) Cell(item uint64) appkit.OutlineCell {
-	n, _ := ts.t.Node(item)
-
-	return appkit.OutlineCell{Title: n.Title, Symbol: kindSymbol(n.Kind), ToolTip: n.Detail, Group: n.Kind == app.KindSection}
-}
-
-func kindSymbol(k app.NodeKind) string {
-	switch k {
-	case app.KindProject:
-		return "shippingbox"
-	case app.KindDataset:
-		return "cylinder.split.1x2"
-	case app.KindTable:
-		return "tablecells"
-	case app.KindView, app.KindMaterializedView:
-		return "eye"
-	case app.KindExternalTable:
-		return "externaldrive.connected.to.line.below"
-	case app.KindSnapshot:
-		return "camera"
-	case app.KindRoutine:
-		return "function"
-	case app.KindModel:
-		return "brain"
-	case app.KindRoot, app.KindSection, app.KindPlaceholder:
-	}
-
-	return ""
-}
-
-// demoTree is static placeholder content until the explorer is wired to
-// BigQuery in M3.
-func demoTree() *app.Tree {
-	t := app.NewTree()
-	sec := t.Add(app.RootID, app.KindSection, "Explorer", "")
-	p := t.Add(sec, app.KindProject, "bigquery-public-data", "")
-	samples := t.Add(p, app.KindDataset, "samples", "US")
-	t.Add(samples, app.KindTable, "github_nested", "")
-	t.Add(samples, app.KindTable, "shakespeare", "")
-	t.Add(samples, app.KindTable, "wikipedia", "")
-	ga := t.Add(p, app.KindDataset, "google_analytics_sample", "US")
-	t.Add(ga, app.KindTable, "ga_sessions_20170801", "")
-	t.Add(p, app.KindDataset, "usa_names", "US")
-
-	saved := t.Add(app.RootID, app.KindSection, "Saved Queries", "")
-	t.Add(saved, app.KindPlaceholder, "No saved queries yet", "")
-
-	return t
+		if p := bq.DefaultProject(ctx); p != "" {
+			objc.Main(func() {
+				if s.settings.BillingProject == "" {
+					s.SetBillingProject(p)
+				}
+			})
+		}
+	}()
 }
 
 const sampleSQL = `-- Top words in Shakespeare's works

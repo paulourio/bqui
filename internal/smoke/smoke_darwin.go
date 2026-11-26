@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/ui"
@@ -29,6 +30,8 @@ const (
 	editorReadyTimeout = 45 * time.Second // no GPU in the QEMU VM: Monaco boots slowly
 	selfTestTimeout    = 20 * time.Second
 	runTimeout         = 10 * time.Second
+	loadTimeout        = 15 * time.Second
+	maxReload          = 500 * time.Millisecond // QEMU without GPU; real hardware is far faster
 	pollInterval       = 100 * time.Millisecond
 )
 
@@ -93,6 +96,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		runStatus = runAtCursor(s)
 	}
 
+	ex := exploreFlow(s)
+
 	queued := time.Now()
 
 	objc.Main(func() {
@@ -105,6 +110,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		}
 
 		editorChecks(s, rep, ready, bootTime, selfTest, stErr)
+
+		explorerChecks(rep, ex)
 
 		if ready {
 			// Cursor is on line 3 ("SELECT "), the third statement.
@@ -168,8 +175,164 @@ func structuralChecks(s *ui.Shell, rep *Report) {
 	panes := len(objc.ArrayItems(objc.Msg(s.Split, "splitViewItems")))
 	rep.check("split-panes", panes == 3, "%d panes (sidebar, content, inspector)", panes)
 
-	rows := objc.Send[int64](s.Sidebar.View, "numberOfRows")
-	rep.check("sidebar-rows", rows >= 6, "%d visible outline rows", rows)
+	rows := s.Explorer.Outline.Rows()
+	rep.check("sidebar-rows", rows >= 2, "%d visible outline rows", rows)
+}
+
+// onMain runs fn on the main thread and waits for it.
+func onMain(fn func()) {
+	done := make(chan struct{})
+
+	objc.Main(func() { fn(); close(done) })
+	<-done
+}
+
+// waitMain polls cond on the main thread until it holds or timeout elapses.
+func waitMain(timeout time.Duration, cond func() bool) bool {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		var ok bool
+
+		onMain(func() { ok = cond() })
+
+		if ok {
+			return true
+		}
+
+		time.Sleep(pollInterval)
+	}
+
+	return false
+}
+
+// exploreResult captures what the explorer flow observed.
+type exploreResult struct {
+	Roots, Datasets, SampleTables, ScaleRows int
+	ShardGroup                               bool
+	ScaleReload, MaxReload                   time.Duration
+	SchemaFields                             int
+	SchemaRows                               int64
+	SchemaSegment                            int
+	DatasetDetails                           int64
+	DatasetSegment                           int
+	FilterRows                               int64
+	SegGeometry                              string
+	Errors                                   []string
+}
+
+// exploreFlow drives the explorer through the real UI path: expanding via
+// the outline view (which fires the will-expand delegate), selecting rows
+// (which fires the inspector), filtering, and loading a 2000-table dataset.
+func exploreFlow(s *ui.Shell) exploreResult {
+	var r exploreResult
+
+	m := s.Explorer.Model
+	out := s.Explorer.Outline
+
+	find := func(project, dataset, name string) uint64 {
+		var id uint64
+
+		onMain(func() { id, _ = m.Find(project, dataset, name) })
+
+		if id == 0 {
+			r.Errors = append(r.Errors, "missing node "+project+"."+dataset+"."+name)
+		}
+
+		return id
+	}
+
+	expand := func(id uint64) bool {
+		if id == 0 {
+			return false
+		}
+
+		onMain(func() { out.Expand(id, false) })
+
+		ok := waitMain(loadTimeout, func() bool { return m.Loaded(id) })
+		if !ok {
+			r.Errors = append(r.Errors, fmt.Sprintf("node %d did not load", id))
+		}
+
+		return ok
+	}
+
+	onMain(func() { r.Roots = len(m.Children(app.RootID)) })
+
+	pub := find("bigquery-public-data", "", "")
+	if expand(pub) {
+		onMain(func() { r.Datasets = len(m.Children(pub)) })
+	}
+
+	samples := find("bigquery-public-data", "samples", "")
+	if expand(samples) {
+		onMain(func() { r.SampleTables = len(m.Children(samples)) })
+	}
+
+	if ga := find("bigquery-public-data", "google_analytics_sample", ""); expand(ga) {
+		var id uint64
+
+		onMain(func() { id, _ = m.Find("bigquery-public-data", "google_analytics_sample", "ga_sessions_") })
+
+		r.ShardGroup = id != 0
+	}
+
+	demo := find(app.FakeProject, "", "")
+	expand(demo)
+
+	if scale := find(app.FakeProject, app.FakeScaleDataset, ""); expand(scale) {
+		onMain(func() {
+			r.ScaleRows = len(m.Children(scale))
+			r.ScaleReload = s.Explorer.LastReload
+		})
+	}
+
+	onMain(func() { s.Explorer.SetFilter("shakes") })
+	onMain(func() { r.FilterRows = out.Rows() })
+	onMain(func() { s.Explorer.SetFilter("") })
+
+	// Dataset: details only.
+	onMain(func() { out.Select(samples) })
+	waitMain(loadTimeout, func() bool { return s.Inspector.DetailRows() > 0 && s.Inspector.Current().Kind == app.KindDataset })
+	onMain(func() {
+		r.DatasetDetails = s.Inspector.DetailRows()
+		r.DatasetSegment = s.Inspector.Segment()
+	})
+
+	// Nested table: schema tab.
+	if nested := find("bigquery-public-data", "samples", "github_nested"); nested != 0 {
+		onMain(func() { out.Select(nested) })
+		waitMain(loadTimeout, func() bool {
+			return s.Inspector.Current().Name == "github_nested" && s.Inspector.SchemaFields() > 0
+		})
+		onMain(func() {
+			r.SchemaFields = s.Inspector.SchemaFields()
+			r.SchemaRows = s.Inspector.SchemaRows()
+			r.SchemaSegment = s.Inspector.Segment()
+		})
+	}
+
+	onMain(func() {
+		r.MaxReload = s.Explorer.MaxReload
+		r.SegGeometry = s.Inspector.SegmentGeometry()
+	})
+
+	return r
+}
+
+func explorerChecks(rep *Report, r exploreResult) {
+	rep.check("explorer-flow", len(r.Errors) == 0, "errors: %v", r.Errors)
+	rep.check("explorer-projects", r.Roots == 2, "%d pinned projects", r.Roots)
+	rep.check("explorer-datasets", r.Datasets == 10, "%d datasets in bigquery-public-data", r.Datasets)
+	rep.check("explorer-tables", r.SampleTables == 7, "%d tables in samples", r.SampleTables)
+	rep.check("explorer-shards", r.ShardGroup, "ga_sessions_ shard group present: %v", r.ShardGroup)
+	rep.check("explorer-scale", r.ScaleRows == app.FakeScaleTables && r.ScaleReload < maxReload,
+		"%d tables; main-thread reload %v (max over run %v)", r.ScaleRows, r.ScaleReload.Round(time.Millisecond), r.MaxReload.Round(time.Millisecond))
+	rep.check("explorer-filter", r.FilterRows >= 3 && r.FilterRows <= 6, "%d rows visible for filter \"shakes\"", r.FilterRows)
+	rep.check("inspector-dataset", r.DatasetDetails > 3 && r.DatasetSegment == 1, "%d detail rows, segment %d", r.DatasetDetails, r.DatasetSegment)
+	rep.skip("inspector-segments", "%s", r.SegGeometry)
+	rep.check("inspector-schema", r.SchemaFields > 20 && r.SchemaRows > 5 && r.SchemaSegment == 0,
+		"%d fields (%d top-level rows), segment %d", r.SchemaFields, r.SchemaRows, r.SchemaSegment)
 }
 
 // runAtCursor triggers "Run Statement at Cursor" (page → Go → bqls
@@ -252,6 +415,10 @@ func accessibilityChecks(ax *appkit.AXNode, rep *Report) {
 func screenshots(s *ui.Shell, dir string, rep *Report, next func(error)) {
 	// The frame view (content view's superview) includes titlebar and toolbar.
 	frameView := objc.Msg(objc.Msg(s.Window, "contentView"), "superview")
+
+	if err := appkit.WritePNG(s.Inspector.SegmentView(), filepath.Join(dir, "segmented.png")); err == nil {
+		rep.Screenshots = append(rep.Screenshots, "segmented.png")
+	}
 	looks := []struct{ name, appearance string }{
 		{"light", "NSAppearanceNameAqua"},
 		{"dark", "NSAppearanceNameDarkAqua"},

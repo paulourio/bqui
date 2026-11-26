@@ -1,0 +1,21 @@
+{
+ "creationTime": "1573756794538",
+ "datasetReference": {
+  "datasetId": "wikipedia",
+  "projectId": "bigquery-public-data"
+ },
+ "description": "",
+ "kind": "bigquery#dataset",
+ "labels": {
+  "dataplex-data-documentation-published-location": "us-central1",
+  "dataplex-data-documentation-published-project": "bigquery-public-data",
+  "dataplex-data-documentation-published-scan": "aeb1843cc-35eb-4f3a-9832-50ef733e3267",
+  "dg_data_confidentiality": "public",
+  "dg_data_context": "metadata",
+  "dg_data_source": "public"
+ },
+ "lastModifiedTime": "1773067031716",
+ "location": "US",
+ "maxTimeTravelHours": "168",
+ "type": "DEFAULT"
+}

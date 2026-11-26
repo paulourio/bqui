@@ -1,0 +1,84 @@
+{
+ "models": [
+  {
+   "creationTime": "1756313374245",
+   "lastModifiedTime": "1756313374332",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "bqml_kmeans_model",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "KMEANS"
+  },
+  {
+   "creationTime": "1752878029975",
+   "lastModifiedTime": "1752878030059",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "census_adult_income_classification_model",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "LOGISTIC_REGRESSION"
+  },
+  {
+   "creationTime": "1752432567835",
+   "lastModifiedTime": "1752432567946",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "census_adult_income_logistic_regression",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "LOGISTIC_REGRESSION"
+  },
+  {
+   "creationTime": "1752427404121",
+   "lastModifiedTime": "1752427404212",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "census_adult_income_logistic_regression_model",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "LOGISTIC_REGRESSION"
+  },
+  {
+   "creationTime": "1771890516418",
+   "lastModifiedTime": "1771890516494",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "census_income_classifier",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "LOGISTIC_REGRESSION"
+  },
+  {
+   "creationTime": "1770764875852",
+   "lastModifiedTime": "1770764875924",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "kmeans_census_model",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "KMEANS"
+  },
+  {
+   "creationTime": "1762562186025",
+   "lastModifiedTime": "1762562186098",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "kmeans_model",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "KMEANS"
+  },
+  {
+   "creationTime": "1761771228444",
+   "lastModifiedTime": "1761771228518",
+   "modelReference": {
+    "datasetId": "ml_datasets",
+    "modelId": "ulb_fraud_detection_kmeans_model",
+    "projectId": "bigquery-public-data"
+   },
+   "modelType": "KMEANS"
+  }
+ ]
+}

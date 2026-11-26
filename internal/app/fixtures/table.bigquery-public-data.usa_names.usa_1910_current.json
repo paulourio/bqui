@@ -1,0 +1,63 @@
+{
+ "creationTime": "1488231345458",
+ "description": "The table contains the number of applicants for a Social Security card by year of birth and sex. The number of such applicants is restricted to U.S. births where the year of birth, sex, State of birth (50 States and District of Columbia) are known, and where the given name is at least 2 characters long.\n\nsource: http://www.ssa.gov/OACT/babynames/limits.html",
+ "kind": "bigquery#table",
+ "labels": {
+  "dataplex-data-documentation-published-location": "us-central1",
+  "dataplex-data-documentation-published-project": "rraypmdemoproject",
+  "dataplex-data-documentation-published-scan": "a3f78f58e-0571-4492-8075-0e35804132fb"
+ },
+ "lastModifiedTime": "1748461590315",
+ "location": "US",
+ "numActiveLogicalBytes": "0",
+ "numActivePhysicalBytes": "0",
+ "numBytes": "194873810",
+ "numCurrentPhysicalBytes": "12635176",
+ "numLongTermBytes": "194873810",
+ "numLongTermLogicalBytes": "194873810",
+ "numLongTermPhysicalBytes": "12635176",
+ "numRows": "6311504",
+ "numTimeTravelPhysicalBytes": "0",
+ "numTotalLogicalBytes": "194873810",
+ "numTotalPhysicalBytes": "12635176",
+ "schema": {
+  "fields": [
+   {
+    "description": "2-digit state code",
+    "mode": "NULLABLE",
+    "name": "state",
+    "type": "STRING"
+   },
+   {
+    "description": "Sex (M=male or F=female)",
+    "mode": "NULLABLE",
+    "name": "gender",
+    "type": "STRING"
+   },
+   {
+    "description": "4-digit year of birth",
+    "mode": "NULLABLE",
+    "name": "year",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Given name of a person at birth",
+    "mode": "NULLABLE",
+    "name": "name",
+    "type": "STRING"
+   },
+   {
+    "description": "Number of occurrences of the name",
+    "mode": "NULLABLE",
+    "name": "number",
+    "type": "INTEGER"
+   }
+  ]
+ },
+ "tableReference": {
+  "datasetId": "usa_names",
+  "projectId": "bigquery-public-data",
+  "tableId": "usa_1910_current"
+ },
+ "type": "TABLE"
+}

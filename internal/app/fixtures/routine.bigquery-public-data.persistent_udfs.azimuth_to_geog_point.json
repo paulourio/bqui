@@ -1,0 +1,42 @@
+{
+ "arguments": [
+  {
+   "dataType": {
+    "typeKind": "FLOAT64"
+   },
+   "name": "input_lat"
+  },
+  {
+   "dataType": {
+    "typeKind": "FLOAT64"
+   },
+   "name": "input_lon"
+  },
+  {
+   "dataType": {
+    "typeKind": "FLOAT64"
+   },
+   "name": "azimuth"
+  },
+  {
+   "dataType": {
+    "typeKind": "FLOAT64"
+   },
+   "name": "distance"
+  }
+ ],
+ "creationTime": "1768947154892",
+ "definitionBody": "(\n  with variables as (\n    select acos(-1) as pi, 180/acos(-1) as rad2deg, acos(-1)/180 as deg2rag, 6378.1 as earth_radius_km, 1.61 as miles_in_km\n  )\n  select ST_GeogPOINT(\n    rad2deg*(input_lon * deg2rag + (atan2(sin(azimuth * deg2rag) * sin(distance * miles_in_km/earth_radius_km) * cos(input_lat * deg2rag), cos(distance * miles_in_km/earth_radius_km) - sin(input_lat * deg2rag) * sin(rad2deg * (asin(sin(input_lat * deg2rag) * cos(distance * miles_in_km/earth_radius_km) + cos(input_lat * deg2rag) * sin(distance * miles_in_km/earth_radius_km) * cos(azimuth * deg2rag))))))), \n    rad2deg*(asin(sin(input_lat * deg2rag) * cos(distance * miles_in_km/earth_radius_km) + cos(input_lat * deg2rag) * sin(distance * miles_in_km/earth_radius_km) * cos(azimuth * deg2rag)))\n  )\n  from variables\n)",
+ "description": "Forms BigQuery GEOGRAPHY point (latitude and longitude) from input latitude, longitude, azimuth, and distance (in miles)",
+ "language": "SQL",
+ "lastModifiedTime": "1768947154892",
+ "returnType": {
+  "typeKind": "GEOGRAPHY"
+ },
+ "routineReference": {
+  "datasetId": "persistent_udfs",
+  "projectId": "bigquery-public-data",
+  "routineId": "azimuth_to_geog_point"
+ },
+ "routineType": "SCALAR_FUNCTION"
+}

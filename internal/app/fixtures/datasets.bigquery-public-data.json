@@ -1,0 +1,156 @@
+{
+ "datasets": [
+  {
+   "datasetReference": {
+    "datasetId": "austin_bikeshare",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "crypto_bitcoin",
+    "projectId": "bigquery-public-data"
+   },
+   "friendlyName": "",
+   "kind": "bigquery#dataset",
+   "location": "US",
+   "type": "LINKED"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "github_repos",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dataplex-data-documentation-published-location": "us-central1",
+    "dataplex-data-documentation-published-project": "bigquery-public-data",
+    "dataplex-data-documentation-published-scan": "a0156a680-bbd4-4fb9-929c-c7b5fc3fea5d",
+    "dataplex-knowledge-engine-published-location": "us-central1",
+    "dataplex-knowledge-engine-published-project": "bigquery-public-data",
+    "dataplex-knowledge-engine-published-scan": "ab57c27db-dae0-44a1-bd47-40f77e38490d",
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "google_analytics_sample",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "ml_datasets",
+    "projectId": "bigquery-public-data"
+   },
+   "friendlyName": "",
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "new_york_taxi_trips",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "persistent_udfs",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "samples",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dataplex-data-documentation-published-location": "us-central1",
+    "dataplex-data-documentation-published-project": "bigquery-public-data",
+    "dataplex-data-documentation-published-scan": "a9bb275bd-2f20-4e05-9a3d-486ab8fbf6fb",
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "usa_names",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dataplex-data-documentation-published-location": "us-central1",
+    "dataplex-data-documentation-published-project": "bigquery-public-data",
+    "dataplex-data-documentation-published-scan": "a98ee4cb0-de2f-49a4-8fa4-dc98fba62d3f",
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  },
+  {
+   "datasetReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data"
+   },
+   "kind": "bigquery#dataset",
+   "labels": {
+    "dataplex-data-documentation-published-location": "us-central1",
+    "dataplex-data-documentation-published-project": "bigquery-public-data",
+    "dataplex-data-documentation-published-scan": "aeb1843cc-35eb-4f3a-9832-50ef733e3267",
+    "dg_data_confidentiality": "public",
+    "dg_data_context": "metadata",
+    "dg_data_source": "public"
+   },
+   "location": "US",
+   "type": "DEFAULT"
+  }
+ ]
+}

@@ -1,0 +1,213 @@
+{
+ "creationTime": "1457975807183",
+ "kind": "bigquery#table",
+ "lastModifiedTime": "1457975807183",
+ "location": "US",
+ "numActiveLogicalBytes": "0",
+ "numActivePhysicalBytes": "0",
+ "numBytes": "23562717384",
+ "numCurrentPhysicalBytes": "1209802476",
+ "numLongTermBytes": "23562717384",
+ "numLongTermLogicalBytes": "23562717384",
+ "numLongTermPhysicalBytes": "1209802476",
+ "numRows": "137826763",
+ "numTimeTravelPhysicalBytes": "0",
+ "numTotalLogicalBytes": "23562717384",
+ "numTotalPhysicalBytes": "1209802476",
+ "schema": {
+  "fields": [
+   {
+    "description": "Four-digit year of the birth. Example: 1975.",
+    "mode": "REQUIRED",
+    "name": "source_year",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Four-digit year of the birth. Example: 1975.",
+    "mode": "NULLABLE",
+    "name": "year",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Month index of the date of birth, where 1=January.",
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Day of birth, starting from 1.",
+    "mode": "NULLABLE",
+    "name": "day",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Day of the week, where 1 is Sunday and 7 is Saturday.",
+    "mode": "NULLABLE",
+    "name": "wday",
+    "type": "INTEGER"
+   },
+   {
+    "description": "The two character postal code for the state. Entries after 2004 do not include this value.",
+    "mode": "NULLABLE",
+    "name": "state",
+    "type": "STRING"
+   },
+   {
+    "description": "TRUE if the child is male, FALSE if female.",
+    "mode": "REQUIRED",
+    "name": "is_male",
+    "type": "BOOLEAN"
+   },
+   {
+    "description": "The race of the child. One of the following numbers:\n\n1 - White\n2 - Black\n3 - American Indian\n4 - Chinese\n5 - Japanese\n6 - Hawaiian\n7 - Filipino\n9 - Unknown/Other\n18 - Asian Indian\n28 - Korean\n39 - Samoan\n48 - Vietnamese",
+    "mode": "NULLABLE",
+    "name": "child_race",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Weight of the child, in pounds.",
+    "mode": "NULLABLE",
+    "name": "weight_pounds",
+    "type": "FLOAT"
+   },
+   {
+    "description": "How many children were born as a result of this pregnancy. twins=2, triplets=3, and so on.",
+    "mode": "NULLABLE",
+    "name": "plurality",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Apgar scores measure the health of a newborn child on a scale from 0-10. Value after 1 minute. Available from 1978-2002.",
+    "mode": "NULLABLE",
+    "name": "apgar_1min",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Apgar scores measure the health of a newborn child on a scale from 0-10. Value after 5 minutes. Available from 1978-2002.",
+    "mode": "NULLABLE",
+    "name": "apgar_5min",
+    "type": "INTEGER"
+   },
+   {
+    "description": "The two-letter postal code of the mother's state of residence when the child was born.",
+    "mode": "NULLABLE",
+    "name": "mother_residence_state",
+    "type": "STRING"
+   },
+   {
+    "description": "Race of the mother. Same values as child_race.",
+    "mode": "NULLABLE",
+    "name": "mother_race",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Reported age of the mother when giving birth.",
+    "mode": "NULLABLE",
+    "name": "mother_age",
+    "type": "INTEGER"
+   },
+   {
+    "description": "The number of weeks of the pregnancy.",
+    "mode": "NULLABLE",
+    "name": "gestation_weeks",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Date of the last menstrual period in the format MMDDYYYY. Unknown values are recorded as \"99\" or \"9999\".",
+    "mode": "NULLABLE",
+    "name": "lmp",
+    "type": "STRING"
+   },
+   {
+    "description": "True if the mother was married when she gave birth.",
+    "mode": "NULLABLE",
+    "name": "mother_married",
+    "type": "BOOLEAN"
+   },
+   {
+    "description": "The two-letter postal code of the mother's birth state.",
+    "mode": "NULLABLE",
+    "name": "mother_birth_state",
+    "type": "STRING"
+   },
+   {
+    "description": "True if the mother smoked cigarettes. Available starting 2003.",
+    "mode": "NULLABLE",
+    "name": "cigarette_use",
+    "type": "BOOLEAN"
+   },
+   {
+    "description": "Number of cigarettes smoked by the mother per day. Available starting 2003.",
+    "mode": "NULLABLE",
+    "name": "cigarettes_per_day",
+    "type": "INTEGER"
+   },
+   {
+    "description": "True if the mother used alcohol. Available starting 1989.",
+    "mode": "NULLABLE",
+    "name": "alcohol_use",
+    "type": "BOOLEAN"
+   },
+   {
+    "description": "Number of drinks per week consumed by the mother. Available starting 1989.",
+    "mode": "NULLABLE",
+    "name": "drinks_per_week",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Number of pounds gained by the mother during pregnancy.",
+    "mode": "NULLABLE",
+    "name": "weight_gain_pounds",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Number of children previously born to the mother who are now living.",
+    "mode": "NULLABLE",
+    "name": "born_alive_alive",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Number of children previously born to the mother who are now dead.",
+    "mode": "NULLABLE",
+    "name": "born_alive_dead",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Number of children who were born dead (i.e. miscarriages)",
+    "mode": "NULLABLE",
+    "name": "born_dead",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Total number of children to whom the woman has ever given birth (includes the current birth).",
+    "mode": "NULLABLE",
+    "name": "ever_born",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Race of the father. Same values as child_race.",
+    "mode": "NULLABLE",
+    "name": "father_race",
+    "type": "INTEGER"
+   },
+   {
+    "description": "Age of the father when the child was born.",
+    "mode": "NULLABLE",
+    "name": "father_age",
+    "type": "INTEGER"
+   },
+   {
+    "description": "1 or 2, where 1 is a row from a full-reporting area, and 2 is a row from a 50% sample area.",
+    "mode": "NULLABLE",
+    "name": "record_weight",
+    "type": "INTEGER"
+   }
+  ]
+ },
+ "tableReference": {
+  "datasetId": "samples",
+  "projectId": "bigquery-public-data",
+  "tableId": "natality"
+ },
+ "type": "TABLE"
+}

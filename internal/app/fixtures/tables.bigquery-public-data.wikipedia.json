@@ -1,0 +1,560 @@
+{
+ "tables": [
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1573773867990",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2015"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1573774726000",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2016"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1573775681540",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2017"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1573776654432",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2018"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1573777436268",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2019"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1579643855205",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2020"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1609466443754",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2021"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1641002399899",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2022"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1672542005350",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2023"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1704077985192",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2024"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1735700384411",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2025"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "wiki",
+     "title"
+    ]
+   },
+   "creationTime": "1767240004077",
+   "kind": "bigquery#table",
+   "requirePartitionFilter": true,
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "pageviews_2026"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139606744",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_activists"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139621318",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_actors"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139631206",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_alumni"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139633304",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_artists"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139626131",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_athlete"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139687594",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_bands"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139611837",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_born"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139635506",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_businesspeople"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139637957",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_comedians"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139632826",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_composers"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139636533",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_inventors"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139632544",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_politicians"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139631330",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_scientists"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139603634",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_singers"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "title"
+    ]
+   },
+   "creationTime": "1627139600965",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "table_writers"
+   },
+   "timePartitioning": {
+    "field": "datehour",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  },
+  {
+   "clustering": {
+    "fields": [
+     "numeric_id"
+    ]
+   },
+   "creationTime": "1794912375607",
+   "kind": "bigquery#table",
+   "tableReference": {
+    "datasetId": "wikipedia",
+    "projectId": "bigquery-public-data",
+    "tableId": "wikidata"
+   },
+   "timePartitioning": {
+    "field": "fake_date",
+    "type": "DAY"
+   },
+   "type": "TABLE"
+  }
+ ]
+}

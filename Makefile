@@ -71,8 +71,12 @@ vm-test:
 
 # Real on-screen capture (Liquid Glass included). Needs Screen Recording
 # permission for /usr/libexec/sshd-keygen-wrapper in the VM (one-time, GUI).
+# Runs the smoke flow (fixture data) and captures the state it leaves behind.
 vm-screen: vm-deploy
-	$(SSH) 'pkill -x bqui; open -n $(VM_DIR)/bqui.app; sleep 3; screencapture -x $(VM_DIR)/screen.png; rc=$$?; pkill -x bqui; exit $$rc'
+	$(SSH) 'pkill -x bqui; rm -f $(VM_DIR)/shot/report.json; \
+		open -n $(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/shot --smoke-hold=20s; \
+		for i in $$(seq 120); do test -f $(VM_DIR)/shot/report.json && break; sleep 0.5; done; \
+		sleep 1; screencapture -x $(VM_DIR)/screen.png; rc=$$?; pkill -x bqui; exit $$rc'
 	scp -q -P $(VM_PORT) $(VM_HOST):$(VM_DIR)/screen.png $(DIST)/screen-vm.png
 	@echo "wrote $(DIST)/screen-vm.png"
 

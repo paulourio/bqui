@@ -193,6 +193,22 @@ func (b *Bridge) SendApp(method string, params any) error {
 	return nil
 }
 
+// Notify sends a JSON-RPC notification to bqls (e.g.
+// workspace/didChangeConfiguration). Monaco never sees it.
+func (b *Bridge) Notify(method string, params any) error {
+	p, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("editor: marshal %s: %w", method, err)
+	}
+
+	msg, err := json.Marshal(rpcMessage{JSONRPC: "2.0", Method: method, Params: p})
+	if err != nil {
+		return err
+	}
+
+	return b.writeServer(msg)
+}
+
 // Statements asks bqls for the statement boundaries of a document. uri must be
 // the model URI as Monaco reports it (Monaco's LSP client lowercases URIs).
 func (b *Bridge) Statements(ctx context.Context, uri string) ([]lsp.StatementInfo, error) {

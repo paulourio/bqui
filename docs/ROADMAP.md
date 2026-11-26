@@ -155,6 +155,20 @@ Each milestone lists deliverables, then tests, then the exit criteria (**Exit**)
 
 ### M3 — Explorer (dataset/table browser + metadata)
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **Explorer** (`app.Explorer`, UI-agnostic and tested on Linux): pinned projects → datasets → tables, views, materialized views, external tables, snapshots, routines and models, loaded lazily through the `app.Backend` interface (`*bq.Client`, or `app.FakeBackend`). Date-sharded tables are grouped like the console (`ga_sessions_(366)`). Includes a client-side filter, error placeholders with retry, Refresh, and per-kind context menus (Query, Insert Reference, Copy ID, Copy SQL Reference, Open in BigQuery Console, Use as Billing Project, Unpin). Double-click inserts the reference into the editor.
+- **Metadata goes in the inspector pane, not in table tabs.** The inspector has Schema and Details tabs; per-object tabs arrive with tabs and sessions (M10).
+  - Schema: a nested tree (name, type, mode, key badges, description). Parameterized types are shown, and partition, cluster and policy-tag badges appear in a Key column that is hidden when no field has any.
+  - Details: the console's sections for tables, views, materialized views, external tables, snapshots and clones, plus datasets, routines and models. View SQL is formatted with bqfmt. A view whose SQL is hidden from the account says so instead of showing an empty value.
+- **Not done:** Preview moves to M5, where it uses the results grid. Partitions (`INFORMATION_SCHEMA.PARTITIONS`) and Delete were not built: Partitions is deferred, and Delete is a destructive action that needs its own confirmation design.
+- **Projects:** the toolbar picker lists pinned projects and then every accessible project. The selection is the billing project and also bqls's default project (pushed live through `workspace/didChangeConfiguration`), and it persists in `~/Library/Application Support/bqui/settings.json`.
+- **Fake mode:** `--fake` / `BQUI_FAKE=1` (the smoke test turns it on) serves fixtures recorded from `bigquery-public-data`, plus a synthetic `bqui-demo` project with a 2,000-table dataset.
+- **Binding-layer finding:** purego callbacks cannot return floating-point values, so delegate methods that return `CGFloat` (such as `heightOfRowByItem:`) cannot be implemented in Go. Use `usesAutomaticRowHeights` and Auto Layout instead.
+- **To check on real hardware:**
+  - In the QEMU VM, the unselected segment of the inspector's segmented control is invisible on screen, though a CPU render of the same control draws it correctly. This is most likely vibrancy compositing without a GPU.
+  - At 1280 points wide, the toolbar overflows and hides the cost label.
+- **Exit:** the VM smoke test drives the real UI path (expand through the outline delegate, select to update the inspector, filter). Reloading the 2,000-table dataset takes 71 ms on the main thread in the GPU-less VM.
+
 **Sidebar `NSOutlineView`**
 - Hierarchy: Project → Dataset → (Tables | Views | Routines | Models), with lazy children through `DiscoverTables`.
 - Type icons from SF Symbols (`NSImage imageWithSystemSymbolName:`), filter field, starred items, refresh, and a context menu: Query, Preview, Copy ID, Copy as `project.dataset.table`, Open in console, Delete (with confirmation).

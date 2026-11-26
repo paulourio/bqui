@@ -88,6 +88,33 @@
       case 'setOptions':
         ed.updateOptions(p || {});
         break;
+      case 'insertText': {
+        var sel = ed.getSelection();
+        ed.executeEdits('bqui', [{ range: sel, text: p.text, forceMoveMarkers: true }]);
+        ed.focus();
+        break;
+      }
+      case 'appendText': {
+        // Append a statement after the current text (or replace an empty
+        // buffer), select it and reveal it. Undoable as one edit.
+        var model = ed.getModel();
+        var text = p.text || '';
+        var current = model.getValue();
+        if (current.trim() === '') {
+          model.pushEditOperations([], [{ range: model.getFullModelRange(), text: text }], function () { return null; });
+          ed.setSelection(model.getFullModelRange());
+        } else {
+          var last = model.getLineCount();
+          var end = new monaco.Range(last, model.getLineMaxColumn(last), last, model.getLineMaxColumn(last));
+          var sep = current.endsWith('\n') ? '\n' : '\n\n';
+          model.pushEditOperations([], [{ range: end, text: sep + text }], function () { return null; });
+          var startLine = model.getLineCount() - text.split('\n').length + 1;
+          ed.setSelection(new monaco.Range(startLine, 1, model.getLineCount(), model.getLineMaxColumn(model.getLineCount())));
+        }
+        ed.revealRangeInCenterIfOutsideViewport(ed.getSelection());
+        ed.focus();
+        break;
+      }
       default:
         console.warn('bqui: unknown app message', method);
     }
@@ -106,6 +133,10 @@
     },
     requestRun: function (atCursor) { if (state.editor) app('run', runPayload(atCursor)); },
     format: function () { if (state.editor) state.editor.getAction('editor.action.formatDocument').run(); },
+    action: function (id) {
+      var a = state.editor && state.editor.getAction(id);
+      if (a) { state.editor.focus(); a.run(); } else { console.warn('bqui: unknown editor action', id); }
+    },
     // selfTest is used by the smoke harness: it exercises completion, markers
     // and semantic tokens end to end and reports what Monaco actually shows.
     selfTest: function (sql, line, column) {

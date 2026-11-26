@@ -11,6 +11,11 @@ import (
 
 // Method describes one Go-implemented Objective-C method. Fn must have the
 // signature func(self ID, cmd SEL, args...) [result].
+//
+// Limitation: purego callbacks cannot return floating-point values, so
+// methods returning CGFloat/double (e.g. outlineView:heightOfRowByItem:)
+// cannot be implemented in Go; use AppKit alternatives (automatic row
+// heights, constraints) instead.
 type Method struct {
 	Sel string
 	Fn  any
