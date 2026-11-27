@@ -507,6 +507,7 @@ func runRead(ctx context.Context, g *globals, c *bq.Client, args []string) error
 	fields := fs.String("fields", "", "comma-separated columns")
 	where := fs.String("where", "", "row restriction (SQL boolean expression)")
 	streams := fs.Int("streams", 4, "maximum parallel streams")
+	showSchema := fs.Bool("schema", false, "print the Arrow schema of the session")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -540,6 +541,10 @@ func runRead(ctx context.Context, g *globals, c *bq.Client, args []string) error
 	}
 
 	fmt.Fprintf(g.stderr, "session: %d streams, ~%d rows, ~%s scanned\n", sess.Streams(), sess.EstimatedRows(), humanBytes(sess.EstimatedBytes()))
+
+	if *showSchema {
+		fmt.Fprintln(g.stdout, sess.Schema())
+	}
 
 	var total, batches int64
 

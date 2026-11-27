@@ -140,6 +140,19 @@ func TestDecodeRowsErrors(t *testing.T) {
 	}
 }
 
+func TestTimestampRangeNormalized(t *testing.T) {
+	f := &bigquery.TableFieldSchema{Name: "r", Type: "RANGE", RangeElementType: &bigquery.TableFieldSchemaRangeElementType{Type: "TIMESTAMP"}}
+	rows, err := DecodeRows([]*bigquery.TableFieldSchema{f}, []*bigquery.TableRow{{F: []*bigquery.TableCell{{V: "[1704067200000000, 1704153600500000)"}}}})
+
+	if err != nil || rows[0][0] != "[2024-01-01 00:00:00 UTC, 2024-01-02 00:00:00.500000 UTC)" {
+		t.Fatalf("range = %#v, %v", rows[0][0], err)
+	}
+
+	if got := normalizeTimestampRange("[1704067200000000, UNBOUNDED)"); got != "[2024-01-01 00:00:00 UTC, UNBOUNDED)" {
+		t.Errorf("unbounded = %q", got)
+	}
+}
+
 func TestParseTimestampForms(t *testing.T) {
 	want := time.Date(2024, 1, 2, 3, 4, 5, 500000000, time.UTC)
 

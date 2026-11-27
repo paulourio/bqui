@@ -127,7 +127,41 @@ func decodeValue(f *bigquery.TableFieldSchema, raw any) (any, error) {
 		return nil, fmt.Errorf("%w: %s value is %T", ErrBadRow, f.Type, raw)
 	}
 
+	if f.Type == "RANGE" && f.RangeElementType != nil && f.RangeElementType.Type == "TIMESTAMP" {
+		return normalizeTimestampRange(s), nil
+	}
+
 	return parseScalar(f.Type, s)
+}
+
+// normalizeTimestampRange rewrites "[1704067200000000, UNBOUNDED)" (REST
+// applies useInt64Timestamp inside ranges) as readable UTC timestamps:
+// "[2024-01-01 00:00:00 UTC, UNBOUNDED)".
+func normalizeTimestampRange(s string) string {
+	inner, ok := strings.CutPrefix(s, "[")
+	if !ok {
+		return s
+	}
+
+	inner, ok = strings.CutSuffix(inner, ")")
+	if !ok {
+		return s
+	}
+
+	start, end, ok := strings.Cut(inner, ", ")
+	if !ok {
+		return s
+	}
+
+	bound := func(b string) string {
+		if us, err := strconv.ParseInt(b, 10, 64); err == nil {
+			return FormatTimestamp(time.UnixMicro(us))
+		}
+
+		return b
+	}
+
+	return "[" + bound(start) + ", " + bound(end) + ")"
 }
 
 func isRecord(t string) bool { return t == "RECORD" || t == "STRUCT" }

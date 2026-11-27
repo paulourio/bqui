@@ -41,6 +41,9 @@ type QueryRequest struct {
 	SessionID     string
 	// OnProgress, if set, receives job snapshots while the query runs.
 	OnProgress func(*bigquery.Job)
+	// OnJob, if set, receives the job reference as soon as it is known (to
+	// allow cancellation while the query runs).
+	OnJob func(JobRef)
 }
 
 // QueryResult is the outcome of a completed query.
@@ -82,6 +85,10 @@ func (c *Client) Query(ctx context.Context, req QueryRequest) (*QueryResult, err
 
 	res := fromQueryResponse(resp)
 	res.DryRun = req.DryRun
+
+	if res.Job != nil && req.OnJob != nil {
+		req.OnJob(*res.Job)
+	}
 
 	if err := errorsOf(resp.Errors); err != nil && resp.JobComplete {
 		return res, err

@@ -175,12 +175,60 @@ type Batch struct {
 	Record arrow.RecordBatch
 }
 
+// RawBatch is one serialized (possibly LZ4-compressed) Arrow record batch as
+// BigQuery sent it; Decode turns it into a record. Spilling raw batches keeps
+// disk usage at the wire size and avoids re-encoding.
+type RawBatch struct {
+	Stream int
+	Rows   int64
+	Data   []byte
+}
+
+// Decode turns a raw batch into a record batch (caller releases it).
+func (s *Session) Decode(data []byte) (arrow.RecordBatch, error) {
+	return s.decode(data)
+}
+
+// RawBatches yields serialized batches as they arrive from all streams,
+// with the same concurrency, resumption and cancellation as Batches.
+func (s *Session) RawBatches(ctx context.Context) iter.Seq2[RawBatch, error] {
+	return func(yield func(RawBatch, error) bool) {
+		for b, err := range s.stream(ctx, false) {
+			if !yield(b.raw, err) {
+				return
+			}
+		}
+	}
+}
+
 // Batches reads all streams concurrently and yields record batches as they
 // arrive (order across streams is not defined; order within a stream is).
 // The consumer owns each Record and must Release it. Breaking out of the loop
 // cancels outstanding reads.
 func (s *Session) Batches(ctx context.Context) iter.Seq2[Batch, error] {
 	return func(yield func(Batch, error) bool) {
+		for b, err := range s.stream(ctx, true) {
+			if !yield(b.batch, err) {
+				return
+			}
+		}
+	}
+}
+
+// item carries either a decoded batch or a raw one through the fan-in.
+type item struct {
+	batch Batch
+	raw   RawBatch
+}
+
+func (it item) release() {
+	if it.batch.Record != nil {
+		it.batch.Record.Release()
+	}
+}
+
+func (s *Session) stream(ctx context.Context, decode bool) iter.Seq2[item, error] {
+	return func(yield func(item, error) bool) {
 		streams := s.pb.GetStreams()
 		if len(streams) == 0 {
 			return
@@ -189,14 +237,14 @@ func (s *Session) Batches(ctx context.Context) iter.Seq2[Batch, error] {
 		rctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		out := make(chan Batch, bufferPerStream*len(streams))
+		out := make(chan item, bufferPerStream*len(streams))
 		errc := make(chan error, len(streams))
 
 		var wg sync.WaitGroup
 
 		for i, st := range streams {
 			wg.Go(func() {
-				if err := s.readStream(rctx, i, st.GetName(), out); err != nil {
+				if err := s.readStream(rctx, i, st.GetName(), decode, out); err != nil {
 					errc <- err
 
 					cancel()
@@ -209,8 +257,8 @@ func (s *Session) Batches(ctx context.Context) iter.Seq2[Batch, error] {
 			close(out)
 		}()
 
-		for b := range out {
-			if !yield(b, nil) {
+		for it := range out {
+			if !yield(it, nil) {
 				cancel()
 				drain(out)
 
@@ -220,28 +268,28 @@ func (s *Session) Batches(ctx context.Context) iter.Seq2[Batch, error] {
 
 		select {
 		case err := <-errc:
-			yield(Batch{}, err)
+			yield(item{}, err)
 		default:
 		}
 	}
 }
 
-func drain(ch <-chan Batch) {
-	for b := range ch {
-		b.Record.Release()
+func drain(ch <-chan item) {
+	for it := range ch {
+		it.release()
 	}
 }
 
 // readStream reads one stream to the end, resuming at the current row
 // offset after retryable errors.
-func (s *Session) readStream(ctx context.Context, idx int, name string, out chan<- Batch) error {
+func (s *Session) readStream(ctx context.Context, idx int, name string, decode bool, out chan<- item) error {
 	var (
 		offset   int64
 		attempts int
 	)
 
 	for {
-		n, err := s.readFrom(ctx, idx, name, offset, out)
+		n, err := s.readFrom(ctx, idx, name, offset, decode, out)
 		offset += n
 
 		if err == nil {
@@ -266,7 +314,7 @@ func (s *Session) readStream(ctx context.Context, idx int, name string, out chan
 	}
 }
 
-func (s *Session) readFrom(ctx context.Context, idx int, name string, offset int64, out chan<- Batch) (int64, error) {
+func (s *Session) readFrom(ctx context.Context, idx int, name string, offset int64, decode bool, out chan<- item) (int64, error) {
 	rr, err := s.c.rc.ReadRows(ctx, &storagepb.ReadRowsRequest{ReadStream: name, Offset: offset})
 	if err != nil {
 		return 0, err
@@ -289,16 +337,22 @@ func (s *Session) readFrom(ctx context.Context, idx int, name string, offset int
 			continue
 		}
 
-		rec, err := s.decode(batch)
-		if err != nil {
-			return rows, err
+		it := item{raw: RawBatch{Stream: idx, Rows: resp.GetRowCount(), Data: batch}}
+
+		if decode {
+			rec, err := s.decode(batch)
+			if err != nil {
+				return rows, err
+			}
+
+			it = item{batch: Batch{Stream: idx, Record: rec}}
 		}
 
 		select {
-		case out <- Batch{Stream: idx, Record: rec}:
+		case out <- it:
 			rows += resp.GetRowCount()
 		case <-ctx.Done():
-			rec.Release()
+			it.release()
 
 			return rows, ctx.Err()
 		}
