@@ -120,7 +120,7 @@ func (s *Shell) ApplyPreferences(text store.PreferenceText) error {
 	s.saveSettings()
 	s.Runner.SetMaxSpillBytes(p.MaxSpillBytes)
 	s.Editor.ConfigureLSP(s.lspOptions())
-	s.Saved.ReloadStudio()
+	s.Workbooks.ReloadStudio()
 
 	return nil
 }

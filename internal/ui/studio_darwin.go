@@ -204,7 +204,7 @@ func (s *Shell) PublishStudioAs(title string) {
 
 		s.updateTitle()
 		s.status("Saved “" + title + "” to BigQuery Studio.")
-		s.Saved.Reload()
+		s.Workbooks.Reload()
 	})
 }
 
@@ -228,7 +228,7 @@ func (s *Shell) RenameStudioQuery(q dataform.SavedQuery) {
 		}
 
 		s.status("Renamed to “" + strings.TrimSpace(title) + "”.")
-		s.Saved.ReloadStudio()
+		s.Workbooks.ReloadStudio()
 	})
 }
 
@@ -253,6 +253,6 @@ func (s *Shell) DeleteStudioQuery(q dataform.SavedQuery) {
 		}
 
 		s.status("Deleted “" + q.Title + "”.")
-		s.Saved.ReloadStudio()
+		s.Workbooks.ReloadStudio()
 	})
 }

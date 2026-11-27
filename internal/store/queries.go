@@ -32,6 +32,8 @@ type SavedQuery struct {
 	Labels         map[string]string `toml:"labels,omitempty"`
 	// LinkID ties the file to a BigQuery Studio saved query (M11).
 	LinkID string `toml:"link_id,omitempty"`
+	// ID identifies the file across renames and moves (run history).
+	ID string `toml:"id,omitempty"`
 }
 
 const (
@@ -134,7 +136,13 @@ func ReadQuery(path string) (SavedQuery, string, error) {
 func WriteQuery(q SavedQuery, sqlText string) error {
 	var buf bytes.Buffer
 
-	header := SavedQuery{Title: q.Title, Project: q.Project, DefaultDataset: q.DefaultDataset, Labels: q.Labels, LinkID: q.LinkID}
+	header := SavedQuery{Title: q.Title, Project: q.Project, DefaultDataset: q.DefaultDataset, Labels: q.Labels, LinkID: q.LinkID, ID: q.ID}
+
+	// The file name is the default title; don't freeze it into the header
+	// (it would go stale after a rename).
+	if header.Title == strings.TrimSuffix(filepath.Base(q.Path), filepath.Ext(q.Path)) {
+		header.Title = ""
+	}
 
 	var meta bytes.Buffer
 	if err := toml.NewEncoder(&meta).Encode(header); err != nil {

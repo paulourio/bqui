@@ -723,16 +723,20 @@ func exportFlow(s *ui.Shell, dir string) exportResult {
 	return r
 }
 
-// workspaceResult captures the saved-query, autosave, session and local
-// history flow.
+// workspaceResult captures the workbooks, autosave, session, runs-per-file
+// and local history flow.
 type workspaceResult struct {
-	Edited, Saved, Listed, Dirty, Reopened bool
-	Autosaves                              int
-	AutosaveErr, Title                     string
-	SessionID, SessionAfter                string
-	SessionEnded                           bool
-	LocalRuns, LocalMatches                int
-	LocalSQL                               string
+	FirstQuery, FirstTitle              string
+	Autosaved, SwitchedBack, SecondSave bool
+	Renamed, RenamedTitle               string
+	NewWorkbook, WorkbookTitle          string
+	Workbooks                           []string
+	SessionID, SessionAfter             string
+	SessionEnded                        bool
+	FileRuns, OtherFileRuns             int
+	RunsTab                             string
+	LocalRuns, LocalMatches             int
+	LocalSQL                            string
 }
 
 func workspaceFlow(s *ui.Shell) workspaceResult {
@@ -741,35 +745,63 @@ func workspaceFlow(s *ui.Shell) workspaceResult {
 	var r workspaceResult
 
 	sqlIs := func(want string) func() bool {
-		return func() bool { return s.Workspace.Tab().SQL == want }
+		return func() bool { return strings.TrimSpace(s.Workspace.Tab().SQL) == want }
 	}
 
-	// A real edit (insertText) must come back as a change and autosave.
-	onMain(func() { s.Editor.SetTextAt("", 0, 0); s.Editor.InsertText(text) })
-	r.Edited = waitMain(loadTimeout, sqlIs(text))
+	body := func(path string) string {
+		_, b, _ := store.ReadQuery(path)
 
-	path := filepath.Join(s.Workspace.QueriesDir(), "smoke-saved.sql")
+		return strings.TrimSpace(b)
+	}
 
+	// The first launch made workbook-<today>/Untitled-1 the open query.
+	first, _ := s.Workspace.CurrentQuery()
 	onMain(func() {
-		r.Saved = s.SaveQueryTo(path)
-		s.SelectSidebar(ui.SidebarSaved)
-		r.Listed = len(s.Saved.Queries()) == 1 && s.Saved.Queries()[0].Path == path
-		s.SelectSidebar(ui.SidebarExplorer)
-		s.Editor.InsertText(" -- edited")
+		s.SelectSidebar(ui.SidebarWorkbooks)
+		r.FirstQuery, r.FirstTitle = first.Workbook+"/"+first.Name, s.Workspace.Title()
 	})
-	waitMain(loadTimeout, func() bool { return s.Workspace.Dirty() })
-	onMain(func() { r.Dirty, r.Title = s.Workspace.Dirty(), s.Workspace.Title() })
 
+	// Edits autosave to the file.
+	onMain(func() { s.Editor.SetTextAt("", 0, 0); s.Editor.InsertText(text) })
+	waitMain(loadTimeout, sqlIs(text))
 	_ = s.Workspace.Flush()
-	n, err := s.Workspace.Saves()
-	r.Autosaves = n
+	r.Autosaved = body(first.Path) == text
 
-	if err != nil {
-		r.AutosaveErr = err.Error()
-	}
+	// New query, then switch back: the second query was saved on the way.
+	onMain(s.NewQuery)
+	waitMain(loadTimeout, sqlIs(""))
+	second, _ := s.Workspace.CurrentQuery()
+	onMain(func() { s.Editor.InsertText("SELECT 2 AS second") })
+	waitMain(loadTimeout, sqlIs("SELECT 2 AS second"))
+	onMain(func() { s.OpenLibraryQuery(first.Path) })
+	r.SwitchedBack = waitMain(loadTimeout, sqlIs(text))
+	r.SecondSave = second.Name == "Untitled-2" && body(second.Path) == "SELECT 2 AS second"
 
-	onMain(func() { s.NewQuery(); s.OpenQuery(path) })
-	r.Reopened = waitMain(loadTimeout, sqlIs(text+"\n")) && !s.Workspace.Dirty()
+	// Rename the open query; the title follows.
+	onMain(func() {
+		s.MoveQuery(first, first.Workbook, "smoke query")
+
+		if q, ok := s.Workspace.CurrentQuery(); ok {
+			r.Renamed = q.Name
+		}
+
+		r.RenamedTitle = s.Workspace.Title()
+	})
+
+	// New workbook (with its first query), then rename it.
+	onMain(func() {
+		s.NewWorkbook()
+
+		q, _ := s.Workspace.CurrentQuery()
+		for _, w := range s.Workspace.Library().MustWorkbooks() {
+			if w.Name == q.Workbook {
+				s.RenameWorkbookTo(w, "reports")
+			}
+		}
+
+		q, _ = s.Workspace.CurrentQuery()
+		r.NewWorkbook, r.WorkbookTitle, r.Workbooks = q.Workbook+"/"+q.Name, s.Workspace.Title(), s.Workbooks.Workbooks()
+	})
 
 	// Session mode: the first run creates a session, the next joins it.
 	onMain(s.ToggleSessionMode)
@@ -780,6 +812,17 @@ func workspaceFlow(s *ui.Shell) workspaceResult {
 	waitRun(s, s.EndSession)
 	on, id := s.Workspace.SessionMode()
 	r.SessionEnded = !on && id == ""
+
+	// Runs per file: the two session runs belong to reports/Untitled-1; the
+	// renamed query keeps the runs made before (same file ID).
+	waitMain(loadTimeout, func() bool { return len(s.Runs.Runs()) >= 2 })
+	onMain(func() { r.FileRuns, r.RunsTab = len(s.Runs.Runs()), s.TabTitle(ui.TabRuns) })
+	onMain(func() {
+		q, _ := s.Workspace.Library().Find(filepath.Join(s.Workspace.Library().Root, first.Workbook, "smoke query.sql"))
+		s.OpenLibraryQuery(q.Path)
+	})
+	waitMain(loadTimeout, func() bool { return len(s.Runs.Runs()) != r.FileRuns })
+	onMain(func() { r.OtherFileRuns = len(s.Runs.Runs()) })
 
 	// Local run history: everything above was recorded; FTS finds it.
 	onMain(s.RunHistory)
@@ -957,13 +1000,13 @@ func studioFlow(s *ui.Shell, dir string) studioResult {
 
 	idle := func() bool { return !s.StudioBusy() }
 
-	onMain(func() { s.SelectSidebar(ui.SidebarSaved) })
-	waitMain(loadTimeout, func() bool { return !s.Saved.StudioLoading() && len(s.Saved.StudioQueries()) >= 2 })
+	onMain(func() { s.SelectSidebar(ui.SidebarWorkbooks) })
+	waitMain(loadTimeout, func() bool { return !s.Workbooks.StudioLoading() && len(s.Workbooks.StudioQueries()) >= 2 })
 
 	var target dataform.SavedQuery
 
 	onMain(func() {
-		for _, q := range s.Saved.StudioQueries() {
+		for _, q := range s.Workbooks.StudioQueries() {
 			r.Listed = append(r.Listed, q.Title)
 
 			if q.Title == "Top items" {
@@ -1012,9 +1055,9 @@ func studioFlow(s *ui.Shell, dir string) studioResult {
 	onMain(func() { s.PublishStudioAs("Smoke published") })
 	waitMain(loadTimeout, idle)
 	waitMain(loadTimeout, func() bool {
-		for _, q := range s.Saved.StudioQueries() {
+		for _, q := range s.Workbooks.StudioQueries() {
 			if q.Title == "Smoke published" {
-				return !s.Saved.StudioLoading()
+				return !s.Workbooks.StudioLoading()
 			}
 		}
 
@@ -1245,12 +1288,17 @@ func themeChecks(rep *Report, r themeResult) {
 }
 
 func workspaceChecks(rep *Report, r workspaceResult) {
-	rep.check("workspace-save", r.Edited && r.Saved && r.Listed, "edited %v, saved %v, listed in Saved %v", r.Edited, r.Saved, r.Listed)
-	rep.check("workspace-dirty", r.Dirty && strings.HasSuffix(r.Title, "— Edited"), "dirty %v, title %q", r.Dirty, r.Title)
-	rep.check("workspace-autosave", r.Autosaves > 0 && r.AutosaveErr == "", "%d autosaves %s", r.Autosaves, r.AutosaveErr)
-	rep.check("workspace-open", r.Reopened, "reopened saved query clean: %v", r.Reopened)
+	rep.check("workbook-start", strings.HasPrefix(r.FirstQuery, "workbook-") && strings.HasSuffix(r.FirstQuery, "/Untitled-1") &&
+		strings.HasSuffix(r.FirstTitle, " / Untitled-1"), "first query %q, title %q", r.FirstQuery, r.FirstTitle)
+	rep.check("workbook-autosave", r.Autosaved && r.SwitchedBack && r.SecondSave,
+		"autosaved %v, switched back %v, second query saved %v", r.Autosaved, r.SwitchedBack, r.SecondSave)
+	rep.check("workbook-rename", r.Renamed == "smoke query" && strings.HasSuffix(r.RenamedTitle, "/ smoke query") &&
+		r.NewWorkbook == "reports/Untitled-1" && r.WorkbookTitle == "reports / Untitled-1" && len(r.Workbooks) == 2,
+		"query %q (%q); new workbook %q (%q); workbooks %q", r.Renamed, r.RenamedTitle, r.NewWorkbook, r.WorkbookTitle, r.Workbooks)
 	rep.check("workspace-session", r.SessionID != "" && r.SessionAfter == r.SessionID && r.SessionEnded,
 		"session %q, after second run %q, ended %v", r.SessionID, r.SessionAfter, r.SessionEnded)
+	rep.check("workbook-runs", r.FileRuns == 2 && r.RunsTab == "Runs (2)" && r.OtherFileRuns > 2,
+		"runs of reports/Untitled-1 %d (tab %q); smoke query %d", r.FileRuns, r.RunsTab, r.OtherFileRuns)
 	rep.check("workspace-history", r.LocalRuns >= 3 && r.LocalMatches == 1 && strings.Contains(r.LocalSQL, "CREATE TEMP TABLE smoke_t"),
 		"%d local runs; search found %d: %q", r.LocalRuns, r.LocalMatches, r.LocalSQL)
 }

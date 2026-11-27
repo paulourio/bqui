@@ -32,6 +32,9 @@ var ErrNoFile = errors.New("app: query has no file yet; use Save As")
 type WorkspaceOptions struct {
 	DB         *store.DB // nil: nothing persists (fake/smoke runs)
 	QueriesDir string
+	// Library holds workbooks and queries (M15). With a library every
+	// editor tab is a query file, autosaved.
+	Library *store.Library
 	// InitialSQL fills a brand-new workspace.
 	InitialSQL string
 	// Delay is the autosave debounce (0 = 2s).
@@ -49,6 +52,7 @@ type Workspace struct {
 	mu        sync.Mutex
 	tab       store.Tab
 	fileText  string // text as last read from/written to tab.File
+	fileID    string // tab.File's stable ID (run history)
 	timer     *time.Timer
 	pending   bool
 	saveErr   error
@@ -68,7 +72,7 @@ func OpenWorkspace(opts WorkspaceOptions) (*Workspace, error) {
 	w := &Workspace{opts: opts, tab: store.Tab{ID: DefaultTabID, Title: "Untitled", SQL: opts.InitialSQL}}
 
 	if opts.DB == nil {
-		return w, nil
+		return w, w.adopt()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
@@ -96,7 +100,113 @@ func OpenWorkspace(opts WorkspaceOptions) (*Workspace, error) {
 		}
 	}
 
-	return w, nil
+	return w, w.adopt()
+}
+
+// adopt makes the restored tab a library query: an existing library file is
+// reopened; otherwise its text becomes a new query (the first launch
+// creates workbook-YYYY-MM-DD/Untitled-1). Studio-only tabs stay as they are.
+func (w *Workspace) adopt() error {
+	l := w.opts.Library
+	if l == nil {
+		return nil
+	}
+
+	if w.tab.File != "" {
+		if _, ok := l.Find(w.tab.File); ok {
+			_, err := w.Open(w.tab.File)
+
+			return err
+		}
+	}
+
+	if w.tab.Remote != "" && w.tab.File == "" {
+		return nil
+	}
+
+	q, err := l.EnsureStarted(w.tab.SQL, time.Now())
+	if err != nil {
+		return err
+	}
+
+	if q.Path == "" {
+		wbs, werr := l.Workbooks()
+		if werr != nil || len(wbs) == 0 {
+			return werr
+		}
+
+		if q, err = l.CreateQuery(wbs[0].Name, w.tab.SQL); err != nil {
+			return err
+		}
+	}
+
+	_, err = w.Open(q.Path)
+
+	return err
+}
+
+// Library returns the workbook library (nil without one).
+func (w *Workspace) Library() *store.Library { return w.opts.Library }
+
+// CurrentQuery returns the open library query, if any.
+func (w *Workspace) CurrentQuery() (store.Query, bool) {
+	if w.opts.Library == nil {
+		return store.Query{}, false
+	}
+
+	return w.opts.Library.Find(w.Tab().File)
+}
+
+// FileID is the open query file's stable ID ("" if none).
+func (w *Workspace) FileID() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.fileID
+}
+
+// Switch saves the open query if edited and opens another.
+func (w *Workspace) Switch(path string) (string, error) {
+	if w.Tab().File != "" && w.Dirty() {
+		if err := w.Save(); err != nil {
+			return "", err
+		}
+	}
+
+	return w.Open(path)
+}
+
+// NewQuery creates Untitled-N in a workbook and switches to it.
+func (w *Workspace) NewQuery(workbook string) (store.Query, error) {
+	q, err := w.opts.Library.CreateQuery(workbook, "")
+	if err != nil {
+		return q, err
+	}
+
+	_, err = w.Switch(q.Path)
+
+	return q, err
+}
+
+// Relink follows a rename or move of the open query.
+func (w *Workspace) Relink(from, to store.Query) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.tab.File == from.Path {
+		w.tab.File, w.tab.Title = to.Path, to.Name
+		w.scheduleLocked()
+	}
+}
+
+// FileRuns returns the open query's runs, newest first.
+func (w *Workspace) FileRuns(ctx context.Context) ([]store.Run, error) {
+	id := w.FileID()
+	if w.opts.DB == nil || id == "" {
+		return nil, nil
+	}
+
+	return w.opts.DB.FileRuns(ctx, id, searchRunLimit)
 }
 
 // Tab returns a copy of the current tab state.
@@ -120,7 +230,7 @@ func (w *Workspace) Edited(text string, line, col int) {
 }
 
 func (w *Workspace) scheduleLocked() {
-	if w.opts.DB == nil {
+	if w.opts.DB == nil && w.opts.Library == nil {
 		return
 	}
 
@@ -135,8 +245,16 @@ func (w *Workspace) scheduleLocked() {
 
 // Flush writes pending state now (also called on quit).
 func (w *Workspace) Flush() error {
+	// Library queries autosave to their files.
+	if w.opts.Library != nil && w.Tab().File != "" && w.Dirty() {
+		if err := w.Save(); err != nil {
+			w.opts.Logger.Warn("query autosave failed", "err", err)
+		}
+	}
+
 	w.mu.Lock()
 	if !w.pending || w.opts.DB == nil {
+		w.pending = false
 		w.mu.Unlock()
 
 		return nil
@@ -199,6 +317,10 @@ func (w *Workspace) Title() string {
 		title = "Untitled"
 	}
 
+	if q, ok := w.libraryQuery(t.File); ok {
+		title = q.Workbook + " / " + q.Name
+	}
+
 	if w.Dirty() && (t.File != "" || t.Remote != "") {
 		title += " — Edited"
 	}
@@ -227,8 +349,19 @@ func (w *Workspace) Open(path string) (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = body, path, q.Title, 0, 0
-	w.fileText = body
+	id := q.ID
+	if id == "" {
+		// Give the file a stable ID for its run history.
+		id, _ = store.EnsureID(path)
+	}
+
+	title := q.Title
+	if lq, ok := w.libraryQuery(path); ok {
+		title = lq.Name
+	}
+
+	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = body, path, title, 0, 0
+	w.fileText, w.fileID = body, id
 	w.linkFromFile(q, body)
 	w.scheduleLocked()
 
@@ -327,8 +460,9 @@ func (w *Workspace) Prepare(req *bq.QueryRequest) {
 }
 
 // Finished records a completed run: it keeps a new session ID, the last
-// job, and appends to the local run history.
-func (w *Workspace) Finished(snap RunSnapshot, project string) {
+// job, and appends to the local run history under fileID (the query file
+// open when the run started; "" for none).
+func (w *Workspace) Finished(snap RunSnapshot, project, fileID string) {
 	if snap.Kind != "query" {
 		return
 	}
@@ -350,7 +484,7 @@ func (w *Workspace) Finished(snap RunSnapshot, project string) {
 		return
 	}
 
-	r := store.Run{Started: snap.Started, Project: project, SQL: snap.SQL, State: snap.State.String(), Elapsed: snap.Elapsed}
+	r := store.Run{Started: snap.Started, Project: project, SQL: snap.SQL, State: snap.State.String(), Elapsed: snap.Elapsed, FileID: fileID}
 	if snap.Job != nil {
 		r.JobID, r.Location, r.Project = snap.Job.JobID, snap.Job.Location, snap.Job.Project
 	}
@@ -409,4 +543,12 @@ func ApplyPreferences(p store.Preferences, req *bq.QueryRequest) {
 			req.DefaultDataset = &bq.DatasetRef{Project: project, Dataset: dataset}
 		}
 	}
+}
+
+func (w *Workspace) libraryQuery(path string) (store.Query, bool) {
+	if w.opts.Library == nil || path == "" {
+		return store.Query{}, false
+	}
+
+	return w.opts.Library.Find(path)
 }

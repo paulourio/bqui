@@ -94,7 +94,8 @@ type Shell struct {
 	Graph     *GraphPane
 	Job       *JobPane
 	History   *HistoryPane
-	Saved     *SavedPane
+	Workbooks *WorkbooksPane
+	Runs      *RunsPane
 	Runner    *app.Runner
 	Workspace *app.Workspace
 	tabs      *appkit.Segmented
@@ -102,6 +103,8 @@ type Shell struct {
 	sideTabs  *appkit.Segmented
 	sideViews []objc.ID
 	recorded  map[*app.Run]bool
+	runFiles  map[*app.Run]string  // file ID a run started from
+	lastRuns  map[string]store.Run // query path → latest run (tooltips)
 
 	Themes      []*theme.Theme
 	Theme       *theme.Theme
@@ -185,6 +188,7 @@ func NewShell(opts Options) (*Shell, error) {
 	s.Graph = newGraphPane(s)
 	s.Job = newJobPane(opts.Jobs)
 	s.History = newHistoryPane(s, opts.Jobs)
+	s.Runs = newRunsPane(s)
 	s.Runner = app.NewRunner(app.RunnerOptions{
 		Backend:  opts.Queries,
 		Metadata: opts.Backend,
@@ -221,6 +225,7 @@ func NewShell(opts Options) (*Shell, error) {
 	objc.Msg(s.Window, "center")
 	appkit.SetToolbar(s.Window, "BQUIMainToolbar", s.toolbarItems())
 	s.restoreWorkspace()
+	s.Runs.Reload()
 	s.ApplyTheme(s.settings.Theme)
 	s.rebuildMenus() // theme check marks
 	s.watchAppearance()
@@ -296,8 +301,8 @@ func (s *Shell) SetBillingProject(project string) {
 	s.Editor.ConfigureLSP(s.lspOptions())
 	s.rebuildProjectPicker()
 
-	if s.Saved != nil && s.sideTabs.Selected() == SidebarSaved {
-		s.Saved.ReloadStudio()
+	if s.Workbooks != nil && s.sideTabs.Selected() == SidebarWorkbooks {
+		s.Workbooks.ReloadStudio()
 	}
 	s.saveSettings()
 }
@@ -482,7 +487,8 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Save As…", Key: "s", Mods: cmd | shift, Run: func() { s.SaveQueryAs() }},
 			{Title: "Save to BigQuery Studio…", Key: "s", Mods: cmd | opt, Run: s.PublishStudio},
 			{Title: "Reload from BigQuery Studio", Run: s.ReloadStudio},
-			{Title: "Show Saved Queries", Key: "1", Mods: cmd | opt, Run: func() { s.SelectSidebar(SidebarSaved) }},
+			{Title: "New Workbook", Key: "n", Mods: cmd | shift, Run: func() { s.NewWorkbook() }},
+			{Title: "Show Workbooks", Key: "1", Mods: cmd | opt, Run: func() { s.SelectSidebar(SidebarWorkbooks) }},
 			{},
 			{Title: "Close Window", Action: "performClose:", Key: "w"},
 		}},
@@ -599,7 +605,17 @@ func (s *Shell) RunSQL(sql string) {
 	req := bq.QueryRequest{SQL: sql, Project: s.settings.BillingProject, MaxInlineRows: firstPageRows}
 	app.ApplyPreferences(s.settings.Prefs, &req)
 	s.Workspace.Prepare(&req)
-	s.Results.Show(s.Runner.Start(req))
+
+	run := s.Runner.Start(req)
+	if id := s.Workspace.FileID(); id != "" {
+		if s.runFiles == nil {
+			s.runFiles = map[*app.Run]string{}
+		}
+
+		s.runFiles[run] = id
+	}
+
+	s.Results.Show(run)
 }
 
 // Preview shows the first rows of a table (Storage Read API, no query cost).
@@ -610,6 +626,7 @@ func (s *Shell) Preview(info app.ObjectInfo) {
 // Bottom-pane tabs.
 const (
 	TabResults = iota
+	TabRuns
 	TabJSON
 	TabPlan
 	TabGraph
@@ -620,8 +637,8 @@ const (
 // bottomPane stacks the Results, Job information and History tabs under a
 // segmented switcher.
 func (s *Shell) bottomPane() objc.ID {
-	s.tabs = appkit.NewSegmented([]string{"Results", "JSON", "Execution details", "Execution graph", "Job information", "History"}, s.SelectTab)
-	s.tabViews = []objc.ID{s.Results.View, s.JSON.View, s.Plan.View, s.Graph.View, s.Job.View, s.History.View}
+	s.tabs = appkit.NewSegmented([]string{"Results", "Runs", "JSON", "Execution details", "Execution graph", "Job information", "History"}, s.SelectTab)
+	s.tabViews = []objc.ID{s.Results.View, s.Runs.View, s.JSON.View, s.Plan.View, s.Graph.View, s.Job.View, s.History.View}
 
 	v := appkit.NewView()
 	appkit.UseAutoLayout(s.tabs.View)

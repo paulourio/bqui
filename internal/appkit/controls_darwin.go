@@ -3,6 +3,8 @@
 package appkit
 
 import (
+	"fmt"
+
 	"github.com/paulourio/bqui/internal/objc"
 )
 
@@ -230,4 +232,14 @@ func Prompt(message, info, value string) (text string, ok bool) {
 	}
 
 	return objc.GoString(objc.Msg(field, "stringValue")), true
+}
+
+// Trash moves a file or folder to the Trash (recoverable, unlike delete).
+func Trash(path string) error {
+	fm := objc.Msg(objc.Cls("NSFileManager"), "defaultManager")
+	if !objc.Send[bool](fm, "trashItemAtURL:resultingItemURL:error:", fileURL(path), objc.Nil, objc.Nil) {
+		return fmt.Errorf("could not move %s to the Trash", path)
+	}
+
+	return nil
 }

@@ -44,6 +44,7 @@ func main() {
 	inspect := flag.Bool("inspect", version == "dev", "enable the Safari Web Inspector for the editor")
 	fake := flag.Bool("fake", os.Getenv("BQUI_FAKE") == "1", "serve recorded fixture metadata instead of BigQuery")
 	hold := flag.Duration("smoke-hold", 0, "keep the window open this long after a passing smoke test (for screen captures)")
+	library := flag.String("library", store.DefaultLibrary, "library of workbooks to open (~/Documents/bqui/libraries/<name>)")
 	flag.Parse()
 
 	if *smokeDir != "" {
@@ -74,7 +75,7 @@ func main() {
 
 	settings, settingsPath := loadSettings(*fake, *smokeDir != "")
 
-	workspace, closeDB := openWorkspace(*fake, *smokeDir)
+	workspace, closeDB := openWorkspace(*fake, *smokeDir, *library)
 	defer closeDB()
 
 	var shell *ui.Shell
@@ -241,14 +242,14 @@ func fatal(err error) {
 // openWorkspace opens the local database and saved-queries folder. Smoke
 // runs use a fresh database and folder under the smoke directory; fake runs
 // keep nothing.
-func openWorkspace(fake bool, smokeDir string) (*app.Workspace, func()) {
-	var dbPath, queries string
+func openWorkspace(fake bool, smokeDir, library string) (*app.Workspace, func()) {
+	var dbPath, queries, libraries string
 
 	switch {
 	case smokeDir != "":
 		state := filepath.Join(smokeDir, "state")
 		_ = os.RemoveAll(state)
-		dbPath, queries = filepath.Join(state, "bqui.db"), filepath.Join(state, "queries")
+		dbPath, queries, libraries = filepath.Join(state, "bqui.db"), filepath.Join(state, "queries"), filepath.Join(state, "libraries")
 	case !fake:
 		var err error
 		if dbPath, err = store.DefaultDBPath(); err != nil {
@@ -258,9 +259,18 @@ func openWorkspace(fake bool, smokeDir string) (*app.Workspace, func()) {
 		if queries, err = store.DefaultQueriesDir(); err != nil {
 			fmt.Fprintln(os.Stderr, "bqui:", err)
 		}
+
+		if libraries, err = store.DefaultLibrariesDir(); err != nil {
+			fmt.Fprintln(os.Stderr, "bqui:", err)
+		}
 	default:
-		queries, _ = store.DefaultQueriesDir()
+		// Fake runs keep their own library, away from real queries.
+		if cache, err := os.UserCacheDir(); err == nil {
+			libraries = filepath.Join(cache, "bqui", "fake-libraries")
+		}
 	}
+
+	lib := openLibrary(libraries, library, queries, !fake && smokeDir == "")
 
 	var db *store.DB
 
@@ -271,11 +281,17 @@ func openWorkspace(fake bool, smokeDir string) (*app.Workspace, func()) {
 		}
 	}
 
-	w, err := app.OpenWorkspace(app.WorkspaceOptions{DB: db, QueriesDir: queries, InitialSQL: ui.SampleSQL})
+	opts := app.WorkspaceOptions{DB: db, QueriesDir: queries, InitialSQL: ui.SampleSQL, Library: lib}
+	if lib != nil {
+		opts.QueriesDir = lib.Root
+	}
+
+	w, err := app.OpenWorkspace(opts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "bqui: restoring the workspace failed:", err)
 
-		w, _ = app.OpenWorkspace(app.WorkspaceOptions{QueriesDir: queries, InitialSQL: ui.SampleSQL})
+		opts.DB = nil
+		w, _ = app.OpenWorkspace(opts)
 	}
 
 	var once sync.Once
@@ -329,4 +345,29 @@ func fixGUIPath() {
 	}
 
 	_ = os.Setenv("PATH", app.GUIPath(os.Getenv("PATH"), shellPath, home, exists))
+}
+
+// openLibrary opens the workbook library; the default library adopts the
+// old saved-queries folder (M10) once, as the "imported" workbook.
+func openLibrary(librariesDir, name, oldQueries string, importOld bool) *store.Library {
+	if librariesDir == "" {
+		return nil
+	}
+
+	lib, err := store.OpenLibrary(librariesDir, name)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "bqui: library:", err)
+
+		return nil
+	}
+
+	if importOld && name == store.DefaultLibrary && oldQueries != "" {
+		if moved, err := lib.ImportQueries(oldQueries); err != nil {
+			fmt.Fprintln(os.Stderr, "bqui:", err)
+		} else if moved {
+			slog.Default().Info("imported saved queries", "from", oldQueries, "to", lib.Root)
+		}
+	}
+
+	return lib
 }

@@ -5,6 +5,7 @@ package ui
 import (
 	"errors"
 	"path/filepath"
+	"time"
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
@@ -16,14 +17,14 @@ import (
 // Sidebar sections.
 const (
 	SidebarExplorer = iota
-	SidebarSaved
+	SidebarWorkbooks
 )
 
-// sidebar stacks the Explorer and Saved Queries panes under a switcher.
+// sidebar stacks the Explorer and Workbooks panes under a switcher.
 func (s *Shell) sidebar() objc.ID {
-	s.Saved = newSavedPane(s)
-	s.sideTabs = appkit.NewSegmented([]string{"Explorer", "Saved"}, s.SelectSidebar)
-	s.sideViews = []objc.ID{s.Explorer.View, s.Saved.View}
+	s.Workbooks = newWorkbooksPane(s)
+	s.sideTabs = appkit.NewSegmented([]string{"Explorer", "Workbooks"}, s.SelectSidebar)
+	s.sideViews = []objc.ID{s.Explorer.View, s.Workbooks.View}
 
 	v := appkit.NewView()
 	appkit.UseAutoLayout(s.sideTabs.View)
@@ -52,7 +53,7 @@ func (s *Shell) sidebar() objc.ID {
 	return v
 }
 
-// SelectSidebar switches between Explorer and Saved queries.
+// SelectSidebar switches between Explorer and Workbooks.
 func (s *Shell) SelectSidebar(i int) {
 	s.sideTabs.Select(i)
 
@@ -60,8 +61,8 @@ func (s *Shell) SelectSidebar(i int) {
 		appkit.SetHidden(sv, j != i)
 	}
 
-	if i == SidebarSaved {
-		s.Saved.Reload()
+	if i == SidebarWorkbooks {
+		s.Workbooks.Reload()
 	}
 }
 
@@ -98,6 +99,11 @@ func (s *Shell) keepChanges() bool {
 		return s.keepStudioChanges(t.Title)
 	}
 
+	// Library queries autosave: switching away just saves.
+	if _, ok := s.Workspace.CurrentQuery(); ok {
+		return s.saved(s.Workspace.Save())
+	}
+
 	if t.File == "" {
 		switch appkit.Confirm("Save this query before replacing it?",
 			"The editor text is not saved to a file. It stays in run history only if it was run.",
@@ -119,18 +125,6 @@ func (s *Shell) keepChanges() bool {
 	}
 
 	return false
-}
-
-// NewQuery clears the editor (after offering to save).
-func (s *Shell) NewQuery() {
-	if !s.keepChanges() {
-		return
-	}
-
-	s.Workspace.New()
-	s.Editor.SetTextAt("", 0, 0)
-	s.updateTitle()
-	s.Editor.Focus()
 }
 
 // ChooseQuery shows an open panel in the saved-queries folder.
@@ -211,8 +205,8 @@ func (s *Shell) saved(err error) bool {
 	s.updateTitle()
 	s.status("Saved " + filepath.Base(s.Workspace.Tab().File) + ".")
 
-	if s.sideTabs.Selected() == SidebarSaved {
-		s.Saved.Reload()
+	if s.sideTabs.Selected() == SidebarWorkbooks {
+		s.Workbooks.rebuild()
 	}
 
 	return true
@@ -253,7 +247,8 @@ func (s *Shell) sessionOn() bool {
 	return on
 }
 
-// recordFinished stores a finished run once (session ID, history).
+// recordFinished stores a finished run once (session ID, history, and the
+// query file it ran from).
 func (s *Shell) recordFinished(r *app.Run, snap app.RunSnapshot) {
 	if s.recorded[r] {
 		return
@@ -271,9 +266,19 @@ func (s *Shell) recordFinished(r *app.Run, snap app.RunSnapshot) {
 		return
 	}
 
-	s.Workspace.Finished(snap, s.BillingProject())
+	fileID := s.runFiles[r]
+	delete(s.runFiles, r)
+
+	s.Workspace.Finished(snap, s.BillingProject(), fileID)
 	s.History.LocalChanged()
+
+	// Recording is asynchronous; refresh the Runs tab shortly after.
+	if fileID != "" && fileID == s.Workspace.FileID() {
+		time.AfterFunc(runsRefreshDelay, func() { objc.Main(s.Runs.Reload) })
+	}
 }
+
+const runsRefreshDelay = 200 * time.Millisecond
 
 // keepStudioChanges offers to save edits to a BigQuery Studio query before
 // replacing them; the save runs synchronously (bounded by a timeout).

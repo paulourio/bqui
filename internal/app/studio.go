@@ -128,6 +128,13 @@ func (w *Workspace) ReloadRemote(ctx context.Context, sb StudioBackend) (string,
 // PublishRemote creates a saved query from the tab and links it. A linked
 // local file records the link in its header (link_id).
 func (w *Workspace) PublishRemote(ctx context.Context, sb StudioBackend, project, region, title string, author dataform.Author) (dataform.SavedQuery, error) {
+	// Save the file first so it and the new saved query start identical.
+	if w.Tab().File != "" && w.Dirty() {
+		if err := w.Save(); err != nil {
+			return dataform.SavedQuery{}, err
+		}
+	}
+
 	t := w.Tab()
 
 	q, head, err := sb.Create(ctx, project, region, title, t.SQL, author)

@@ -134,7 +134,7 @@ func TestWorkspaceSessionsAndRunHistory(t *testing.T) {
 	run := func(sql string) {
 		req := bq.QueryRequest{SQL: sql}
 		w.Prepare(&req)
-		w.Finished(wait(t, rn.Start(req)), FakeProject)
+		w.Finished(wait(t, rn.Start(req)), FakeProject, "")
 	}
 
 	run("SELECT 1 FROM orders")
@@ -315,5 +315,116 @@ func TestStudioOpenSaveConflictAndLink(t *testing.T) {
 
 	if err := w.SaveRemote(ctx, sb, me, false); !errors.Is(err, dataform.ErrConflict) {
 		t.Errorf("stale linked file save = %v", err)
+	}
+}
+
+func TestWorkspaceLibrary(t *testing.T) {
+	ctx := context.Background()
+	tmp := t.TempDir()
+
+	lib, err := store.OpenLibrary(filepath.Join(tmp, "libraries"), store.DefaultLibrary)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := store.Open(filepath.Join(tmp, "bqui.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	open := func() *Workspace {
+		w, oerr := OpenWorkspace(WorkspaceOptions{DB: db, Library: lib, InitialSQL: "SELECT 'sample'", Delay: time.Hour})
+		if oerr != nil {
+			t.Fatal(oerr)
+		}
+
+		return w
+	}
+
+	// First launch: the sample becomes workbook-<today>/Untitled-1.
+	w := open()
+	q, ok := w.CurrentQuery()
+
+	if !ok || q.Name != "Untitled-1" || !strings.HasPrefix(q.Workbook, "workbook-") || strings.TrimSpace(w.Tab().SQL) != "SELECT 'sample'" || w.FileID() == "" {
+		t.Fatalf("first query = %+v %v, tab %+v", q, ok, w.Tab())
+	}
+
+	if w.Title() != q.Workbook+" / Untitled-1" {
+		t.Errorf("title = %q", w.Title())
+	}
+
+	// Edits autosave to the file on Flush (no explicit save).
+	w.Edited("SELECT 42", 0, 0)
+
+	if err = w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, body, _ := store.ReadQuery(q.Path); body != "SELECT 42\n" {
+		t.Fatalf("autosaved body = %q", body)
+	}
+
+	// New query; switching back keeps edits made in the second one.
+	q2, err := w.NewQuery(q.Workbook)
+	if err != nil || q2.Name != "Untitled-2" || w.Tab().SQL != "" {
+		t.Fatalf("new query = %+v %v", q2, err)
+	}
+
+	w.Edited("SELECT 2", 0, 0)
+
+	if _, err = w.Switch(q.Path); err != nil || w.Tab().SQL != "SELECT 42\n" {
+		t.Fatalf("switch back = %q %v", w.Tab().SQL, err)
+	}
+
+	if _, body, _ := store.ReadQuery(q2.Path); body != "SELECT 2\n" {
+		t.Errorf("switching away did not save: %q", body)
+	}
+
+	// Runs attach to the file; renames keep the link (stable ID).
+	id := w.FileID()
+	w.Finished(RunSnapshot{Kind: "query", SQL: "SELECT 42", State: RunDone, Started: time.Now()}, "p", id)
+
+	renamed, err := lib.MoveQuery(q, q.Workbook, "answer")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w.Relink(q, renamed)
+
+	if w.Tab().File != renamed.Path || !strings.HasSuffix(w.Title(), "/ answer") {
+		t.Fatalf("relinked = %+v %q", w.Tab(), w.Title())
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+
+	for {
+		runs, _ := w.FileRuns(ctx)
+		if len(runs) == 1 && runs[0].SQL == "SELECT 42" {
+			break
+		}
+
+		if time.Now().After(deadline) {
+			t.Fatalf("file runs = %+v", runs)
+		}
+
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	if _, err := w.Switch(q2.Path); err != nil {
+		t.Fatal(err)
+	}
+
+	if runs, _ := w.FileRuns(ctx); len(runs) != 0 {
+		t.Errorf("other file has %d runs", len(runs))
+	}
+
+	// Relaunch restores the open query.
+	if err := w.Flush(); err != nil {
+		t.Fatal(err)
+	}
+
+	if w2 := open(); w2.Tab().File != q2.Path || w2.Tab().SQL != "SELECT 2\n" {
+		t.Errorf("relaunch = %+v", w2.Tab())
 	}
 }

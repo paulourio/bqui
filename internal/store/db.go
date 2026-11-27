@@ -52,6 +52,9 @@ var schema = []string{
 	`ALTER TABLE tabs ADD COLUMN remote TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE tabs ADD COLUMN remote_head TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE tabs ADD COLUMN remote_text TEXT NOT NULL DEFAULT ''`,
+	// M15: runs per query file (stable file ID from the file header).
+	`ALTER TABLE runs ADD COLUMN file_id TEXT NOT NULL DEFAULT ''`,
+	`CREATE INDEX runs_file ON runs(file_id, started)`,
 }
 
 // DB is bqui's local database: editor tabs (sessions) and run history.
@@ -242,14 +245,15 @@ type Run struct {
 	Bytes    int64
 	Elapsed  time.Duration
 	Error    string
+	FileID   string // query file the run came from ("" if none)
 }
 
 // RecordRun appends a run to the local history.
 func (d *DB) RecordRun(ctx context.Context, r Run) error {
 	_, err := d.db.ExecContext(ctx, `
-		INSERT INTO runs (started, project, job_id, location, sql, state, rows, bytes, elapsed_ms, error)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.Started.UnixMilli(), r.Project, r.JobID, r.Location, r.SQL, r.State, r.Rows, r.Bytes, r.Elapsed.Milliseconds(), r.Error)
+		INSERT INTO runs (started, project, job_id, location, sql, state, rows, bytes, elapsed_ms, error, file_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.Started.UnixMilli(), r.Project, r.JobID, r.Location, r.SQL, r.State, r.Rows, r.Bytes, r.Elapsed.Milliseconds(), r.Error, r.FileID)
 	if err != nil {
 		return fmt.Errorf("store: record run: %w", err)
 	}
@@ -260,7 +264,7 @@ func (d *DB) RecordRun(ctx context.Context, r Run) error {
 // SearchRuns returns runs newest first; a non-empty query matches SQL text
 // and job IDs with FTS5 (each word as a prefix).
 func (d *DB) SearchRuns(ctx context.Context, query string, limit int) ([]Run, error) {
-	q := `SELECT id, started, project, job_id, location, sql, state, rows, bytes, elapsed_ms, error FROM runs`
+	q := `SELECT id, started, project, job_id, location, sql, state, rows, bytes, elapsed_ms, error, file_id FROM runs`
 	args := []any{}
 
 	if terms := ftsQuery(query); terms != "" {
@@ -268,6 +272,18 @@ func (d *DB) SearchRuns(ctx context.Context, query string, limit int) ([]Run, er
 		args = append(args, terms)
 	}
 
+	return d.queryRuns(ctx, q, args, limit)
+}
+
+// FileRuns returns a query file's runs, newest first.
+func (d *DB) FileRuns(ctx context.Context, fileID string, limit int) ([]Run, error) {
+	q := `SELECT id, started, project, job_id, location, sql, state, rows, bytes, elapsed_ms, error, file_id
+		FROM runs WHERE file_id = ?`
+
+	return d.queryRuns(ctx, q, []any{fileID}, limit)
+}
+
+func (d *DB) queryRuns(ctx context.Context, q string, args []any, limit int) ([]Run, error) {
 	q += ` ORDER BY started DESC, id DESC LIMIT ?`
 	args = append(args, limit)
 
@@ -285,7 +301,7 @@ func (d *DB) SearchRuns(ctx context.Context, query string, limit int) ([]Run, er
 			started, elapsed int64
 		)
 
-		if err := rows.Scan(&r.ID, &started, &r.Project, &r.JobID, &r.Location, &r.SQL, &r.State, &r.Rows, &r.Bytes, &elapsed, &r.Error); err != nil {
+		if err := rows.Scan(&r.ID, &started, &r.Project, &r.JobID, &r.Location, &r.SQL, &r.State, &r.Rows, &r.Bytes, &elapsed, &r.Error, &r.FileID); err != nil {
 			return nil, fmt.Errorf("store: search runs: %w", err)
 		}
 

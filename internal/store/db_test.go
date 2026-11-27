@@ -176,3 +176,24 @@ func TestSavedQueriesRoundTrip(t *testing.T) {
 		t.Errorf("missing dir = %v %v", l, err)
 	}
 }
+
+func TestFileRuns(t *testing.T) {
+	ctx := context.Background()
+	db, _ := openTest(t)
+	base := time.Date(2026, 11, 27, 9, 0, 0, 0, time.UTC)
+
+	for i, f := range []string{"a", "b", "a"} {
+		if err := db.RecordRun(ctx, Run{Started: base.Add(time.Duration(i) * time.Minute), Project: "p", SQL: "SELECT " + f, State: "done", FileID: f}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	runs, err := db.FileRuns(ctx, "a", 10)
+	if err != nil || len(runs) != 2 || !runs[0].Started.After(runs[1].Started) || runs[0].FileID != "a" {
+		t.Fatalf("runs = %+v %v", runs, err)
+	}
+
+	if runs, _ := db.FileRuns(ctx, "zzz", 10); len(runs) != 0 {
+		t.Errorf("unknown file runs = %d", len(runs))
+	}
+}

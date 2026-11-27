@@ -622,6 +622,31 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M15 — Workbooks: a Library › Workbook › Query tree (replaces the Saved sidebar)
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **`store.Library`:**
+  - Workbooks are folders and queries are `.sql` files, listed in natural order (Untitled-2 before Untitled-10).
+  - Naming: workbook-YYYY-MM-DD and Untitled-N, with collision suffixes. Names are validated.
+  - Operations: rename and move, duplicate, the first-launch starter, and a one-time import of `~/Documents/bqui/queries` into `default/imported`.
+  - Each file gets a stable `id` in its header. Headers no longer freeze the file-name title.
+- **`app.Workspace`:**
+  - Every editor tab is a library query. Restored text that isn't in a file yet becomes Untitled-N, so nothing is lost.
+  - Autosave writes the file itself, and switching queries saves the current one, so there are no save prompts for library files.
+  - The title is "workbook / query". Renames and moves keep following the open file.
+- **Runs per query:**
+  - `runs.file_id` holds the ID of the file the run *started* from.
+  - A **Runs** tab in the bottom pane shows the count, e.g. "Runs (2)". Double-click shows results, and the menu offers insert SQL, run again, details, copy job ID, and console.
+  - The query's tree tooltip shows its last run.
+- **UI:**
+  - The sidebar switcher is **Explorer | Workbooks**, with New Workbook and New Query buttons.
+  - A single click opens a query.
+  - Context menus: rename, duplicate, move to another workbook, Show in Finder, Move to Trash. Workbooks can also be renamed and trashed.
+  - The BigQuery Studio section moved into this tree. ⌘N and ⇧⌘N create a query and a workbook.
+- **`bqui --library <name>`:** selects `~/Documents/bqui/libraries/<name>`. Fake runs use a separate cache library.
+- **Not done:**
+  - Drag and drop between workbooks (use the Move to menu).
+  - Inline rename in the tree (a prompt is used instead).
+  - The link icon for Studio-linked files.
+
 **Goal:** an IDE-like tree. A **library** holds **workbooks**, which are folders, and each workbook holds **queries**, which are `.sql` files.
 
 **Naming:** the words avoid BigQuery and GCP terms (project, session, workspace, repository, folder, notebook).
