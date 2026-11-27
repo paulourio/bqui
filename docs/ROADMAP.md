@@ -252,7 +252,7 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
   - Table Preview reads 1,000 rows through the Storage Read API, at no query cost.
 - **UI:**
   - The grid is a view-based `NSTableView` with one row per visual line, rather than the custom `NSView` planned, which gives native selection, resizing, reordering and accessibility for free.
-  - It has a row-number gutter, 1pt logical-row separators, right-aligned numbers, italic `null`, ⌘C copy as TSV, and Copy Rows as NDJSON or Copy Cell Value.
+  - It has a row-number gutter, 1pt logical-row separators, right-aligned numbers, italic `null`, ⌘C copy as TSV, and Copy Row as JSON (indented), Copy Rows as NDJSON or Copy Cell Value.
   - A status line shows running, loading, done/failed/cancelled, plus bytes, slot time and elapsed time.
 - **Deferred:**
   - Cell-level selection and find-in-results.

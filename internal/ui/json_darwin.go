@@ -270,6 +270,16 @@ func (p *JSONPane) rowJSON(i int64) []byte {
 	return results.AppendRowJSON(nil, p.grid.Fields(), row)
 }
 
+// rowIndented is one row as an indented JSON object.
+func (p *JSONPane) rowIndented(i int64) string {
+	row, err := p.grid.Row(i)
+	if err != nil {
+		return ""
+	}
+
+	return string(results.IndentRowJSON(p.grid.Fields(), row))
+}
+
 func (p *JSONPane) inspect(i int) {
 	if p.grid == nil {
 		return
@@ -321,7 +331,7 @@ func (p *JSONPane) menu(row int, _ string) []appkit.MenuItem {
 
 	if row >= 0 {
 		items = append([]appkit.MenuItem{
-			{Title: "Copy Row", Run: func() { appkit.CopyToPasteboard(string(p.rowJSON(int64(row)))) }},
+			{Title: "Copy Row as JSON", Run: func() { appkit.CopyToPasteboard(p.rowIndented(int64(row))) }},
 			{Title: "Inspect Row", Run: func() { p.inspect(row) }},
 			{},
 		}, items...)

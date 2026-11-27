@@ -5,6 +5,31 @@ import (
 	"testing"
 )
 
+func TestIndentRowJSON(t *testing.T) {
+	row := order(1001, "Ana", nil, item("A-1", 2, "x"))
+	got := string(IndentRowJSON(ordersFields(), row))
+	want := `{
+  "order_id": "1001",
+  "customer": {
+    "name": "Ana",
+    "tier": null
+  },
+  "items": [
+    {
+      "sku": "A-1",
+      "qty": "2",
+      "tags": [
+        "x"
+      ]
+    }
+  ]
+}`
+
+	if got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+}
+
 func TestAppendRowJSONMatchesConsoleEncoding(t *testing.T) {
 	row := order(1001, "Ana", nil, item("A-1", 2, "x"), item("B-7", 1))
 	got := string(AppendRowJSON(nil, ordersFields(), row))

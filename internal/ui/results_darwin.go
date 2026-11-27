@@ -589,6 +589,49 @@ func (p *ResultsPane) copyNDJSON(lines []int) string {
 	return string(b)
 }
 
+// copyRowJSON renders the logical row behind line as one indented JSON
+// object.
+func (p *ResultsPane) copyRowJSON(line int) string {
+	if p.grid == nil {
+		return ""
+	}
+
+	pos, err := p.grid.Locate(int64(line))
+	if err != nil {
+		return ""
+	}
+
+	row, err := p.grid.Row(pos.Row)
+	if err != nil {
+		return ""
+	}
+
+	return string(results.IndentRowJSON(p.grid.Fields(), row))
+}
+
+// CopyText returns what a results context-menu item copies for line, with
+// lines selected (smoke checks); ok is false when the menu lacks it.
+func (p *ResultsPane) CopyText(title string, line int, lines []int) (string, bool) {
+	switch title {
+	case "Copy Row as JSON":
+		return p.copyRowJSON(line), p.hasMenuItem(line, title)
+	case "Copy Rows as NDJSON":
+		return p.copyNDJSON(lines), p.hasMenuItem(line, title)
+	}
+
+	return "", false
+}
+
+func (p *ResultsPane) hasMenuItem(line int, title string) bool {
+	for _, it := range p.menu(line, "") {
+		if it.Title == title {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (p *ResultsPane) menu(row int, column string) []appkit.MenuItem {
 	if p.grid == nil || row < 0 {
 		return nil
@@ -603,6 +646,7 @@ func (p *ResultsPane) menu(row int, column string) []appkit.MenuItem {
 		{Title: "Auto-fit Column Widths", Run: p.AutoFit},
 		{},
 		{Title: "Copy", Run: func() { appkit.CopyToPasteboard(p.copyLines(lines)) }},
+		{Title: "Copy Row as JSON", Run: func() { appkit.CopyToPasteboard(p.copyRowJSON(row)) }},
 		{Title: "Copy Rows as NDJSON", Run: func() { appkit.CopyToPasteboard(p.copyNDJSON(lines)) }},
 	}
 

@@ -17,6 +17,17 @@ func AppendRowJSON(dst []byte, fields []Field, row []any) []byte {
 	return appendStruct(dst, fields, row)
 }
 
+// IndentRowJSON returns one row as an indented JSON object (two spaces),
+// in the same encoding as AppendRowJSON.
+func IndentRowJSON(fields []Field, row []any) []byte {
+	var b bytes.Buffer
+	if err := json.Indent(&b, AppendRowJSON(nil, fields, row), "", "  "); err != nil {
+		return AppendRowJSON(nil, fields, row) // unreachable: the encoder emits valid JSON
+	}
+
+	return b.Bytes()
+}
+
 func appendStruct(dst []byte, fields []Field, vals []any) []byte {
 	dst = append(dst, '{')
 
