@@ -29,6 +29,15 @@ func TestDocCostKeepsEstimateWithErrors(t *testing.T) {
 	if detail, more := c.ErrorDetail(); detail != "Line 3, column 8: Unrecognized name: wrod" || more != "" {
 		t.Errorf("detail = %q more %q", detail, more)
 	}
+
+	errs, _ := c.ErrorList()
+	if len(errs) != 1 || errs[0].Where() != "Line 3, column 8" || errs[0].Line != 3 || errs[0].Column != 8 {
+		t.Errorf("list = %+v", errs)
+	}
+
+	if (CostError{Line: 4}).Where() != "Line 4" || (CostError{}).Position() != "" {
+		t.Error("partial positions")
+	}
 }
 
 func TestDocCostSummaries(t *testing.T) {

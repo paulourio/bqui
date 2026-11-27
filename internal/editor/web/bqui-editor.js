@@ -125,6 +125,15 @@
       case 'focus':
         ed.focus();
         break;
+      case 'reveal': {
+        // Move the cursor to a 1-based line/column, show it and focus.
+        var to = { lineNumber: p.line || 1, column: p.column || 1 };
+        ed.setPosition(to);
+        ed.revealPositionInCenterIfOutsideViewport(to);
+        ed.focus();
+        if (state.reportChange) state.reportChange();
+        break;
+      }
       case 'setOptions':
         ed.updateOptions(p || {});
         break;
@@ -485,6 +494,7 @@
         app('changed', { text: model.getValue(), line: pos.lineNumber - 1, character: pos.column - 1 });
       }, CHANGE_DEBOUNCE_MS);
     }
+    state.reportChange = changed;
     model.onDidChangeContent(function () { if (!state.quiet) changed(); });
     ed.onDidChangeCursorPosition(function (e) { if (!state.quiet && e.source !== 'api') changed(); });
 

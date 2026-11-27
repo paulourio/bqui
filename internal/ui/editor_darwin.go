@@ -228,6 +228,13 @@ func (p *EditorPane) Focus() {
 	_ = p.Bridge.SendApp("focus", nil)
 }
 
+// GoTo moves the cursor to a 1-based line and column, scrolls it into view
+// and focuses the editor.
+func (p *EditorPane) GoTo(line, column int) {
+	objc.Msg(objc.Msg(p.Web.View, "window"), "makeFirstResponder:", p.Web.View)
+	_ = p.Bridge.SendApp("reveal", map[string]int{"line": line, "column": column})
+}
+
 // WaitReady blocks until Monaco is loaded or timeout elapses.
 func (p *EditorPane) WaitReady(timeout time.Duration) bool {
 	select {

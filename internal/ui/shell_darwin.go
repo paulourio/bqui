@@ -952,17 +952,35 @@ func (s *Shell) onCost(c app.DocCost) {
 	objc.Msg(s.Cost, "invalidateIntrinsicContentSize")
 
 	tip := "Estimated bytes processed (bqls dry run)"
-	detail, more := c.ErrorDetail()
 
 	if c.Errored() {
+		detail, more := c.ErrorDetail()
 		tip = c.ErrorTitle() + "\n" + detail
-		s.SQLErrors.ShowNote(c.ErrorTitle(), detail, more)
+		s.SQLErrors.ShowNoteLinks(c.ErrorTitle(), s.errorLinks(c), more)
 	} else {
 		s.SQLErrors.Hide()
 	}
 
 	objc.Msg(s.Cost, "setToolTip:", objc.String(tip))
 	appkit.SetHidden(s.sqlErrorBar, !c.Errored())
+}
+
+// errorLinks lists SQL errors as links ("Line 2, column 1") that move the
+// editor's cursor there, each followed by its message.
+func (s *Shell) errorLinks(c app.DocCost) []appkit.BannerLink {
+	errs, _ := c.ErrorList()
+	links := make([]appkit.BannerLink, len(errs))
+
+	for i, e := range errs {
+		label := e.Where()
+		if label == "" {
+			label = "Error"
+		}
+
+		links[i] = appkit.BannerLink{Label: label, Text: e.Message, Run: func() { s.Editor.GoTo(max(e.Line, 1), max(e.Column, 1)) }}
+	}
+
+	return links
 }
 
 // CostText returns the toolbar estimate text (smoke checks).

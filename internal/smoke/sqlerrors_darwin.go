@@ -22,6 +22,8 @@ type sqlErrorsResult struct {
 	BarShown         bool
 	BarTitle, Detail string
 	GutterErrors     int
+	JumpedLine       int  // 0-based cursor line after clicking the first link
+	JumpFocused      bool // the editor has focus after the click
 	ClearedBar       bool
 	ClearedGutter    bool
 	ClearedCost      string
@@ -56,7 +58,8 @@ func sqlErrorsFlow(s *ui.Shell, dir string) sqlErrorsResult {
 	onMain(func() {
 		r.Cost = s.CostText()
 		r.BarShown = s.SQLErrors.Visible()
-		r.BarTitle, r.Detail, _ = s.SQLErrors.Text()
+		r.BarTitle, _, _ = s.SQLErrors.Text()
+		r.Detail = strings.Join(s.SQLErrors.LinkRows(), "\n")
 		r.GutterErrors = s.Editor.GutterErrors()
 
 		r.Shot = "sql-errors.png"
@@ -64,6 +67,15 @@ func sqlErrorsFlow(s *ui.Shell, dir string) sqlErrorsResult {
 			r.Shot = "✕ " + err.Error()
 		}
 
+		// Clicking "Line 2, column 1" moves the cursor there and focuses
+		// the editor (focus starts in the explorer to prove the move).
+		s.Explorer.Outline.Focus()
+		objc.Msg(s.SQLErrors.LinkButton(0), "performClick:", objc.Nil)
+	})
+
+	waitMain(loadTimeout, func() bool { return s.Workspace.Tab().CursorLine == 1 })
+	onMain(func() {
+		r.JumpedLine, r.JumpFocused = s.Workspace.Tab().CursorLine, s.EditorFocused()
 		s.Editor.SetText(sqlErrorsGood)
 	})
 
@@ -78,8 +90,10 @@ func sqlErrorsChecks(rep *Report, r sqlErrorsResult) {
 	rep.check("window-title-workbook", r.WantTitle != "" && r.Title == r.WantTitle && strings.HasPrefix(r.Subtitle, r.WantSubtitle),
 		"title %q subtitle %q (want %q / %q)", r.Title, r.Subtitle, r.WantTitle, r.WantSubtitle)
 	rep.check("sql-errors-shown", r.Err == "" && r.BarShown && r.BarTitle == "1 error in this query" &&
-		strings.Contains(r.Detail, "Line 2") && r.GutterErrors == 1 && strings.Contains(r.Cost, "1 error") && !strings.HasPrefix(r.Shot, "✕"),
+		strings.HasPrefix(r.Detail, "Line 2, column 1 Syntax error") && r.GutterErrors == 1 && strings.Contains(r.Cost, "1 error") && !strings.HasPrefix(r.Shot, "✕"),
 		"bar %v %q %q, gutter error lines %d, toolbar %q, %s %s", r.BarShown, r.BarTitle, r.Detail, r.GutterErrors, r.Cost, r.Shot, r.Err)
+	rep.check("sql-errors-link", r.JumpedLine == 1 && r.JumpFocused,
+		"cursor line %d (want 1, 0-based), editor focused %v", r.JumpedLine, r.JumpFocused)
 	rep.check("sql-errors-cleared", r.ClearedBar && r.ClearedGutter && !strings.Contains(r.ClearedCost, "error"),
 		"bar hidden %v, gutter cleared %v, toolbar %q", r.ClearedBar, r.ClearedGutter, r.ClearedCost)
 }

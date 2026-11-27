@@ -99,33 +99,56 @@ func (c DocCost) ErrorTitle() string {
 	return c.ErrorBadge() + " in this query"
 }
 
-// ErrorDetail lists the errors, one per line with their position, and how
-// many more were left out.
-func (c DocCost) ErrorDetail() (detail, more string) {
-	lines := make([]string, 0, min(len(c.Errors), maxListedErrors))
+// ErrorList returns the first errors to spell out (messages cleaned up)
+// and how many more were left out ("and 2 more").
+func (c DocCost) ErrorList() (errs []CostError, more string) {
+	errs = make([]CostError, 0, min(len(c.Errors), maxListedErrors))
 
 	for i, e := range c.Errors {
 		if i == maxListedErrors {
 			break
 		}
 
-		lines = append(lines, e.Position()+statementPos.ReplaceAllString(e.Message, ""))
+		e.Message = statementPos.ReplaceAllString(e.Message, "")
+		errs = append(errs, e)
 	}
 
-	if extra := c.errorCount() - len(lines); extra > 0 {
+	if extra := c.errorCount() - len(errs); extra > 0 {
 		more = "and " + strconv.Itoa(extra) + " more"
+	}
+
+	return errs, more
+}
+
+// ErrorDetail lists the errors, one per line with their position, and how
+// many more were left out.
+func (c DocCost) ErrorDetail() (detail, more string) {
+	errs, more := c.ErrorList()
+	lines := make([]string, len(errs))
+
+	for i, e := range errs {
+		lines[i] = e.Position() + e.Message
 	}
 
 	return strings.Join(lines, "\n"), more
 }
 
-// Position is "Line 2, column 5: " ("" when unknown).
-func (e CostError) Position() string {
+// Where is "Line 2, column 5" ("" when unknown).
+func (e CostError) Where() string {
 	switch {
 	case e.Line > 0 && e.Column > 0:
-		return "Line " + strconv.Itoa(e.Line) + ", column " + strconv.Itoa(e.Column) + ": "
+		return "Line " + strconv.Itoa(e.Line) + ", column " + strconv.Itoa(e.Column)
 	case e.Line > 0:
-		return "Line " + strconv.Itoa(e.Line) + ": "
+		return "Line " + strconv.Itoa(e.Line)
+	}
+
+	return ""
+}
+
+// Position is Where followed by ": " ("" when unknown).
+func (e CostError) Position() string {
+	if w := e.Where(); w != "" {
+		return w + ": "
 	}
 
 	return ""
