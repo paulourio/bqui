@@ -106,7 +106,7 @@ func (p *RunsPane) openResults(i int) {
 	}
 
 	p.s.SelectTab(TabResults)
-	p.s.Results.Show(p.s.Runner.OpenJob(bq.JobRef{Project: r.Project, JobID: r.JobID, Location: r.Location}))
+	p.s.showRun(p.s.Runner.OpenJob(bq.JobRef{Project: r.Project, JobID: r.JobID, Location: r.Location}))
 }
 
 func (p *RunsPane) menu(i int, _ string) []appkit.MenuItem {

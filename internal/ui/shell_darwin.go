@@ -617,13 +617,21 @@ func (s *Shell) RunSQL(sql string) {
 		s.runFiles[run] = id
 	}
 
-	s.Results.Show(run)
+	s.showRun(run)
 }
 
 // Preview shows the first rows of a table (Storage Read API, no query cost).
 func (s *Shell) Preview(info app.ObjectInfo) {
-	s.Results.Show(s.Runner.Preview(info.ObjectRef()))
+	s.showRun(s.Runner.Preview(info.ObjectRef()))
 }
+
+func (s *Shell) showRun(r *app.Run) {
+	s.Results.Show(r)
+	s.JSON.Update(r.Snapshot())
+}
+
+// ShowRun displays r in both the Results and JSON panes (smoke checks).
+func (s *Shell) ShowRun(r *app.Run) { s.showRun(r) }
 
 // Bottom-pane tabs.
 const (

@@ -264,7 +264,7 @@ func (p *HistoryPane) menu(i int, _ string) []appkit.MenuItem {
 	}
 
 	items = append(items,
-		appkit.MenuItem{Title: "Show Results", Run: func() { p.s.SelectTab(TabResults); p.s.Results.Show(p.s.Runner.OpenJob(r.Ref)) }},
+		appkit.MenuItem{Title: "Show Results", Run: func() { p.s.SelectTab(TabResults); p.s.showRun(p.s.Runner.OpenJob(r.Ref)) }},
 		appkit.MenuItem{Title: "Show Details", Run: func() { p.s.Inspector.ShowJob(r.Ref) }},
 	)
 

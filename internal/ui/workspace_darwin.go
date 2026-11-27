@@ -236,7 +236,7 @@ func (s *Shell) EndSession() {
 		return
 	}
 
-	s.Results.Show(s.Runner.Start(bq.QueryRequest{SQL: app.EndSessionSQL, Project: s.BillingProject(), SessionID: id}))
+	s.showRun(s.Runner.Start(bq.QueryRequest{SQL: app.EndSessionSQL, Project: s.BillingProject(), SessionID: id}))
 	s.status("Ending BigQuery session " + id + "…")
 }
 
