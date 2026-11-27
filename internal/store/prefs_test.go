@@ -1,10 +1,14 @@
 package store
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestParseBytes(t *testing.T) {
 	cases := map[string]int64{
 		"": 0, "1024": 1024, "10 GB": 10e9, "1.5TiB": 3 << 39, "500mb": 500e6, "2 KiB": 2048, "7b": 7,
+		"9223372036854774784 B": 9223372036854774784,
 	}
 
 	for in, want := range cases {
@@ -13,7 +17,10 @@ func TestParseBytes(t *testing.T) {
 		}
 	}
 
-	for _, bad := range []string{"ten", "-1 GB", "1e400", "GB"} {
+	for _, bad := range []string{
+		"ten", "-1 GB", "1e400", "GB",
+		"9223372036854775807 B", "9223372036854775808 B", "8388608 TiB", "1e308 TiB",
+	} {
 		if _, err := ParseBytes(bad); err == nil {
 			t.Errorf("ParseBytes(%q) succeeded", bad)
 		}
@@ -44,12 +51,36 @@ func TestPreferencesRoundTrip(t *testing.T) {
 	for _, bad := range []PreferenceText{
 		{DefaultDataset: "nodot"},
 		{DefaultDataset: "a.b.c"},
+		{DefaultDataset: "p . d"},
+		{DefaultDataset: "p\td"},
+		{DefaultDataset: "p:d.t"},
+		{DefaultDataset: ".d"},
+		{DefaultDataset: "p."},
 		{MaxBytesBilled: "lots"},
 		{CostWarningUSD: "-3"},
+		{CostWarningUSD: "NaN"},
+		{CostWarningUSD: "Inf"},
+		{CostWarningUSD: "+Inf"},
+		{CostWarningUSD: "-Inf"},
+		{CostWarningUSD: "$NaN"},
+		{MaxSpillBytes: "8388608 TiB"},
+		{MaxBytesBilled: "9223372036854775808 B"},
 		{MaxSpillBytes: "x"},
 	} {
-		if _, err := bad.Parse(); err == nil {
+		if _, perr := bad.Parse(); perr == nil {
 			t.Errorf("%+v parsed", bad)
+		}
+	}
+
+	pZero, err := (PreferenceText{CostWarningUSD: "-0"}).Parse()
+	if err != nil || pZero.CostWarningUSD != 0 || math.Signbit(pZero.CostWarningUSD) {
+		t.Errorf("-0 CostWarningUSD = (%+v, %v)", pZero, err)
+	}
+
+	for _, ds := range []string{"example.com:proj.d", "example.com:proj:d", "p:d"} {
+		parsed, derr := (PreferenceText{DefaultDataset: ds}).Parse()
+		if derr != nil || parsed.DefaultDataset != ds {
+			t.Errorf("PreferenceText{DefaultDataset:%q}.Parse() = (%+v, %v)", ds, parsed, derr)
 		}
 	}
 }

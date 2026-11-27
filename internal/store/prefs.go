@@ -80,8 +80,7 @@ func (t PreferenceText) Parse() (Preferences, error) {
 	}
 
 	if p.DefaultDataset != "" {
-		parts := strings.Split(p.DefaultDataset, ".")
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		if !validDefaultDataset(p.DefaultDataset) {
 			return p, errors.New("default dataset: use project.dataset")
 		}
 	}
@@ -95,12 +94,46 @@ func (t PreferenceText) Parse() (Preferences, error) {
 	}
 
 	if s := strings.TrimPrefix(strings.TrimSpace(t.CostWarningUSD), "$"); s != "" {
-		if p.CostWarningUSD, err = strconv.ParseFloat(s, 64); err != nil || p.CostWarningUSD < 0 {
+		if p.CostWarningUSD, err = strconv.ParseFloat(s, 64); err != nil || math.IsNaN(p.CostWarningUSD) || math.IsInf(p.CostWarningUSD, 0) || p.CostWarningUSD < 0 {
 			return p, errors.New("cost warning: enter dollars, like 1.50")
+		}
+
+		if p.CostWarningUSD == 0 {
+			p.CostWarningUSD = 0
 		}
 	}
 
 	return p, nil
+}
+
+// validDefaultDataset checks a "project.dataset" or "project:dataset" reference
+// (including domain-scoped projects such as "example.com:proj.dataset" and
+// "example.com:proj:dataset") without internal whitespace.
+func validDefaultDataset(s string) bool {
+	if s == "" || strings.ContainsAny(s, " \t\r\n`") {
+		return false
+	}
+
+	var proj, ds string
+
+	switch {
+	case strings.Contains(s, ":"):
+		i := strings.LastIndex(s, ":")
+		prefix, rest := s[:i], s[i+1:]
+
+		if strings.Contains(prefix, ".") && strings.Count(rest, ".") == 1 {
+			j := strings.LastIndex(s, ".")
+			proj, ds = s[:j], s[j+1:]
+		} else {
+			proj, ds = prefix, rest
+		}
+	case strings.Count(s, ".") == 1:
+		proj, ds, _ = strings.Cut(s, ".")
+	default:
+		return false
+	}
+
+	return proj != "" && ds != "" && !strings.Contains(ds, ".")
 }
 
 var byteUnits = []struct {
@@ -141,8 +174,10 @@ func ParseBytes(s string) (int64, error) {
 		return 0, errors.New("enter a size like 10 GB")
 	}
 
+	const maxInt64Float = 0x1p63 // float64(math.MaxInt64) rounds up to 2^63
+
 	n := v * scale
-	if n > math.MaxInt64 {
+	if math.IsInf(n, 0) || math.IsNaN(n) || n >= maxInt64Float {
 		return 0, errors.New("size is too large")
 	}
 
