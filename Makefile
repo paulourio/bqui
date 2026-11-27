@@ -70,11 +70,12 @@ vm-smoke: vm-deploy
 # Cross-compile every package's tests for darwin/amd64 and run them in the VM.
 VMTEST := $(DIST)/vmtest
 vm-test:
+	rm -rf $(VMTEST)
 	mkdir -p $(VMTEST)
 	for p in $$(GOOS=darwin go list ./...); do \
 		GOOS=darwin GOARCH=amd64 go test -c -o $(VMTEST)/$$(echo $$p | tr / _).test $$p || exit 1; \
 	done
-	$(SSH) 'mkdir -p $(VM_DIR)/vmtest'
+	$(SSH) 'rm -rf $(VM_DIR)/vmtest && mkdir -p $(VM_DIR)/vmtest'
 	scp -q -P $(VM_PORT) $(VMTEST)/*.test $(VM_HOST):$(VM_DIR)/vmtest/
 	$(SSH) 'cd $(VM_DIR)/vmtest && rc=0; for t in *.test; do echo "== $$t"; ./$$t -test.count=1 || rc=1; done; exit $$rc'
 
