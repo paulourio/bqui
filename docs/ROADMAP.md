@@ -252,7 +252,7 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
   - Table Preview reads 1,000 rows through the Storage Read API, at no query cost.
 - **UI:**
   - The grid is a view-based `NSTableView` with one row per visual line, rather than the custom `NSView` planned, which gives native selection, resizing, reordering and accessibility for free.
-  - It has a row-number gutter, 1pt logical-row separators, right-aligned numbers, italic `null`, ⌘C copy as TSV, and Copy Rows as JSON or Copy Cell Value.
+  - It has a row-number gutter, 1pt logical-row separators, right-aligned numbers, italic `null`, ⌘C copy as TSV, and Copy Rows as NDJSON or Copy Cell Value.
   - A status line shows running, loading, done/failed/cancelled, plus bytes, slot time and elapsed time.
 - **Deferred:**
   - Cell-level selection and find-in-results.
@@ -340,7 +340,7 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 **Status: done.** What shipped, and where it differs from the plan below:
 - **JSON tab:** one compact JSON object per row, in the console's encoding, in a virtualized table. Each row is encoded on demand from the grid's chunk cache, so the result is never materialized as one string. Lines are truncated at 4,096 characters for display.
 - **Value inspector:** selecting a JSON row, or double-clicking a grid cell, shows the row in the inspector as a typed tree (name, value, type), expanded to the clicked element path. For example, the second visual line of `items.tags` maps to `items[0].tags[1]`. Values are shown in full up to 64 KiB, and the menu offers Copy Value, Copy Path and Insert Path in Editor.
-- **Copy All as JSON:** stops at 16 MiB and points to Export (M9), which streams to files.
+- **Copy All as NDJSON:** stops at 16 MiB and points to Export (M9), which streams to files.
 - **Not done:**
   - Folding inside the JSON tab; the inspector tree serves that role.
   - Syntax colors in the JSON tab; they arrive with themes (M12).

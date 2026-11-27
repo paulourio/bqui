@@ -690,9 +690,9 @@ func planFlow(s *ui.Shell) planResult {
 
 // exportResult captures the export flow.
 type exportResult struct {
-	CSVLines, JSONLines, GridLines int64
-	Status                         string
-	Err                            string
+	CSVLines, NDJSONLines, GridLines int64
+	Status                           string
+	Err                              string
 }
 
 func exportFlow(s *ui.Shell, dir string) exportResult {
@@ -733,7 +733,7 @@ func exportFlow(s *ui.Shell, dir string) exportResult {
 	}
 
 	r.CSVLines = countLines(exportOne("export.csv", export.CSV))
-	r.JSONLines = countLines(exportOne("export.jsonl", export.NDJSON))
+	r.NDJSONLines = countLines(exportOne("export.ndjson", export.NDJSON))
 
 	return r
 }
@@ -1213,8 +1213,8 @@ func workspaceChecks(rep *Report, r workspaceResult) {
 
 func exportChecks(rep *Report, r exportResult) {
 	rep.check("export-csv", r.CSVLines == r.GridLines+1, "%d CSV lines for %d grid lines (+ header)", r.CSVLines, r.GridLines)
-	rep.check("export-json", r.JSONLines == 5000 && strings.HasPrefix(r.Status, "✓ Exported") && r.Err == "",
-		"%d JSON lines; status %q %s", r.JSONLines, r.Status, r.Err)
+	rep.check("export-json", r.NDJSONLines == 5000 && strings.HasPrefix(r.Status, "✓ Exported") && r.Err == "",
+		"%d NDJSON lines; status %q %s", r.NDJSONLines, r.Status, r.Err)
 }
 
 func planChecks(rep *Report, r planResult) {

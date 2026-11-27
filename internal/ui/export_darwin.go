@@ -22,7 +22,7 @@ type exportChoice struct {
 var exportChoices = []exportChoice{
 	{"CSV…", export.CSV, export.Options{}},
 	{"CSV with JSON Cells…", export.CSV, export.Options{CSVNesting: export.CSVJSONCells}},
-	{"JSON Lines…", export.NDJSON, export.Options{}},
+	{"NDJSON…", export.NDJSON, export.Options{}},
 	{"Parquet…", export.Parquet, export.Options{}},
 }
 

@@ -15,7 +15,7 @@ import (
 const (
 	jsonLineRunes     = 131072   // safety cap on single-line AppKit cell rendering
 	jsonScanLimit     = 2000     // rows scanned on initial/streaming load for peak width
-	copyAllCap        = 16 << 20 // Copy All as JSON stops here (use export)
+	copyAllCap        = 16 << 20 // Copy All as NDJSON stops here (use export)
 	jsonMinWidth      = 600.0
 	jsonColMinW       = 200.0
 	monoMaxCharFactor = 2.0 // conservative upper-bound px/byte factor for lazy resize check
@@ -290,7 +290,7 @@ func (p *JSONPane) copyRows(rows []int) string {
 	return string(b)
 }
 
-// copyAll copies every row as JSON lines, up to copyAllCap.
+// copyAll copies every row as NDJSON, up to copyAllCap.
 func (p *JSONPane) copyAll() {
 	if p.grid == nil {
 		return
@@ -317,7 +317,7 @@ func (p *JSONPane) menu(row int, _ string) []appkit.MenuItem {
 		return nil
 	}
 
-	items := []appkit.MenuItem{{Title: "Copy All as JSON", Run: p.copyAll}}
+	items := []appkit.MenuItem{{Title: "Copy All as NDJSON", Run: p.copyAll}}
 
 	if row >= 0 {
 		items = append([]appkit.MenuItem{

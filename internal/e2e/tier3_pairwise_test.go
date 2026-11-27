@@ -175,7 +175,7 @@ func TestTier3PairwiseCombinations(t *testing.T) {
 			t.Fatalf("CSV lines = %d, err = %v", len(recs), err)
 		}
 
-		ndPath := filepath.Join(outDir, "deep.jsonl")
+		ndPath := filepath.Join(outDir, "deep.ndjson")
 		ch2 := make(chan app.ExportProgress, 1)
 		rn.Export(app.ExportSource{Grid: g}, ndPath, export.NDJSON, export.Options{}, func(p app.ExportProgress) {
 			if p.Done {

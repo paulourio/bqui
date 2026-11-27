@@ -13,7 +13,7 @@ server.
   - Your jobs or the whole project's.
   - Job details, execution details (stages), and an execution graph.
   - Local run history with full-text search.
-- **Export:** CSV (console-style lines or JSON cells), JSON Lines and Parquet.
+- **Export:** CSV (console-style lines or JSON cells), NDJSON and Parquet.
 - **Workspace:**
   - Saved queries are `.sql` files in `~/Documents/bqui/queries`.
   - The editor autosaves, and survives a crash.

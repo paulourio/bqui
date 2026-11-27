@@ -560,8 +560,9 @@ func (p *ResultsPane) copyLines(lines []int) string {
 	return b.String()
 }
 
-// copyJSON renders the logical rows behind the selected lines as JSON lines.
-func (p *ResultsPane) copyJSON(lines []int) string {
+// copyNDJSON renders the logical rows behind the selected lines as NDJSON
+// (one compact JSON object per line).
+func (p *ResultsPane) copyNDJSON(lines []int) string {
 	if p.grid == nil {
 		return ""
 	}
@@ -602,7 +603,7 @@ func (p *ResultsPane) menu(row int, column string) []appkit.MenuItem {
 		{Title: "Auto-fit Column Widths", Run: p.AutoFit},
 		{},
 		{Title: "Copy", Run: func() { appkit.CopyToPasteboard(p.copyLines(lines)) }},
-		{Title: "Copy Rows as JSON", Run: func() { appkit.CopyToPasteboard(p.copyJSON(lines)) }},
+		{Title: "Copy Rows as NDJSON", Run: func() { appkit.CopyToPasteboard(p.copyNDJSON(lines)) }},
 	}
 
 	if i, ok := columnIndex(column); ok && i < len(p.cols) {

@@ -488,7 +488,7 @@ func TestTier1F2LiveBQContractOffline(t *testing.T) {
 		// Also export from Grid to NDJSON.
 		snap := waitRunDone(t, rn.Preview(*ref))
 		doneND := make(chan app.ExportProgress, 1)
-		rn.Export(app.ExportSource{Grid: snap.Grid}, filepath.Join(outDir, "out.jsonl"), export.NDJSON, export.Options{}, func(p app.ExportProgress) {
+		rn.Export(app.ExportSource{Grid: snap.Grid}, filepath.Join(outDir, "out.ndjson"), export.NDJSON, export.Options{}, func(p app.ExportProgress) {
 			if p.Done {
 				doneND <- p
 			}
@@ -1457,7 +1457,7 @@ func TestTier1F12BuildCLIAndAcceptance(t *testing.T) {
 			t.Fatalf("rows=%d complete=%v", rows, complete)
 		}
 
-		ndPath := filepath.Join(t.TempDir(), "orders.jsonl")
+		ndPath := filepath.Join(t.TempDir(), "orders.ndjson")
 		done := make(chan app.ExportProgress, 1)
 		rn.Export(app.ExportSource{Grid: snap.Grid}, ndPath, export.NDJSON, export.Options{}, func(p app.ExportProgress) {
 			if p.Done {

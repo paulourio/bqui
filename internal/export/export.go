@@ -35,7 +35,7 @@ var formatInfo = [...]struct {
 	columnar  bool
 }{
 	CSV:     {"CSV", "csv", false},
-	NDJSON:  {"Newline-delimited JSON", "jsonl", false},
+	NDJSON:  {"NDJSON", "ndjson", false},
 	Parquet: {"Parquet", "parquet", true},
 }
 

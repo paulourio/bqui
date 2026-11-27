@@ -59,12 +59,12 @@ func TestExportFromGrid(t *testing.T) {
 		t.Fatalf("csv has %d records for %d lines; header %q", len(recs), lines, recs[0])
 	}
 
-	p = runExport(t, rn, ExportSource{Grid: s.Grid}, filepath.Join(dir, "out.jsonl"), export.NDJSON)
+	p = runExport(t, rn, ExportSource{Grid: s.Grid}, filepath.Join(dir, "out.ndjson"), export.NDJSON)
 	if p.Err != nil {
 		t.Fatal(p.Err)
 	}
 
-	b, _ := os.ReadFile(filepath.Join(dir, "out.jsonl"))
+	b, _ := os.ReadFile(filepath.Join(dir, "out.ndjson"))
 	if n := strings.Count(string(b), "\n"); n != 300 {
 		t.Errorf("ndjson lines = %d", n)
 	}
@@ -95,7 +95,7 @@ func TestExportFromStorageAndCancel(t *testing.T) {
 	dir := t.TempDir()
 	ref := &bq.TableRef{Project: FakeProject, Dataset: "analytics", Table: "events"}
 
-	p := runExport(t, rn, ExportSource{Table: ref}, filepath.Join(dir, "events.jsonl"), export.NDJSON)
+	p := runExport(t, rn, ExportSource{Table: ref}, filepath.Join(dir, "events.ndjson"), export.NDJSON)
 	if p.Err != nil || p.Rows != 20_000 || p.EstRows != 20_000 {
 		t.Fatalf("storage export = %+v", p)
 	}
