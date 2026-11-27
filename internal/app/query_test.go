@@ -66,7 +66,7 @@ func TestRunnerInlineNestedResult(t *testing.T) {
 	r := rn.Start(bq.QueryRequest{SQL: "SELECT * FROM orders LIMIT 25"})
 	s := wait(t, r)
 
-	if s.State != RunDone || s.Source != "inline" || s.Grid == nil || s.Job == nil || s.StagesDone != fakeStages {
+	if s.State != RunDone || s.Source != "inline" || s.Grid == nil || s.Job == nil || s.StagesDone != s.Stages || s.Stages != 13 || s.JobDetails == nil {
 		t.Fatalf("snapshot = %+v", s)
 	}
 

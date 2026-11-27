@@ -153,21 +153,42 @@ func (f *FakeBackend) ResultPage(ctx context.Context, job bq.JobRef, token strin
 // CancelJob implements QueryBackend.
 func (f *FakeBackend) CancelJob(context.Context, bq.JobRef) error { return nil }
 
+// fakeJob replays a real recorded 13-stage plan (fixtures/plan.job.json):
+// after `done` of fakeStages progress steps, that share of stages is
+// COMPLETE, the next one RUNNING, the rest PENDING.
 func fakeJob(ref bq.JobRef, done int) *bigquery.Job {
-	plan := make([]*bigquery.ExplainQueryStage, fakeStages)
-	for i := range plan {
-		status := "PENDING"
-		if i < done {
-			status = "COMPLETE"
-		}
+	var recorded bigquery.Job
+	if err := readFixture("plan.job", &recorded); err != nil || recorded.Statistics == nil || recorded.Statistics.Query == nil {
+		panic("fake: plan fixture: " + fmt.Sprint(err))
+	}
 
-		plan[i] = &bigquery.ExplainQueryStage{Id: int64(i), Name: fmt.Sprintf("S%02d", i), Status: status}
+	stats := recorded.Statistics
+	plan := stats.Query.QueryPlan
+	complete := len(plan) * done / fakeStages
+
+	for i, st := range plan {
+		switch {
+		case i < complete:
+			st.Status = "COMPLETE"
+		case i == complete:
+			st.Status = "RUNNING"
+		default:
+			st.Status = "PENDING"
+		}
+	}
+
+	state := "RUNNING"
+	if done >= fakeStages {
+		state = "DONE"
 	}
 
 	return &bigquery.Job{
 		JobReference: &bigquery.JobReference{ProjectId: ref.Project, JobId: ref.JobID, Location: ref.Location},
-		Status:       &bigquery.JobStatus{State: "RUNNING"},
-		Statistics:   &bigquery.JobStatistics{TotalSlotMs: int64(done) * 400, Query: &bigquery.JobStatistics2{QueryPlan: plan}},
+		Status:       &bigquery.JobStatus{State: state},
+		Statistics: &bigquery.JobStatistics{
+			TotalSlotMs: stats.TotalSlotMs * int64(done) / fakeStages,
+			Query:       &bigquery.JobStatistics2{QueryPlan: plan, Timeline: stats.Query.Timeline, StatementType: "SELECT"},
+		},
 	}
 }
 

@@ -91,6 +91,7 @@ type RunSnapshot struct {
 	Elapsed    time.Duration
 	Job        *bq.JobRef
 	Result     *bq.QueryResult
+	JobDetails *bigquery.Job // latest job snapshot (plan, statistics)
 	Grid       *results.Grid
 	Stages     int
 	StagesDone int
@@ -585,6 +586,8 @@ func (s *RunSnapshot) progress(j *bigquery.Job) {
 	if j == nil || j.Statistics == nil {
 		return
 	}
+
+	s.JobDetails = j
 
 	s.SlotMs = j.Statistics.TotalSlotMs
 

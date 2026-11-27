@@ -33,8 +33,10 @@ func newExplorerPane(s *Shell, be app.Backend) *ExplorerPane {
 	p.Model = app.NewExplorer(be, objc.Main, p.changed)
 
 	p.Outline = appkit.NewOutline(explorerSource{p}, appkit.OutlineOptions{
-		OnSelect:      p.onSelect,
-		OnExpand:      p.Model.Expand,
+		OnSelect: p.onSelect,
+		// Expanding reloads the outline; never do that inside its own
+		// delegate callback (AppKit warns about reentrancy), so defer it.
+		OnExpand:      func(id uint64) { objc.Main(func() { p.Model.Expand(id) }) },
 		OnDoubleClick: p.onDoubleClick,
 		Menu:          p.menu,
 	})

@@ -609,3 +609,12 @@ func CountFields(fields []SchemaField) int {
 
 	return n
 }
+
+// CountInt formats a non-negative int64 count (negatives render as 0).
+func CountInt(n int64) string {
+	if n < 0 {
+		n = 0
+	}
+
+	return Count(uint64(n))
+}

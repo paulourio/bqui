@@ -56,7 +56,9 @@ vm-run: vm-deploy
 # Run the offscreen smoke test in the VM and fetch screenshots + report.
 vm-smoke: vm-deploy
 	$(SSH) 'rm -rf $(VM_DIR)/smoke && : > $(VM_DIR)/smoke.log && open -W -n --stdout $$HOME/$(VM_DIR)/smoke.log --stderr $$HOME/$(VM_DIR)/smoke.log \
-		$(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/smoke; rc=$$?; cat $(VM_DIR)/smoke.log; exit $$rc'
+		$(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/smoke; rc=$$?; cat $(VM_DIR)/smoke.log; \
+		n=$$(grep -c "WARNING: Application performed" $(VM_DIR)/smoke.log); \
+		if [ "$$n" -gt 0 ]; then echo "note: $$n AppKit table reentrancy warnings (known issue, see ROADMAP M8)"; fi; exit $$rc'
 	rm -rf $(DIST)/smoke-vm && scp -q -P $(VM_PORT) -r $(VM_HOST):$(VM_DIR)/smoke $(DIST)/smoke-vm
 	cat $(DIST)/smoke-vm/report.json
 
@@ -76,9 +78,11 @@ vm-test:
 # Runs the smoke flow (fixture data) and captures the state it leaves behind.
 vm-screen: vm-deploy
 	$(SSH) 'pkill -x bqui; rm -f $(VM_DIR)/shot/report.json; \
-		open -n $(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/shot --smoke-hold=20s; \
-		for i in $$(seq 120); do test -f $(VM_DIR)/shot/report.json && break; sleep 0.5; done; \
-		sleep 1; screencapture -x $(VM_DIR)/screen.png; rc=$$?; pkill -x bqui; exit $$rc'
+		: > $(VM_DIR)/shot.log; \
+		open -n --stdout $$HOME/$(VM_DIR)/shot.log --stderr $$HOME/$(VM_DIR)/shot.log \
+			$(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/shot --smoke-hold=20s; \
+		for i in $$(seq 360); do test -f $(VM_DIR)/shot/report.json && break; sleep 0.5; done; \
+		sleep 1; screencapture -x $(VM_DIR)/screen.png; rc=$$?; pkill -x bqui; tail -3 $(VM_DIR)/shot.log; exit $$rc'
 	scp -q -P $(VM_PORT) $(VM_HOST):$(VM_DIR)/screen.png $(DIST)/screen-vm.png
 	@echo "wrote $(DIST)/screen-vm.png"
 

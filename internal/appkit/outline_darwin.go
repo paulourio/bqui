@@ -99,6 +99,8 @@ func outlineMethods() []objc.Method {
 
 	return []objc.Method{
 		{Sel: "outlineView:numberOfChildrenOfItem:", Fn: func(self objc.ID, _ objc.SEL, _, item objc.ID) int64 {
+			defer enterDelegate()()
+
 			o, ok := get(self)
 			if !ok {
 				return 0
@@ -107,6 +109,8 @@ func outlineMethods() []objc.Method {
 			return int64(len(o.src.Children(objc.Uint64(item))))
 		}},
 		{Sel: "outlineView:child:ofItem:", Fn: func(self objc.ID, _ objc.SEL, _ objc.ID, index int64, item objc.ID) objc.ID {
+			defer enterDelegate()()
+
 			o, ok := get(self)
 			if !ok {
 				return objc.Nil
@@ -120,16 +124,22 @@ func outlineMethods() []objc.Method {
 			return objc.Number(kids[index])
 		}},
 		{Sel: "outlineView:isItemExpandable:", Fn: func(self objc.ID, _ objc.SEL, _, item objc.ID) bool {
+			defer enterDelegate()()
+
 			o, ok := get(self)
 
 			return ok && o.src.Expandable(objc.Uint64(item))
 		}},
 		{Sel: "outlineView:isGroupItem:", Fn: func(self objc.ID, _ objc.SEL, _, item objc.ID) bool {
+			defer enterDelegate()()
+
 			o, ok := get(self)
 
 			return ok && o.src.Cell(objc.Uint64(item)).Group
 		}},
 		{Sel: "outlineView:viewForTableColumn:item:", Fn: func(self objc.ID, _ objc.SEL, ov, col, item objc.ID) objc.ID {
+			defer enterDelegate()()
+
 			o, ok := get(self)
 			if !ok {
 				return objc.Nil
@@ -138,11 +148,16 @@ func outlineMethods() []objc.Method {
 			return o.viewFor(ov, col, objc.Uint64(item))
 		}},
 		{Sel: "outlineViewSelectionDidChange:", Fn: func(self objc.ID, _ objc.SEL, _ objc.ID) {
+			defer enterDelegate()()
+
 			if o, ok := get(self); ok && o.opts.OnSelect != nil {
-				o.opts.OnSelect(o.Selected())
+				// Run after AppKit finishes delivering the selection change.
+				objc.Main(func() { o.opts.OnSelect(o.Selected()) })
 			}
 		}},
 		{Sel: "outlineViewItemWillExpand:", Fn: func(self objc.ID, _ objc.SEL, notif objc.ID) {
+			defer enterDelegate()()
+
 			o, ok := get(self)
 			if !ok || o.opts.OnExpand == nil {
 				return
@@ -153,6 +168,8 @@ func outlineMethods() []objc.Method {
 			o.opts.OnExpand(objc.Uint64(item))
 		}},
 		{Sel: "menuNeedsUpdate:", Fn: func(self objc.ID, _ objc.SEL, menu objc.ID) {
+			defer enterDelegate()()
+
 			if o, ok := get(self); ok {
 				o.rebuildMenu(menu)
 			}
@@ -234,6 +251,8 @@ func NewOutline(src OutlineSource, opts OutlineOptions) *Outline {
 // Reload reloads item and its children (0 reloads everything). Expanded
 // descendants stay expanded because item handles are identity-stable.
 func (o *Outline) Reload(item uint64) {
+	checkReentrancy("outline reload")
+
 	if item == 0 {
 		objc.Msg(o.View, "reloadData")
 
@@ -246,6 +265,8 @@ func (o *Outline) Reload(item uint64) {
 // Expand expands item; recursive also expands its descendants. Item 0 is the
 // root, so Expand(0, true) expands the whole tree.
 func (o *Outline) Expand(item uint64, recursive bool) {
+	checkReentrancy("outline expand")
+
 	target := objc.Nil
 	if item != 0 {
 		target = objc.Number(item)
@@ -266,6 +287,8 @@ func (o *Outline) Rows() int64 {
 
 // Select selects item's row (if visible) and scrolls to it.
 func (o *Outline) Select(item uint64) bool {
+	checkReentrancy("outline select")
+
 	row := objc.Send[int64](o.View, "rowForItem:", objc.Number(item))
 	if row < 0 {
 		return false
@@ -436,6 +459,13 @@ func textCell(ov objc.ID, c CellText, auto bool) objc.ID {
 	}
 
 	objc.Msg(tf, "setFont:", font)
+
+	align := TextAlignmentLeft
+	if c.Right {
+		align = textAlignRight
+	}
+
+	objc.Msg(tf, "setAlignment:", align)
 	objc.Msg(cell, "setToolTip:", stringOrNil(c.ToolTip))
 
 	return cell

@@ -364,6 +364,26 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M8 — Query plan: execution details + execution graph
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **`internal/plan`** (Linux-tested against a real 13-stage plan recorded from public data, scrubbed):
+  - A stage model: timings (avg/max), records, shuffle, spill, slot time, steps and the timeline.
+  - Flags: BigQuery's performance insights, compute or read skew (max ≥ 3× avg), spill, and dominant slot share.
+  - A layered DAG layout: longest-path layers, then barycenter sweeps that keep the fewest crossings. The real plan has 0 crossings, and 200 synthetic stages lay out in under 50 ms.
+- **Execution details tab:** a stage outline with status, duration, wait/read/compute/write avg/max, records in and out, shuffle, slot time and flags, with expandable steps.
+- **Execution graph tab:** a Go-drawn `NSView` with nodes heat-colored by slot time, curved edges and flags, zoomable by pinch or ⌘-scroll. Clicking a stage shows its full details in the inspector.
+- **Live updates:** both tabs update from each job snapshot while the query runs. The fake backend replays the recorded plan stage by stage.
+- **Not done:**
+  - Brandes–Köpf coordinate assignment; layers are simply centered.
+  - A minimap.
+  - Selectable heat metrics; slot time is the only one.
+  - Edge weights by shuffle bytes.
+  - The timeline chart; its samples are parsed but not drawn yet.
+- **Known issue:**
+  - AppKit logs "reentrant operation in its NSTableView delegate" a few times per smoke run, after asynchronous loads land through `objc.Main` (explorer children, run completion, history).
+  - A Go-side guard (`appkit/reentrancy_darwin.go`) confirms no table is mutated from inside our own delegate callbacks.
+  - Finding the native trigger needs `lldb` with a symbolic breakpoint, so it waits for the Command Line Tools in the VM or a real Mac.
+  - `make vm-smoke` reports the count instead of failing.
+
 **Plan model (`internal/plan`)**
 - Built from `statistics.query.queryPlan[]` (`ExplainQueryStage`: id, name, status, inputStages, steps (kind + substeps), wait/read/compute/write avg/max ratios and ms, records read/written, shuffle output bytes and spilled, slotMs, parallel inputs), `timeline[]`, `performanceInsights`, plus BI Engine and search statistics.
 - Live updates: poll `jobs.get` while RUNNING, then diff the stages.

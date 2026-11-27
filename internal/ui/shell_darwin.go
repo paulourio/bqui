@@ -19,6 +19,7 @@ import (
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/objc"
+	"github.com/paulourio/bqui/internal/plan"
 	"github.com/paulourio/bqui/internal/results"
 	"github.com/paulourio/bqui/internal/store"
 )
@@ -78,6 +79,8 @@ type Shell struct {
 	Cost      objc.ID // toolbar cost estimate label
 	Results   *ResultsPane
 	JSON      *JSONPane
+	Plan      *PlanPane
+	Graph     *GraphPane
 	Job       *JobPane
 	History   *HistoryPane
 	Runner    *app.Runner
@@ -128,6 +131,8 @@ func NewShell(opts Options) (*Shell, error) {
 	s.Results = newResultsPane()
 	s.Results.Inspect = func(f []results.Field, row []any, i int64, path string) { s.Inspector.ShowRow(f, row, i, path) }
 	s.JSON = newJSONPane(s)
+	s.Plan = newPlanPane(s)
+	s.Graph = newGraphPane(s)
 	s.Job = newJobPane(opts.Jobs)
 	s.History = newHistoryPane(s, opts.Jobs)
 	s.Runner = app.NewRunner(app.RunnerOptions{
@@ -444,6 +449,8 @@ func (s *Shell) Preview(info app.ObjectInfo) {
 const (
 	TabResults = iota
 	TabJSON
+	TabPlan
+	TabGraph
 	TabJob
 	TabHistory
 )
@@ -451,8 +458,8 @@ const (
 // bottomPane stacks the Results, Job information and History tabs under a
 // segmented switcher.
 func (s *Shell) bottomPane() objc.ID {
-	s.tabs = appkit.NewSegmented([]string{"Results", "JSON", "Job information", "History"}, s.SelectTab)
-	s.tabViews = []objc.ID{s.Results.View, s.JSON.View, s.Job.View, s.History.View}
+	s.tabs = appkit.NewSegmented([]string{"Results", "JSON", "Execution details", "Execution graph", "Job information", "History"}, s.SelectTab)
+	s.tabViews = []objc.ID{s.Results.View, s.JSON.View, s.Plan.View, s.Graph.View, s.Job.View, s.History.View}
 
 	v := appkit.NewView()
 	appkit.UseAutoLayout(s.tabs.View)
@@ -504,6 +511,10 @@ func (s *Shell) onRunUpdate(r *app.Run) {
 	snap := r.Snapshot()
 	s.JSON.Update(snap)
 
+	pl := plan.FromJob(snap.JobDetails)
+	s.Plan.SetPlan(pl)
+	s.Graph.SetPlan(pl)
+
 	switch snap.State {
 	case app.RunDone, app.RunFailed, app.RunCancelled:
 		if snap.Job != nil {
@@ -515,6 +526,16 @@ func (s *Shell) onRunUpdate(r *app.Run) {
 		s.History.RefreshIfShown()
 	case app.RunRunning, app.RunFetching:
 	}
+}
+
+// ShowStage shows a plan stage in the inspector.
+func (s *Shell) ShowStage(pl *plan.Plan, id int64) {
+	st, ok := pl.Stage(id)
+	if !ok {
+		return
+	}
+
+	s.Inspector.ShowSections(st.Name, "plan stage · "+strings.ToLower(st.Status), app.StageSections(pl, st))
 }
 
 // CancelJob asks BigQuery to cancel a job from the history.

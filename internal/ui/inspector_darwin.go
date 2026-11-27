@@ -153,6 +153,24 @@ func (p *InspectorPane) setState(st inspectorState) {
 	}
 }
 
+// ShowSections shows prepared detail sections (plan stages).
+func (p *InspectorPane) ShowSections(title, subtitle string, sections []app.Section) {
+	p.gen++
+	p.current = app.ObjectInfo{Kind: app.KindPlaceholder, Name: title}
+
+	appkit.SetString(p.title, title)
+	appkit.SetString(p.subtitle, subtitle)
+	p.schemaSrc.set(nil)
+	p.detailsSrc.set(sections)
+	p.schema.Reload(0)
+	p.details.Reload(0)
+	p.details.Expand(0, true)
+	p.seg.SetEnabled(segSchema, false)
+	p.setState(stateReady)
+	p.seg.Select(segDetails)
+	p.showSegment(segDetails)
+}
+
 // ShowRow shows one result row as a typed value tree, revealing and
 // selecting focus (a value path such as "items[1].sku"; "" for none).
 func (p *InspectorPane) ShowRow(fields []results.Field, row []any, index int64, focus string) {

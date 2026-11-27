@@ -100,10 +100,17 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		runStatus = runAtCursor(s)
 	}
 
+	phase("explorer")
 	ex := exploreFlow(s)
+	phase("results")
 	rs := resultsFlow(s)
+	phase("jobs")
 	js := jobsFlow(s)
+	phase("value")
 	vs := valueFlow(s)
+	phase("plan")
+	ps := planFlow(s)
+	phase("checks")
 
 	queued := time.Now()
 
@@ -128,6 +135,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		resultsChecks(rep, rs)
 		jobsChecks(rep, js)
 		valueChecks(rep, vs)
+		planChecks(rep, ps)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -187,6 +195,11 @@ func structuralChecks(s *ui.Shell, rep *Report) {
 
 	rows := s.Explorer.Outline.Rows()
 	rep.check("sidebar-rows", rows >= 2, "%d visible outline rows", rows)
+}
+
+// phase logs a timestamped marker so AppKit log lines can be attributed.
+func phase(name string) {
+	fmt.Fprintf(os.Stderr, "%s smoke phase: %s\n", time.Now().Format("15:04:05.000"), name)
 }
 
 // onMain runs fn on the main thread and waits for it.
@@ -586,6 +599,36 @@ func valueFlow(s *ui.Shell) valueResult {
 	onMain(func() { r.ValueRows, r.SelectedPath = s.Inspector.ValueRows() })
 
 	return r
+}
+
+// planResult captures the execution details/graph flow.
+type planResult struct {
+	DetailRows int64
+	Nodes      int
+	Inspector  string
+}
+
+func planFlow(s *ui.Shell) planResult {
+	var r planResult
+
+	onMain(func() { s.SelectTab(ui.TabPlan) })
+	waitMain(loadTimeout, func() bool { return s.Plan.Rows() > 0 })
+	onMain(func() { r.DetailRows = s.Plan.Rows() })
+
+	onMain(func() { s.SelectTab(ui.TabGraph) })
+	onMain(func() {
+		r.Nodes = s.Graph.Nodes()
+		s.Graph.SelectStage(9) // the join
+	})
+	waitMain(loadTimeout, func() bool { return strings.HasPrefix(s.Inspector.Current().Name, "S09") })
+	onMain(func() { r.Inspector = s.Inspector.Current().Name })
+
+	return r
+}
+
+func planChecks(rep *Report, r planResult) {
+	rep.check("plan-details", r.DetailRows == 13, "%d stage rows", r.DetailRows)
+	rep.check("plan-graph", r.Nodes == 13 && strings.HasPrefix(r.Inspector, "S09: Join"), "%d nodes; inspector %q", r.Nodes, r.Inspector)
 }
 
 func valueChecks(rep *Report, r valueResult) {

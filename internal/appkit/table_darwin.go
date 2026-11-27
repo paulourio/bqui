@@ -108,6 +108,8 @@ func tableMethods() []objc.Method {
 
 	return []objc.Method{
 		{Sel: "numberOfRowsInTableView:", Fn: func(self objc.ID, _ objc.SEL, _ objc.ID) int64 {
+			defer enterDelegate()()
+
 			if t, ok := get(self); ok {
 				return int64(t.src.NumberOfRows())
 			}
@@ -115,6 +117,8 @@ func tableMethods() []objc.Method {
 			return 0
 		}},
 		{Sel: "tableView:viewForTableColumn:row:", Fn: func(self objc.ID, _ objc.SEL, tv, col objc.ID, row int64) objc.ID {
+			defer enterDelegate()()
+
 			t, ok := get(self)
 			if !ok || col == objc.Nil {
 				return objc.Nil
@@ -125,6 +129,8 @@ func tableMethods() []objc.Method {
 			return gridCell(tv, c)
 		}},
 		{Sel: "tableView:rowViewForRow:", Fn: func(self objc.ID, _ objc.SEL, tv objc.ID, row int64) objc.ID {
+			defer enterDelegate()()
+
 			t, ok := get(self)
 			if !ok {
 				return objc.Nil
@@ -133,13 +139,18 @@ func tableMethods() []objc.Method {
 			return t.rowView(tv, int(row))
 		}},
 		{Sel: "menuNeedsUpdate:", Fn: func(self objc.ID, _ objc.SEL, menu objc.ID) {
+			defer enterDelegate()()
+
 			if t, ok := get(self); ok {
 				t.rebuildMenu(menu)
 			}
 		}},
 		{Sel: "tableViewSelectionDidChange:", Fn: func(self objc.ID, _ objc.SEL, _ objc.ID) {
+			defer enterDelegate()()
+
 			if t, ok := get(self); ok && t.opts.OnSelect != nil {
-				t.opts.OnSelect(t.SelectedRows())
+				// Run after AppKit finishes delivering the selection change.
+				objc.Main(func() { t.opts.OnSelect(t.SelectedRows()) })
 			}
 		}},
 	}
@@ -197,6 +208,8 @@ func NewTable(src TableSource, opts TableOptions) *Table {
 
 // SetColumns replaces all columns.
 func (t *Table) SetColumns(cols []TableColumn) {
+	checkReentrancy("table set columns")
+
 	for _, c := range objc.ArrayItems(objc.Msg(objc.Msg(t.View, "tableColumns"), "copy")) {
 		objc.Msg(t.View, "removeTableColumn:", c)
 	}
@@ -223,10 +236,16 @@ func (t *Table) SetColumns(cols []TableColumn) {
 }
 
 // Reload reloads everything.
-func (t *Table) Reload() { objc.Msg(t.View, "reloadData") }
+func (t *Table) Reload() {
+	checkReentrancy("table reload")
+	objc.Msg(t.View, "reloadData")
+}
 
 // NoteRowsChanged tells the table the row count changed (keeps scrolling).
-func (t *Table) NoteRowsChanged() { objc.Msg(t.View, "noteNumberOfRowsChanged") }
+func (t *Table) NoteRowsChanged() {
+	checkReentrancy("table rows changed")
+	objc.Msg(t.View, "noteNumberOfRowsChanged")
+}
 
 // Rows returns the number of rows the table currently shows.
 func (t *Table) Rows() int { return int(objc.Send[int64](t.View, "numberOfRows")) }
@@ -272,6 +291,8 @@ func (t *Table) SelectedRows() []int {
 
 // SelectRows selects rows [from, to].
 func (t *Table) SelectRows(from, to int) {
+	checkReentrancy("table select")
+
 	if from < 0 || to < from {
 		return
 	}
