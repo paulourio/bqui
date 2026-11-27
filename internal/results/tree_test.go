@@ -63,3 +63,64 @@ func TestColumnPathFollowsSubLines(t *testing.T) {
 		}
 	}
 }
+
+func TestColumnPathBlankContinuationAndNestedRepeated(t *testing.T) {
+	fields := []Field{
+		{Name: "long", Type: TypeInt64, Repeated: true},
+		{
+			Name:     "short",
+			Type:     TypeStruct,
+			Repeated: true,
+			Fields: []Field{
+				{Name: "tags", Type: TypeString, Repeated: true},
+				{Name: "b", Type: TypeString},
+				{Name: "c", Type: TypeString},
+			},
+		},
+		{
+			Name: "s",
+			Type: TypeStruct,
+			Fields: []Field{
+				{Name: "tags", Type: TypeString, Repeated: true},
+			},
+		},
+	}
+
+	row := []any{
+		[]any{int64(1), int64(2), int64(3)},
+		[]any{
+			[]any{[]any{"t0"}, "b0", "c0"},
+			[]any{[]any{"t1"}, "b1", "c1"},
+		},
+		[]any{[]any{"only"}},
+	}
+
+	cols := Leaves(fields)
+
+	// short.tags on line 2 (Blank continuation past short's 2 elements) must not synthesize [2].
+	if got := ColumnPath(fields, row, cols[1], 2); got != "short.tags" {
+		t.Errorf("ColumnPath(short.tags, line 2) = %q, want %q", got, "short.tags")
+	}
+
+	// Non-repeated struct containing a shorter repeated child on Blank line 2.
+	if got := ColumnPath(fields, row, cols[4], 2); got != "s.tags" {
+		t.Errorf("ColumnPath(s.tags, line 2) = %q, want %q", got, "s.tags")
+	}
+
+	// Empty REPEATED RECORD -> "short.tags" on line 0.
+	emptyRow := []any{[]any{int64(1)}, []any{}, []any{[]any{}}}
+	if got := ColumnPath(fields, emptyRow, cols[1], 0); got != "short.tags" {
+		t.Errorf("ColumnPath(empty short.tags, line 0) = %q, want %q", got, "short.tags")
+	}
+
+	// NULL struct element inside REPEATED RECORD -> "short[0].tags" on line 0.
+	nullElemRow := []any{[]any{int64(1)}, []any{nil}, []any{[]any{}}}
+	if got := ColumnPath(fields, nullElemRow, cols[1], 0); got != "short[0].tags" {
+		t.Errorf("ColumnPath(null elem short.tags, line 0) = %q, want %q", got, "short[0].tags")
+	}
+
+	// Negative sub line must safely fall back without indexing.
+	if got := ColumnPath(fields, row, cols[1], -1); got != "short.tags" {
+		t.Errorf("ColumnPath(short.tags, line -1) = %q, want %q", got, "short.tags")
+	}
+}

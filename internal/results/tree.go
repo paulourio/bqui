@@ -59,7 +59,7 @@ func elemNode(f Field, name, path string, v any) ValueNode {
 		return n
 	}
 
-	if f.Type == TypeStruct {
+	if IsStructType(f.Type) {
 		s, _ := v.([]any)
 		n.Display = plural(len(f.Fields), "field")
 
@@ -84,6 +84,10 @@ func elemNode(f Field, name, path string, v any) ValueNode {
 }
 
 func typeName(f Field) string {
+	if IsStructType(f.Type) {
+		return TypeStruct
+	}
+
 	if f.Type == TypeRange && f.RangeElem != "" {
 		return "RANGE<" + f.RangeElem + ">"
 	}
@@ -132,6 +136,8 @@ func locate(fields []Field, vals []any, path []int, sub int) (string, bool) {
 		if i, it, rel, ok := elementAt(f, v, sub); ok {
 			name = name + "[" + strconv.Itoa(i) + "]"
 			v, sub = it, rel
+		} else {
+			v = nil
 		}
 	}
 
@@ -152,6 +158,10 @@ func locate(fields []Field, vals []any, path []int, sub int) (string, bool) {
 // elementAt finds the array element whose lines cover sub, and sub relative
 // to that element.
 func elementAt(f Field, v any, sub int) (index int, elem any, rel int, ok bool) {
+	if sub < 0 {
+		return 0, nil, 0, false
+	}
+
 	items, _ := v.([]any)
 	line := 0
 

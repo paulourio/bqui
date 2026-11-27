@@ -1,16 +1,22 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"iter"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/decimal128"
+	"github.com/apache/arrow-go/v18/arrow/ipc"
+	"github.com/apache/arrow-go/v18/arrow/memory"
 	bigquery "google.golang.org/api/bigquery/v2"
 
 	"github.com/paulourio/bqui/internal/bq"
@@ -263,5 +269,228 @@ func TestPreviewQueryTimesOutAndCancels(t *testing.T) {
 
 	if rows, _, _ := s.Grid.Size(); rows == 0 || rows > PreviewQueryRows {
 		t.Errorf("preview rows = %d", rows)
+	}
+}
+
+type arrowStorage struct {
+	mem     memory.Allocator
+	schema  *arrow.Schema
+	batches [][]byte
+	rows    int64
+}
+
+func (a *arrowStorage) RawBatches(ctx context.Context) iter.Seq2[bqstorage.RawBatch, error] {
+	return func(yield func(bqstorage.RawBatch, error) bool) {
+		for _, b := range a.batches {
+			if ctx.Err() != nil {
+				yield(bqstorage.RawBatch{}, ctx.Err())
+
+				return
+			}
+
+			if !yield(bqstorage.RawBatch{Rows: a.rows, Data: b}, nil) {
+				return
+			}
+		}
+	}
+}
+
+func (a *arrowStorage) DecodeRecord(raw []byte) (arrow.RecordBatch, error) {
+	rdr, err := ipc.NewReader(bytes.NewReader(raw), ipc.WithAllocator(a.mem))
+	if err != nil {
+		return nil, err
+	}
+	defer rdr.Release()
+
+	if !rdr.Next() {
+		if err := rdr.Err(); err != nil {
+			return nil, err
+		}
+
+		return nil, errors.New("empty arrow ipc stream")
+	}
+
+	rec := rdr.RecordBatch()
+	rec.Retain()
+
+	return rec, nil
+}
+
+func (a *arrowStorage) DecodeRows(fields []results.Field, raw []byte) ([][]any, error) {
+	rec, err := a.DecodeRecord(raw)
+	if err != nil {
+		return nil, err
+	}
+	defer rec.Release()
+
+	return results.RowsFromRecord(fields, rec)
+}
+
+func (a *arrowStorage) Schema() *arrow.Schema { return a.schema }
+func (a *arrowStorage) EstimatedRows() int64  { return a.rows }
+func (a *arrowStorage) EstimatedBytes() int64 { return a.rows * 128 }
+
+type arrowNestedBackend struct {
+	FakeBackend
+	schema *bigquery.TableSchema
+}
+
+func (b *arrowNestedBackend) Query(ctx context.Context, req bq.QueryRequest) (*bq.QueryResult, error) {
+	res, err := b.FakeBackend.Query(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	res.Schema = b.schema
+	res.Rows = nil
+	res.TotalRows = 3
+	res.Destination = &bq.TableRef{Project: FakeProject, Dataset: "_anon", Table: "nested_arrow"}
+
+	return res, nil
+}
+
+func TestRunnerArrowStorageNestedPipeline(t *testing.T) {
+	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer mem.AssertSize(t, 0)
+
+	tagList := arrow.ListOf(arrow.BinaryTypes.String)
+	itemType := arrow.StructOf(
+		arrow.Field{Name: "sku", Type: arrow.BinaryTypes.String, Nullable: true},
+		arrow.Field{Name: "price", Type: &arrow.Decimal128Type{Precision: 38, Scale: 2}, Nullable: true},
+		arrow.Field{Name: "tags", Type: tagList},
+	)
+	arrowSchema := arrow.NewSchema([]arrow.Field{
+		{Name: "id", Type: arrow.PrimitiveTypes.Int64, Nullable: false},
+		{Name: "meta", Type: arrow.StructOf(
+			arrow.Field{Name: "owner", Type: arrow.BinaryTypes.String, Nullable: true},
+			arrow.Field{Name: "t", Type: arrow.FixedWidthTypes.Time64us, Nullable: true},
+		), Nullable: true},
+		{Name: "items", Type: arrow.ListOf(itemType)},
+	}, nil)
+
+	bqSchema := &bigquery.TableSchema{Fields: []*bigquery.TableFieldSchema{
+		{Name: "id", Type: "INTEGER", Mode: "REQUIRED"},
+		{Name: "meta", Type: "RECORD", Fields: []*bigquery.TableFieldSchema{
+			{Name: "owner", Type: "STRING"},
+			{Name: "t", Type: "TIME"},
+		}},
+		{Name: "items", Type: "RECORD", Mode: "REPEATED", Fields: []*bigquery.TableFieldSchema{
+			{Name: "sku", Type: "STRING"},
+			{Name: "price", Type: "NUMERIC"},
+			{Name: "tags", Type: "STRING", Mode: "REPEATED"},
+		}},
+	}}
+
+	b := array.NewRecordBuilder(mem, arrowSchema)
+	defer b.Release()
+
+	// Row 0: nested struct + 2 items (first item has 2 tags).
+	b.Field(0).(*array.Int64Builder).Append(10)
+	mb := b.Field(1).(*array.StructBuilder)
+	mb.Append(true)
+	mb.FieldBuilder(0).(*array.StringBuilder).Append("ana")
+	mb.FieldBuilder(1).(*array.Time64Builder).Append(arrow.Time64((9*3600 + 15*60) * 1_000_000))
+
+	ilb := b.Field(2).(*array.ListBuilder)
+	ilb.Append(true)
+	isb := ilb.ValueBuilder().(*array.StructBuilder)
+	p1, _ := decimal128.FromString("19.95", 38, 2)
+	isb.Append(true)
+	isb.FieldBuilder(0).(*array.StringBuilder).Append("SKU-1")
+	isb.FieldBuilder(1).(*array.Decimal128Builder).Append(p1)
+	tlb := isb.FieldBuilder(2).(*array.ListBuilder)
+	tlb.Append(true)
+	tlb.ValueBuilder().(*array.StringBuilder).Append("blue")
+	tlb.ValueBuilder().(*array.StringBuilder).Append("sale")
+
+	p2, _ := decimal128.FromString("5.00", 38, 2)
+	isb.Append(true)
+	isb.FieldBuilder(0).(*array.StringBuilder).Append("SKU-2")
+	isb.FieldBuilder(1).(*array.Decimal128Builder).Append(p2)
+	tlb.Append(true)
+
+	// Row 1: NULL struct + empty items list.
+	b.Field(0).(*array.Int64Builder).Append(20)
+	mb.AppendNull()
+	ilb.Append(true)
+
+	// Row 2: non-NULL struct with NULL field + 1 item.
+	b.Field(0).(*array.Int64Builder).Append(30)
+	mb.Append(true)
+	mb.FieldBuilder(0).(*array.StringBuilder).AppendNull()
+	mb.FieldBuilder(1).(*array.Time64Builder).Append(arrow.Time64(0))
+	ilb.Append(true)
+	isb.Append(true)
+	isb.FieldBuilder(0).(*array.StringBuilder).Append("SKU-3")
+	isb.FieldBuilder(1).(*array.Decimal128Builder).AppendNull()
+	tlb.Append(true)
+	tlb.ValueBuilder().(*array.StringBuilder).Append("new")
+
+	rec := b.NewRecordBatch()
+	defer rec.Release()
+
+	var buf bytes.Buffer
+
+	w := ipc.NewWriter(&buf, ipc.WithSchema(arrowSchema), ipc.WithAllocator(mem))
+	if err := w.Write(rec); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	sess := &arrowStorage{mem: mem, schema: arrowSchema, batches: [][]byte{buf.Bytes()}, rows: 3}
+	be := &arrowNestedBackend{schema: bqSchema}
+	rn := NewRunner(RunnerOptions{
+		Backend: be, Metadata: &FakeBackend{},
+		Storage: func(context.Context, bq.TableRef) (StorageSession, error) { return sess, nil },
+		Post:    func(fn func()) { fn() }, SpillDir: t.TempDir(),
+	})
+
+	r := rn.Start(bq.QueryRequest{SQL: "SELECT id, meta, items FROM nested"})
+	defer r.Close()
+
+	s := wait(t, r)
+	if s.State != RunDone || s.Source != "storage" || s.Grid == nil {
+		t.Fatalf("snapshot = %+v", s)
+	}
+
+	rows, lines, complete := s.Grid.Size()
+	if rows != 3 || lines != 5 || !complete {
+		t.Fatalf("grid = %d rows %d lines complete=%v", rows, lines, complete)
+	}
+
+	// Verify Grid.Cell across sub-rows and NULL struct expansion.
+	cPrice, _, err := s.Grid.Cell(0, 4) // items.price
+	if err != nil || cPrice.Kind != results.Value || cPrice.V != "19.95" {
+		t.Fatalf("line 0 price = %+v, err=%v", cPrice, err)
+	}
+
+	cTag2, _, err := s.Grid.Cell(1, 5) // items.tags[1]
+	if err != nil || cTag2.Kind != results.Value || cTag2.V != "sale" {
+		t.Fatalf("line 1 tag = %+v, err=%v", cTag2, err)
+	}
+
+	cNullOwner, _, err := s.Grid.Cell(3, 1) // row 1 meta.owner (NULL struct)
+	if err != nil || cNullOwner.Kind != results.Null {
+		t.Fatalf("row 1 meta.owner = %+v, err=%v", cNullOwner, err)
+	}
+
+	// Verify AppendRowJSON matches decoded row 0 structure.
+	row0, err := s.Grid.Row(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gotJSON := string(results.AppendRowJSON(nil, s.Grid.Fields(), row0))
+	wantJSON := `{"id":"10","meta":{"owner":"ana","t":"09:15:00"},"items":[{"sku":"SKU-1","price":"19.95","tags":["blue","sale"]},{"sku":"SKU-2","price":"5","tags":[]}]}`
+
+	if gotJSON != wantJSON {
+		t.Fatalf("AppendRowJSON:\n got: %s\nwant: %s", gotJSON, wantJSON)
+	}
+
+	if !reflect.DeepEqual(results.Leaves(s.Grid.Fields())[0].Name, "id") {
+		t.Fatal("unexpected first leaf")
 	}
 }

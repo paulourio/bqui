@@ -31,10 +31,12 @@ func FormatValue(typ string, v any) string {
 	case time.Time:
 		return FormatTimestamp(x)
 	case []any:
+		if IsStructType(typ) && len(x) == 0 {
+			return "{}"
+		}
+
 		return "[" + strconv.Itoa(len(x)) + " items]"
 	}
-
-	_ = typ
 
 	return ""
 }

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	bigquery "google.golang.org/api/bigquery/v2"
 )
 
 // ordersFields is the schema from the M0 discussion: a struct, a repeated
@@ -233,5 +235,129 @@ func TestFormatValue(t *testing.T) {
 	long := FormatCell(TypeString, strings.Repeat("é", MaxCellRunes+10))
 	if !strings.HasSuffix(long, "…") || len([]rune(long)) != MaxCellRunes+1 {
 		t.Errorf("truncation: %d runes", len([]rune(long)))
+	}
+}
+
+func TestEmptyStructFormattingAndLayout(t *testing.T) {
+	fields := []Field{
+		{Name: "id", Type: TypeInt64},
+		{Name: "empty_s", Type: TypeStruct},
+		{Name: "rep_empty_s", Type: TypeStruct, Repeated: true},
+	}
+
+	cols := Leaves(fields)
+	if len(cols) != 3 || cols[1].Type != TypeStruct || cols[2].Type != TypeStruct {
+		t.Fatalf("unexpected cols = %+v", cols)
+	}
+
+	if got := FormatValue(TypeStruct, []any{}); got != "{}" {
+		t.Errorf("FormatValue(TypeStruct, []) = %q, want {}", got)
+	}
+
+	if got := FormatValue("RECORD", []any{}); got != "{}" {
+		t.Errorf("FormatValue(RECORD, []) = %q, want {}", got)
+	}
+
+	if got := FormatValue(TypeStruct, nil); got != "null" {
+		t.Errorf("FormatValue(TypeStruct, nil) = %q, want null", got)
+	}
+
+	row := []any{int64(1), []any{}, []any{[]any{}, nil}}
+	cells := Render(fields, row)
+
+	if got := FormatCell(cols[1].Type, cells[1][0].V); got != "{}" {
+		t.Errorf("FormatCell(empty_s) = %q, want {}", got)
+	}
+
+	if got := FormatCell(cols[2].Type, cells[2][0].V); got != "{}" {
+		t.Errorf("FormatCell(rep_empty_s[0]) = %q, want {}", got)
+	}
+
+	if cells[2][1].Kind != Null {
+		t.Errorf("rep_empty_s[1] kind = %v, want Null", cells[2][1].Kind)
+	}
+
+	nullRow := []any{int64(2), nil, []any{}}
+	nullCells := Render(fields, nullRow)
+
+	if nullCells[1][0].Kind != Null || nullCells[2][0].Kind != Blank {
+		t.Errorf("unexpected nullRow kinds: empty_s=%+v rep_empty_s=%+v", nullCells[1][0], nullCells[2][0])
+	}
+}
+
+func TestRecordTypeParityWithTypeStruct(t *testing.T) {
+	recordFields := []Field{
+		{Name: "id", Type: TypeInt64},
+		{Name: "meta", Type: "RECORD", Fields: []Field{
+			{Name: "code", Type: TypeString},
+			{Name: "tags", Type: TypeString, Repeated: true},
+		}},
+		{Name: "items", Type: "RECORD", Repeated: true, Fields: []Field{
+			{Name: "sku", Type: TypeString},
+		}},
+	}
+	structFields := []Field{
+		{Name: "id", Type: TypeInt64},
+		{Name: "meta", Type: TypeStruct, Fields: []Field{
+			{Name: "code", Type: TypeString},
+			{Name: "tags", Type: TypeString, Repeated: true},
+		}},
+		{Name: "items", Type: TypeStruct, Repeated: true, Fields: []Field{
+			{Name: "sku", Type: TypeString},
+		}},
+	}
+
+	row := []any{
+		int64(1),
+		[]any{"ok", []any{"a", "b"}},
+		[]any{[]any{"S-1"}, []any{"S-2"}},
+	}
+
+	recCols := Leaves(recordFields)
+	strCols := Leaves(structFields)
+	if len(recCols) != len(strCols) || len(recCols) != 4 {
+		t.Fatalf("Leaves mismatch: rec=%+v struct=%+v", recCols, strCols)
+	}
+
+	for i := range recCols {
+		if recCols[i].Name != strCols[i].Name {
+			t.Errorf("leaf[%d].Name = %q, want %q", i, recCols[i].Name, strCols[i].Name)
+		}
+	}
+
+	if got, want := Lines(recordFields, row), Lines(structFields, row); got != want {
+		t.Errorf("Lines(RECORD) = %d, want %d", got, want)
+	}
+
+	if got, want := render(recordFields, row), render(structFields, row); got != want {
+		t.Errorf("Render(RECORD) mismatch:\n got:\n%s\nwant:\n%s", got, want)
+	}
+
+	if got, want := string(AppendRowJSON(nil, recordFields, row)), string(AppendRowJSON(nil, structFields, row)); got != want {
+		t.Errorf("AppendRowJSON(RECORD) = %s, want %s", got, want)
+	}
+
+	recTree := Tree(recordFields, row)
+	strTree := Tree(structFields, row)
+	if len(recTree) != len(strTree) || recTree[1].Display != strTree[1].Display || len(recTree[1].Children) != len(strTree[1].Children) {
+		t.Errorf("Tree(RECORD) = %+v, want %+v", recTree, strTree)
+	}
+}
+
+func TestFieldsFromRESTNilElements(t *testing.T) {
+	got := FieldsFromREST([]*bigquery.TableFieldSchema{
+		nil,
+		{
+			Name: "rec",
+			Type: "RECORD",
+			Fields: []*bigquery.TableFieldSchema{
+				nil,
+				{Name: "s", Type: "STRING"},
+			},
+		},
+	})
+
+	if len(got) != 1 || got[0].Name != "rec" || got[0].Type != TypeStruct || len(got[0].Fields) != 1 || got[0].Fields[0].Name != "s" {
+		t.Errorf("FieldsFromREST with nil elements = %+v", got)
 	}
 }

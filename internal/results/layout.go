@@ -63,7 +63,7 @@ func fieldLines(f Field, v any) int {
 }
 
 func elemLines(f Field, v any) int {
-	if f.Type != TypeStruct || len(f.Fields) == 0 || v == nil {
+	if !IsStructType(f.Type) || len(f.Fields) == 0 || v == nil {
 		return 1
 	}
 
@@ -151,7 +151,7 @@ func (r *renderer) field(f Field, v any, col, line int) int {
 }
 
 func (r *renderer) elem(f Field, v any, col, line int) int {
-	if f.Type != TypeStruct || len(f.Fields) == 0 {
+	if !IsStructType(f.Type) || len(f.Fields) == 0 {
 		if v == nil {
 			r.set(col, line, Cell{Kind: Null})
 		} else {

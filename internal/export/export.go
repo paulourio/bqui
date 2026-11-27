@@ -164,6 +164,10 @@ func (c *csvWriter) WriteRows(rows [][]any) error {
 
 func (c *csvWriter) writeLines(row []any) error {
 	cells := results.Render(c.fields, row)
+	if len(cells) == 0 {
+		return nil
+	}
+
 	lines := len(cells[0])
 	rec := make([]string, len(cells))
 
@@ -190,7 +194,7 @@ func (c *csvWriter) writeJSONCells(row []any) error {
 		}
 
 		switch {
-		case f.Repeated || f.Type == results.TypeStruct:
+		case f.Repeated || results.IsStructType(f.Type):
 			// Encode the field as a one-field object and keep only its value.
 			obj := string(results.AppendRowJSON(nil, []results.Field{f}, []any{v}))
 			key, _ := json.Marshal(f.Name)

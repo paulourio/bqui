@@ -61,7 +61,7 @@ func appendValue(dst []byte, f Field, v any) []byte {
 	case nil:
 		return append(dst, "null"...)
 	case []any:
-		if f.Type == TypeStruct {
+		if IsStructType(f.Type) {
 			return appendStruct(dst, f.Fields, x)
 		}
 	case int64:

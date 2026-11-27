@@ -198,3 +198,87 @@ func TestParquetAndArrowRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestRowWriterZeroFieldsDoesNotPanic(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		fmt  Format
+		opts Options
+		want string
+	}{
+		{name: "csv_lines", fmt: CSV, opts: Options{CSVNesting: CSVLines}, want: "\n"},
+		{name: "csv_json_cells", fmt: CSV, opts: Options{CSVNesting: CSVJSONCells}, want: "\n\n"},
+		{name: "ndjson", fmt: NDJSON, opts: Options{}, want: "{}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+
+			w, err := NewRowWriter(&buf, tc.fmt, nil, tc.opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := w.WriteRows([][]any{{}}); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			if buf.String() != tc.want {
+				t.Errorf("got %q, want %q", buf.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestRecordTypeParityCSVJSONCellsAndNDJSON(t *testing.T) {
+	recFields := []results.Field{
+		{Name: "id", Type: results.TypeInt64},
+		{Name: "meta", Type: "RECORD", Fields: []results.Field{
+			{Name: "a", Type: results.TypeString},
+		}},
+	}
+	rows := [][]any{{int64(1), []any{"hello"}}}
+
+	var csvBuf bytes.Buffer
+	cw, err := NewRowWriter(&csvBuf, CSV, recFields, Options{CSVNesting: CSVJSONCells})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if werr := cw.WriteRows(rows); werr != nil {
+		t.Fatal(werr)
+	}
+
+	if cerr := cw.Close(); cerr != nil {
+		t.Fatal(cerr)
+	}
+
+	recs, err := csv.NewReader(strings.NewReader(csvBuf.String())).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 2 || recs[1][1] != `{"a":"hello"}` {
+		t.Fatalf("CSVJSONCells(RECORD) = %q, want {\"a\":\"hello\"}", recs)
+	}
+
+	var jsonBuf bytes.Buffer
+	jw, err := NewRowWriter(&jsonBuf, NDJSON, recFields, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if werr := jw.WriteRows(rows); werr != nil {
+		t.Fatal(werr)
+	}
+
+	if cerr := jw.Close(); cerr != nil {
+		t.Fatal(cerr)
+	}
+
+	if got := strings.TrimSpace(jsonBuf.String()); got != `{"id":"1","meta":{"a":"hello"}}` {
+		t.Fatalf("NDJSON(RECORD) = %q", got)
+	}
+}

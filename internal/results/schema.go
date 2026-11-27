@@ -46,6 +46,10 @@ func FieldsFromREST(fs []*bigquery.TableFieldSchema) []Field {
 	out := make([]Field, 0, len(fs))
 
 	for _, f := range fs {
+		if f == nil {
+			continue
+		}
+
 		nf := Field{Name: f.Name, Type: NormalizeType(f.Type), Repeated: f.Mode == "REPEATED"}
 		if len(f.Fields) > 0 {
 			nf.Fields = FieldsFromREST(f.Fields)
@@ -59,6 +63,12 @@ func FieldsFromREST(fs []*bigquery.TableFieldSchema) []Field {
 	}
 
 	return out
+}
+
+// IsStructType reports whether typ represents a struct/record type
+// (GoogleSQL "STRUCT" or legacy REST "RECORD").
+func IsStructType(typ string) bool {
+	return typ == TypeStruct || typ == "RECORD"
 }
 
 // NormalizeType maps legacy REST names to GoogleSQL names.
@@ -108,7 +118,7 @@ func Leaves(fields []Field) []Column {
 			name := prefix + f.Name
 			rep := repeated || f.Repeated
 
-			if f.Type == TypeStruct && len(f.Fields) > 0 {
+			if IsStructType(f.Type) && len(f.Fields) > 0 {
 				walk(f.Fields, name+".", p, rep)
 
 				continue
@@ -125,7 +135,7 @@ func Leaves(fields []Field) []Column {
 
 // leafCount returns how many leaf columns f occupies.
 func leafCount(f Field) int {
-	if f.Type != TypeStruct || len(f.Fields) == 0 {
+	if !IsStructType(f.Type) || len(f.Fields) == 0 {
 		return 1
 	}
 
