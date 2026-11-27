@@ -374,6 +374,45 @@
     }
   }
 
+  // markGutter puts a dot in the glyph margin of each line with an error or
+  // warning marker (bqls diagnostics), in addition to Monaco's squiggles.
+  function markGutter(ed, model) {
+    var gutter = ed.createDecorationsCollection();
+    var S = monaco.MarkerSeverity;
+    function update() {
+      var lines = {};
+      monaco.editor.getModelMarkers({ resource: model.uri }).forEach(function (m) {
+        if (m.severity < S.Warning) return;
+        var prev = lines[m.startLineNumber];
+        if (!prev || m.severity > prev.severity) {
+          lines[m.startLineNumber] = { severity: m.severity, messages: [m.message] };
+        } else if (m.severity === prev.severity) {
+          prev.messages.push(m.message);
+        }
+      });
+      var decorations = [], errors = 0, warnings = 0;
+      Object.keys(lines).forEach(function (ln) {
+        var l = lines[ln], error = l.severity >= S.Error;
+        if (error) errors++; else warnings++;
+        decorations.push({
+          range: new monaco.Range(+ln, 1, +ln, 1),
+          options: {
+            glyphMarginClassName: error ? 'bqui-glyph-error' : 'bqui-glyph-warning',
+            glyphMarginHoverMessage: l.messages.map(function (msg) { return { value: msg }; }),
+            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          },
+        });
+      });
+      gutter.set(decorations);
+      app('gutter', { errorLines: errors, warningLines: warnings });
+    }
+    monaco.editor.onDidChangeMarkers(function (uris) {
+      for (var i = 0; i < uris.length; i++) {
+        if (uris[i].toString() === model.uri.toString()) { update(); return; }
+      }
+    });
+  }
+
   function start() {
     defineThemes();
 
@@ -395,6 +434,7 @@
       fixedOverflowWidgets: true,
       padding: { top: 8 },
       renderLineHighlight: 'all',
+      glyphMargin: true,
     });
     state.editor = ed;
 
@@ -428,6 +468,7 @@
     });
 
     nativeClipboardReads();
+    markGutter(ed, model);
 
     var K = monaco.KeyMod, C = monaco.KeyCode;
     ed.addCommand(K.CtrlCmd | C.Enter, function () { window.bqui.requestRun(false); });

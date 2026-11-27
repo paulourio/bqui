@@ -27,6 +27,13 @@
   :root { color-scheme: light dark; }
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
   #editor { position: absolute; inset: 0; }
+  /* Gutter dots on lines with SQL errors and warnings (see markGutter). */
+  .bqui-glyph-error, .bqui-glyph-warning { display: flex; align-items: center; justify-content: center; }
+  .bqui-glyph-error::before, .bqui-glyph-warning::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+  }
+  .bqui-glyph-error::before { background: var(--vscode-editorError-foreground, #e51400); }
+  .bqui-glyph-warning::before { background: var(--vscode-editorWarning-foreground, #bf8803); }
   #boot-error { display: none; font: 13px -apple-system, sans-serif; padding: 16px; color: #c00; }
 </style>
 </head>

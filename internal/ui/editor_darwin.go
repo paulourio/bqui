@@ -80,6 +80,7 @@ type EditorPane struct {
 	mu            sync.Mutex
 	uri           string
 	changes       int
+	gutterErrors  int // lines with an error dot
 	objectLookups int
 	objectOpens   int
 	appliedTheme  string
@@ -275,6 +276,27 @@ func (p *EditorPane) Diagnostics() (consoleErrors []string, bootError string) {
 	return append([]string(nil), p.consoleErrors...), p.bootError
 }
 
+// onGutter records how many lines carry an error dot.
+func (p *EditorPane) onGutter(params json.RawMessage) {
+	var g struct {
+		ErrorLines int `json:"errorLines"`
+	}
+
+	if json.Unmarshal(params, &g) == nil {
+		p.mu.Lock()
+		p.gutterErrors = g.ErrorLines
+		p.mu.Unlock()
+	}
+}
+
+// GutterErrors is the number of lines marked with an error dot (smoke checks).
+func (p *EditorPane) GutterErrors() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.gutterErrors
+}
+
 // Close stops bqls.
 func (p *EditorPane) Close() error { return p.Bridge.Close() }
 
@@ -339,6 +361,8 @@ func (p *EditorPane) onApp(method string, params json.RawMessage) {
 			p.appliedTheme = t.Theme
 			p.mu.Unlock()
 		}
+	case "gutter":
+		p.onGutter(params)
 	case "readClipboard":
 		// The page asks for the pasteboard instead of reading it itself:
 		// WebKit guards navigator.clipboard reads with its own Paste button.
