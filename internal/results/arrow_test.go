@@ -1,12 +1,14 @@
 package results
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
+	"github.com/apache/arrow-go/v18/arrow/decimal256"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 )
 
@@ -207,5 +209,108 @@ func TestRowsFromRecordAllTypes(t *testing.T) {
 		if v != nil {
 			t.Errorf("row 1 col %d = %#v, want nil", i, v)
 		}
+	}
+}
+
+func TestRowsFromRecordParameterizedDecimalsAndSlicedBatch(t *testing.T) {
+	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer mem.AssertSize(t, 0)
+
+	innerList := arrow.ListOf(arrow.BinaryTypes.String)
+	stType := arrow.StructOf(
+		arrow.Field{Name: "k", Type: arrow.BinaryTypes.String, Nullable: true},
+		arrow.Field{Name: "vals", Type: innerList},
+	)
+	schema := arrow.NewSchema([]arrow.Field{
+		{Name: "d128", Type: &arrow.Decimal128Type{Precision: 38, Scale: 2}, Nullable: true},
+		{Name: "d256", Type: &arrow.Decimal256Type{Precision: 48, Scale: 10}, Nullable: true},
+		{Name: "tms", Type: &arrow.Time64Type{Unit: arrow.Millisecond}, Nullable: true},
+		{Name: "tns", Type: arrow.FixedWidthTypes.Time64ns, Nullable: true},
+		{Name: "nested", Type: arrow.ListOf(stType)},
+	}, nil)
+
+	fields := []Field{
+		{Name: "d128", Type: TypeNumeric},
+		{Name: "d256", Type: TypeBigNumeric},
+		{Name: "tms", Type: TypeTime},
+		{Name: "tns", Type: TypeTime},
+		{Name: "nested", Type: TypeStruct, Repeated: true, Fields: []Field{
+			{Name: "k", Type: TypeString},
+			{Name: "vals", Type: TypeString, Repeated: true},
+		}},
+	}
+
+	b := array.NewRecordBuilder(mem, schema)
+	defer b.Release()
+
+	appendRow := func(d128, d256 string, ms, ns int64, key string, vals []string) {
+		n128, err := decimal128.FromString(d128, 38, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n256, err := decimal256.FromString(d256, 48, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		b.Field(0).(*array.Decimal128Builder).Append(n128)
+		b.Field(1).(*array.Decimal256Builder).Append(n256)
+		b.Field(2).(*array.Time64Builder).Append(arrow.Time64(ms))
+		b.Field(3).(*array.Time64Builder).Append(arrow.Time64(ns))
+
+		lb := b.Field(4).(*array.ListBuilder)
+		if key == "" && vals == nil {
+			lb.AppendNull()
+
+			return
+		}
+
+		lb.Append(true)
+		sb := lb.ValueBuilder().(*array.StructBuilder)
+		sb.Append(true)
+		sb.FieldBuilder(0).(*array.StringBuilder).Append(key)
+		vb := sb.FieldBuilder(1).(*array.ListBuilder)
+		vb.Append(true)
+		for _, v := range vals {
+			vb.ValueBuilder().(*array.StringBuilder).Append(v)
+		}
+	}
+
+	// Row 0 (sliced away), Row 1 & Row 2 (retained in slice), Row 3 (sliced away).
+	appendRow("1.10", "1.0000000001", 1000, 1_000_000_000, "skip0", []string{"z"})
+	appendRow("123.45", "98765432109876543210.1234500000", (3*3600+4*60+5)*1000+500, (12*3600+30*60+1)*1_000_000_000+250_000_000, "k1", []string{"a", "b"})
+	appendRow("-0.50", "-42.0000000000", 0, 0, "", nil)
+	appendRow("9.99", "2.5000000000", 2000, 2_000_000_000, "skip3", []string{"w"})
+
+	rec := b.NewRecordBatch()
+	defer rec.Release()
+
+	sliced := rec.NewSlice(1, 3)
+	defer sliced.Release()
+
+	rows, err := RowsFromRecord(fields, sliced)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := [][]any{
+		{
+			"123.45",
+			"98765432109876543210.12345",
+			"03:04:05.500000",
+			"12:30:01.250000",
+			[]any{[]any{"k1", []any{"a", "b"}}},
+		},
+		{
+			"-0.5",
+			"-42",
+			"00:00:00",
+			"00:00:00",
+			[]any{},
+		},
+	}
+
+	if !reflect.DeepEqual(rows, want) {
+		t.Fatalf("rows mismatch:\n got: %#v\nwant: %#v", rows, want)
 	}
 }

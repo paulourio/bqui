@@ -14,11 +14,7 @@ import (
 // ErrArrowMismatch is returned when an Arrow column does not fit its field.
 var ErrArrowMismatch = errors.New("results: arrow column does not match schema")
 
-const (
-	decimalScaleNumeric    = 9
-	decimalScaleBigNumeric = 38
-	microsPerMilli         = 1000
-)
+const microsPerMilli = 1000
 
 type getter func(i int) any
 
@@ -118,13 +114,34 @@ func valueGetter(f Field, arr arrow.Array) (getter, error) {
 	case *array.Binary:
 		return nullable(func(i int) any { return append([]byte(nil), a.Value(i)...) }), nil
 	case *array.Decimal128:
-		return nullable(func(i int) any { return trimDecimal(a.Value(i).ToString(decimalScaleNumeric)) }), nil
+		dt, ok := a.DataType().(*arrow.Decimal128Type)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrArrowMismatch, a.DataType())
+		}
+
+		scale := dt.Scale
+
+		return nullable(func(i int) any { return trimDecimal(a.Value(i).ToString(scale)) }), nil
 	case *array.Decimal256:
-		return nullable(func(i int) any { return trimDecimal(a.Value(i).ToString(decimalScaleBigNumeric)) }), nil
+		dt, ok := a.DataType().(*arrow.Decimal256Type)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrArrowMismatch, a.DataType())
+		}
+
+		scale := dt.Scale
+
+		return nullable(func(i int) any { return trimDecimal(a.Value(i).ToString(scale)) }), nil
 	case *array.Date32:
 		return nullable(func(i int) any { return a.Value(i).ToTime().Format(time.DateOnly) }), nil
 	case *array.Time64:
-		return nullable(func(i int) any { return FormatTimeOfDay(a.Value(i).ToTime(arrow.Microsecond)) }), nil
+		tt, ok := a.DataType().(*arrow.Time64Type)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrArrowMismatch, a.DataType())
+		}
+
+		unit := tt.Unit
+
+		return nullable(func(i int) any { return FormatTimeOfDay(a.Value(i).ToTime(unit)) }), nil
 	case *array.Timestamp:
 		tt, ok := a.DataType().(*arrow.TimestampType)
 		if !ok {
