@@ -30,6 +30,10 @@ type OutlineCell struct {
 	Secondary bool // dimmed text (placeholders)
 	Wrap      bool // multi-line wrapping (needs OutlineOptions.AutomaticRowHeights)
 	CharWrap  bool // character-wrap unbroken tokens when Wrap is true
+	// Active marks the item in use elsewhere (the query open in the
+	// editor): a semibold title on a rounded accent-tinted background,
+	// shown whatever the selection is.
+	Active bool
 }
 
 // CellText is the content of a plain text column.
@@ -328,6 +332,13 @@ func (o *Outline) Reload(item uint64) {
 	objc.Msg(o.View, "reloadItem:reloadChildren:", objc.Number(item), true)
 }
 
+// RedrawItem refreshes one item's row (not its children), e.g. after its
+// Active state changed.
+func (o *Outline) RedrawItem(item uint64) {
+	checkReentrancy("outline redraw")
+	objc.Msg(o.View, "reloadItem:", objc.Number(item))
+}
+
 // Expand expands item; recursive also expands its descendants. Item 0 is the
 // root, so Expand(0, true) expands the whole tree.
 func (o *Outline) Expand(item uint64, recursive bool) {
@@ -498,6 +509,8 @@ func (o *Outline) outlineCell(ov objc.ID, c OutlineCell) objc.ID {
 	tf := objc.Msg(cell, "textField")
 	SetString(tf, c.Title)
 	setSecondary(tf, c.Secondary)
+	setActive(tf, c.Active)
+	setActiveBackground(cell, c.Active)
 
 	if hasIcon {
 		if img := objc.Msg(cell, "imageView"); img != objc.Nil {
@@ -677,6 +690,46 @@ func newWrappingCellField(selectable bool, lineBreak uint64) objc.ID {
 
 	return tf
 }
+
+// setActive sets a reused cell's title weight: semibold when active,
+// regular otherwise, keeping the cell's point size.
+func setActive(tf objc.ID, active bool) {
+	weight := fontWeightRegular
+	if active {
+		weight = fontWeightSemibold
+	}
+
+	size := objc.Send[float64](objc.Msg(tf, "font"), "pointSize")
+	objc.Msg(tf, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:weight:", size, weight))
+}
+
+// setActiveBackground draws (or clears, on reused cells) the active item's
+// rounded accent-tinted background on the cell's layer.
+func setActiveBackground(cell objc.ID, active bool) {
+	objc.Msg(cell, "setWantsLayer:", true)
+	layer := objc.Msg(cell, "layer")
+
+	if !active {
+		objc.Msg(layer, "setBackgroundColor:", objc.Nil)
+
+		return
+	}
+
+	color := objc.Msg(SystemColor("controlAccentColor"), "colorWithAlphaComponent:", activeFill)
+	objc.Msg(layer, "setBackgroundColor:", objc.Msg(color, "CGColor"))
+	objc.Msg(layer, "setCornerRadius:", activeRadius)
+}
+
+const (
+	activeFill   = 0.22
+	activeRadius = 5.0
+)
+
+// NSFontWeight values.
+const (
+	fontWeightRegular  = 0.0
+	fontWeightSemibold = 0.3
+)
 
 func setSecondary(tf objc.ID, secondary bool) {
 	color := "labelColor"

@@ -41,6 +41,8 @@ type WorkbooksPane struct {
 	loadErr error
 
 	jobs jobTree
+
+	active uint64 // the row marked as open in the editor (0 = none)
 }
 
 func newWorkbooksPane(s *Shell) *WorkbooksPane {
@@ -121,6 +123,9 @@ func (p *WorkbooksPane) rebuild() {
 	}
 
 	p.filterJobs()
+
+	// IDs are stable per path, so the full reload draws the mark directly.
+	p.active, _ = p.ID(p.s.Workspace.Tab().File)
 	p.Outline.Reload(0)
 
 	for _, id := range p.roots {
@@ -170,6 +175,38 @@ func (p *WorkbooksPane) matches(text string) bool {
 }
 
 // selectCurrent highlights the open query (no switch: it is already open).
+// markActive marks the query open in the editor (bold, accent icon) so it
+// stays visible whatever is selected; only the changed rows are redrawn.
+func (p *WorkbooksPane) markActive() {
+	id, ok := p.ID(p.s.Workspace.Tab().File)
+	if !ok {
+		id = 0
+	}
+
+	if id == p.active {
+		return
+	}
+
+	old := p.active
+	p.active = id
+
+	for _, r := range []uint64{old, id} {
+		if _, shown := p.nodes[r]; shown {
+			p.Outline.RedrawItem(r)
+		}
+	}
+}
+
+// ActiveQuery returns the query marked as open (smoke checks).
+func (p *WorkbooksPane) ActiveQuery() (store.Query, bool) {
+	n, ok := p.nodes[p.active]
+	if !ok || n.query == nil {
+		return store.Query{}, false
+	}
+
+	return *n.query, true
+}
+
 func (p *WorkbooksPane) selectCurrent() {
 	if id, ok := p.ids[p.s.Workspace.Tab().File]; ok {
 		if _, shown := p.nodes[id]; shown {
@@ -206,6 +243,16 @@ func (p *WorkbooksPane) Queries(workbook string) []string {
 	}
 
 	return out
+}
+
+// ID returns the tree item of a workbook or query path (smoke checks).
+func (p *WorkbooksPane) ID(path string) (uint64, bool) {
+	id, ok := p.ids[path]
+	if _, shown := p.nodes[id]; !shown {
+		return 0, false
+	}
+
+	return id, ok
 }
 
 // SelectedQuery returns the query selected in the tree (smoke checks).
@@ -340,6 +387,10 @@ func (s workbooksSource) Cell(id uint64) appkit.OutlineCell {
 	case ok && n.workbook != nil:
 		return appkit.OutlineCell{Title: n.workbook.Name, Symbol: "folder", ToolTip: n.workbook.Path}
 	case ok && n.query != nil:
+		if id == p.active {
+			return appkit.OutlineCell{Title: n.query.Name, Symbol: "doc.text.fill", ToolTip: p.s.queryTip(*n.query), Active: true}
+		}
+
 		return appkit.OutlineCell{Title: n.query.Name, Symbol: "doc.text", ToolTip: p.s.queryTip(*n.query)}
 	}
 

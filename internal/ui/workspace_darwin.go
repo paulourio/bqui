@@ -92,6 +92,10 @@ func (s *Shell) updateTitle() {
 	}
 
 	appkit.SetWindowDocument(s.Window, group, name, edited)
+
+	if s.Workbooks != nil {
+		s.Workbooks.markActive()
+	}
 }
 
 // keepChanges asks before replacing edited text; false cancels.
