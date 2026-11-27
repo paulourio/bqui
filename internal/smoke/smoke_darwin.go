@@ -23,6 +23,7 @@ import (
 	"github.com/paulourio/bqui/internal/export"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/results"
+	"github.com/paulourio/bqui/internal/store"
 	"github.com/paulourio/bqui/internal/ui"
 )
 
@@ -117,6 +118,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	ws := workspaceFlow(s)
 	phase("theme")
 	ts := themeFlow(s, dir)
+	phase("prefs")
+	pr := prefsFlow(s, dir)
 	phase("checks")
 
 	queued := time.Now()
@@ -146,6 +149,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		exportChecks(rep, xs)
 		workspaceChecks(rep, ws)
 		themeChecks(rep, ts)
+		prefsChecks(rep, pr)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -847,6 +851,63 @@ func themeFlow(s *ui.Shell, dir string) themeResult {
 	r.DefaultEditor = s.Editor.AppliedTheme()
 
 	return r
+}
+
+// prefsResult captures the Settings window and query guards.
+type prefsResult struct {
+	BadErr, LimitedErr, Shot string
+	Limited, Unlimited       app.RunState
+	WindowShown              bool
+}
+
+func prefsFlow(s *ui.Shell, dir string) prefsResult {
+	var r prefsResult
+
+	onMain(func() {
+		s.ShowPreferences()
+		r.WindowShown = objc.Send[bool](s.PreferencesWindow(), "isVisible")
+
+		if err := s.ApplyPreferences(store.PreferenceText{MaxBytesBilled: "lots"}); err != nil {
+			r.BadErr = err.Error()
+		}
+	})
+
+	time.Sleep(settleDelay)
+	onMain(func() {
+		r.Shot = "settings.png"
+		if err := appkit.WriteWindowPNG(s.PreferencesWindow(), filepath.Join(dir, r.Shot)); err != nil {
+			r.Shot = "✕ " + err.Error()
+		}
+
+		objc.Msg(s.PreferencesWindow(), "orderOut:", objc.Nil)
+	})
+
+	// The fake bills 10 MiB: a 1 MB guard must fail the run like BigQuery.
+	onMain(func() { _ = s.ApplyPreferences(store.PreferenceText{MaxBytesBilled: "1 MB", Location: "US"}) })
+
+	if run := waitRun(s, func() { s.RunSQL("SELECT order_id FROM orders LIMIT 5") }); run != nil {
+		snap := run.Snapshot()
+		r.Limited = snap.State
+
+		if snap.Err != nil {
+			r.LimitedErr = snap.Err.Error()
+		}
+	}
+
+	onMain(func() { _ = s.ApplyPreferences(store.PreferenceText{}) })
+
+	if run := waitRun(s, func() { s.RunSQL("SELECT order_id FROM orders LIMIT 5") }); run != nil {
+		r.Unlimited = run.Snapshot().State
+	}
+
+	return r
+}
+
+func prefsChecks(rep *Report, r prefsResult) {
+	rep.check("prefs-window", r.WindowShown && !strings.HasPrefix(r.Shot, "✕") && strings.Contains(r.BadErr, "maximum bytes billed"),
+		"shown %v, %s, invalid input: %q", r.WindowShown, r.Shot, r.BadErr)
+	rep.check("prefs-bytes-guard", r.Limited == app.RunFailed && strings.Contains(r.LimitedErr, "bytes billed") && r.Unlimited == app.RunDone,
+		"limited run %v (%s); unlimited run %v", r.Limited, r.LimitedErr, r.Unlimited)
 }
 
 func themeChecks(rep *Report, r themeResult) {

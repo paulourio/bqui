@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"text/template"
 )
 
@@ -28,8 +30,9 @@ var infoPlist = template.Must(template.New("Info.plist").Parse(`<?xml version="1
 	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
 	<key>CFBundleName</key><string>{{.Name}}</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
-	<key>CFBundleShortVersionString</key><string>{{.Version}}</string>
-	<key>CFBundleVersion</key><string>{{.Version}}</string>
+	<key>CFBundleShortVersionString</key><string>{{.Short}}</string>
+	<key>CFBundleVersion</key><string>{{.Short}}</string>
+	<key>BQUIBuild</key><string>{{.Version}}</string>
 	<key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key><string>{{.MinOS}}</string>
 	<key>NSHighResolutionCapable</key><true/>
@@ -44,6 +47,20 @@ type bundleInfo struct {
 	Name, Exe, ID, Version, MinOS string
 }
 
+var numericVersion = regexp.MustCompile(`^(\d+(?:\.\d+){0,2})(?:[-+].*)?$`)
+
+// Short is the numeric version macOS expects (1.2.3); development builds
+// ("190d644-dirty") become 0.0.0 and keep the full string in BQUIBuild.
+func (b bundleInfo) Short() string {
+	// A tagged release (1.2.3, 1.2.3-rc1). Git hashes such as 190d644-dirty
+	// fail because the hex digits run into letters.
+	if m := numericVersion.FindStringSubmatch(b.Version); m != nil && !looksLikeHash(b.Version) {
+		return m[1]
+	}
+
+	return "0.0.0"
+}
+
 func main() {
 	bin := flag.String("bin", "", "path to the darwin bqui executable")
 	out := flag.String("o", "dist/bqui.app", "output .app directory")
@@ -52,6 +69,7 @@ func main() {
 	flag.StringVar(&info.ID, "id", "io.github.paulourio.bqui", "CFBundleIdentifier")
 	flag.StringVar(&info.Version, "version", "0.0.0", "bundle version")
 	flag.StringVar(&info.MinOS, "min-os", "26.0", "LSMinimumSystemVersion")
+	zipOut := flag.String("zip", "", "also write the bundle as a release zip here")
 	flag.Parse()
 
 	if *bin == "" {
@@ -62,6 +80,13 @@ func main() {
 	if err := build(*bin, *out, *notices, info); err != nil {
 		fmt.Fprintln(os.Stderr, "bundle:", err)
 		os.Exit(1)
+	}
+
+	if *zipOut != "" {
+		if err := zipBundle(*out, *zipOut); err != nil {
+			fmt.Fprintln(os.Stderr, "bundle:", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -109,4 +134,20 @@ func build(bin, out, notices string, info bundleInfo) error {
 
 	//nolint:gosec // G703: build tool; the output path comes from the developer's own -o flag.
 	return os.WriteFile(filepath.Join(contents, "MacOS", info.Exe), exe, exePerm)
+}
+
+// looksLikeHash reports a git describe --always hash (7+ hex digits).
+func looksLikeHash(v string) bool {
+	head, _, _ := strings.Cut(v, "-")
+	if len(head) < 7 {
+		return false
+	}
+
+	for _, r := range head {
+		if !strings.ContainsRune("0123456789abcdef", r) {
+			return false
+		}
+	}
+
+	return true
 }

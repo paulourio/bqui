@@ -183,13 +183,19 @@ func (p *EditorPane) AppendText(text string) {
 	_ = p.Bridge.SendApp("appendText", map[string]string{"text": text})
 }
 
-// SetDefaultProject points bqls (completion, dry runs) at a project.
-func (p *EditorPane) SetDefaultProject(project string, apiEnabled bool) {
-	_ = p.Bridge.Notify("workspace/didChangeConfiguration", map[string]any{
-		"settings": map[string]any{"bqls": map[string]any{
-			"default_project": project, "bigquery_api_enabled": apiEnabled,
-		}},
-	})
+// ConfigureLSP sends bqls the options bqui controls. bqls replaces its
+// client settings on every notification, so all of them are sent each time.
+func (p *EditorPane) ConfigureLSP(o *bqconfig.LSPOptions) {
+	settings := map[string]any{
+		"default_project": o.DefaultProject, "bigquery_api_enabled": o.BigQueryAPIEnabled,
+		"default_dataset": o.DefaultDataset,
+	}
+
+	if o.CostWarningThresholdUSD > 0 {
+		settings["cost_warning_threshold_usd"] = o.CostWarningThresholdUSD
+	}
+
+	_ = p.Bridge.Notify("workspace/didChangeConfiguration", map[string]any{"settings": map[string]any{"bqls": settings}})
 }
 
 // RequestRun asks the page for the current text/selection and triggers OnRun.

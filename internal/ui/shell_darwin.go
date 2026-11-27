@@ -102,6 +102,7 @@ type Shell struct {
 	Theme       *theme.Theme
 	themeErrs   []error
 	themeColors []objc.ID
+	prefs       *prefsWindow
 
 	exportCancel func()
 	lastExport   app.ExportProgress
@@ -174,6 +175,7 @@ func NewShell(opts Options) (*Shell, error) {
 		OnUpdate: s.onRunUpdate,
 		SpillDir: opts.SpillDir,
 	})
+	s.Runner.SetMaxSpillBytes(s.settings.Prefs.MaxSpillBytes)
 
 	autosave := func(name string) string {
 		if opts.Deterministic {
@@ -237,6 +239,11 @@ func (s *Shell) lspOptions() *bqconfig.LSPOptions {
 	o := bqconfig.DefaultLSPOptions()
 	o.DefaultProject = s.settings.BillingProject
 	o.BigQueryAPIEnabled = s.opts.Live && o.DefaultProject != ""
+	o.DefaultDataset = s.settings.Prefs.DefaultDataset
+
+	if s.settings.Prefs.CostWarningUSD > 0 {
+		o.CostWarningThresholdUSD = s.settings.Prefs.CostWarningUSD
+	}
 
 	return o
 }
@@ -258,7 +265,7 @@ func (s *Shell) SetBillingProject(project string) {
 		s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
 	}
 
-	s.Editor.SetDefaultProject(project, s.opts.Live)
+	s.Editor.ConfigureLSP(s.lspOptions())
 	s.rebuildProjectPicker()
 	s.saveSettings()
 }
@@ -363,7 +370,7 @@ func (s *Shell) menus() []appkit.Menu {
 		{Role: appkit.MenuApp, Title: AppName, Items: []appkit.MenuItem{
 			{Title: "About " + AppName, Action: "orderFrontStandardAboutPanel:"},
 			{},
-			{Title: "Settings…", Key: ",", Run: func() { s.status("Settings arrive in M13.") }},
+			{Title: "Settings…", Key: ",", Run: s.ShowPreferences},
 			{},
 			{Title: "Hide " + AppName, Action: "hide:", Key: "h"},
 			{Title: "Hide Others", Action: "hideOtherApplications:", Key: "h", Mods: cmd | opt},
@@ -491,6 +498,7 @@ func (s *Shell) RunSQL(sql string) {
 	}
 
 	req := bq.QueryRequest{SQL: sql, Project: s.settings.BillingProject, MaxInlineRows: firstPageRows}
+	app.ApplyPreferences(s.settings.Prefs, &req)
 	s.Workspace.Prepare(&req)
 	s.Results.Show(s.Runner.Start(req))
 }

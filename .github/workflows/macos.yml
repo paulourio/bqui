@@ -27,8 +27,8 @@ jobs:
       - name: Test (native arm64, includes darwin-only objc/appkit tests)
         run: go test ./...
 
-      - name: Build bundle
-        run: make bundle-arm64
+      - name: Build bundle and release zip
+        run: make release-arm64
 
       - name: Smoke test (offscreen render, no TCC permission needed)
         run: |
@@ -36,6 +36,8 @@ jobs:
             dist/darwin-arm64/bqui.app --args --smoke-test="$PWD/dist/smoke"
           cat dist/smoke.log
           cat dist/smoke/report.json
+          # open -W always exits 0; fail the job on failed checks.
+          jq -e '.failed == 0' dist/smoke/report.json
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -45,3 +47,9 @@ jobs:
             dist/smoke/
             dist/smoke.log
           if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bqui-darwin-arm64
+          path: dist/bqui-*-darwin-arm64.zip
+          if-no-files-found: error

@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,6 +20,7 @@ import (
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/bqstorage"
+	"github.com/paulourio/bqui/internal/logs"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/smoke"
 	"github.com/paulourio/bqui/internal/store"
@@ -47,6 +49,20 @@ func main() {
 
 	if err := objc.Load(); err != nil {
 		fatal(err)
+	}
+
+	// AppKit's terminate calls exit(): deferred calls never run, so the
+	// terminate hook closes the logs.
+	closeLogs := func() {}
+
+	if *smokeDir == "" {
+		if dir, err := logs.DefaultDir(); err == nil {
+			if c, err := logs.Setup(dir); err == nil {
+				closeLogs = c
+			}
+		}
+
+		slog.Default().Info("bqui", "version", version, "fake", *fake)
 	}
 
 	settings, settingsPath := loadSettings(*fake, *smokeDir != "")
@@ -86,6 +102,7 @@ func main() {
 			WillTerminate: func() {
 				_ = workspace.Flush()
 				closeDB()
+				closeLogs()
 			},
 			DidFinishLaunching: func() {
 				shell.ResolveBillingProject()

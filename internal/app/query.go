@@ -7,6 +7,7 @@ import (
 	"iter"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
@@ -217,9 +218,20 @@ type Runner struct {
 	opts RunnerOptions
 	log  *slog.Logger
 
+	maxSpill atomic.Int64
+
 	mu     sync.Mutex
 	nextID int
 	lastUI map[int]time.Time
+}
+
+// SetMaxSpillBytes changes the per-run spill cap (<= 0 restores the default).
+func (rn *Runner) SetMaxSpillBytes(n int64) {
+	if n <= 0 {
+		n = defaultMaxSpillBytes
+	}
+
+	rn.maxSpill.Store(n)
 }
 
 // NewRunner creates a Runner.
@@ -237,7 +249,10 @@ func NewRunner(opts RunnerOptions) *Runner {
 		log = slog.New(slog.DiscardHandler)
 	}
 
-	return &Runner{opts: opts, log: log, lastUI: make(map[int]time.Time)}
+	rn := &Runner{opts: opts, log: log, lastUI: make(map[int]time.Time)}
+	rn.maxSpill.Store(opts.MaxSpillBytes)
+
+	return rn
 }
 
 func (rn *Runner) newRun(kind, title string) (*Run, context.Context) {
@@ -477,7 +492,7 @@ func (rn *Runner) storageResult(ctx context.Context, r *Run, fields []results.Fi
 		switch {
 		case limit > 0 && rows >= limit:
 			return nil
-		case spill.Bytes() >= rn.opts.MaxSpillBytes:
+		case spill.Bytes() >= rn.maxSpill.Load():
 			r.update(func(s *RunSnapshot) { s.Truncated = true })
 
 			return nil

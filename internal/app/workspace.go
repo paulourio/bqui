@@ -385,3 +385,21 @@ func (w *Workspace) String() string {
 
 	return fmt.Sprintf("tab %s (%s, %d bytes)", t.ID, t.File, len(t.SQL))
 }
+
+// ApplyPreferences sets the location, byte limit and default dataset on a
+// query request (explicit request values win).
+func ApplyPreferences(p store.Preferences, req *bq.QueryRequest) {
+	if req.Location == "" {
+		req.Location = p.Location
+	}
+
+	if req.MaxBytesBilled == 0 {
+		req.MaxBytesBilled = p.MaxBytesBilled
+	}
+
+	if req.DefaultDataset == nil && p.DefaultDataset != "" {
+		if project, dataset, ok := strings.Cut(p.DefaultDataset, "."); ok {
+			req.DefaultDataset = &bq.DatasetRef{Project: project, Dataset: dataset}
+		}
+	}
+}

@@ -30,6 +30,8 @@ type Settings struct {
 	PinnedProjects []string `json:"pinnedProjects"`
 	// Theme is the chosen theme's name ("" = Default).
 	Theme string `json:"theme,omitempty"`
+	// Query preferences.
+	Prefs Preferences `json:"preferences"`
 }
 
 // DefaultThemesDir is ~/Library/Application Support/bqui/themes (or the OS

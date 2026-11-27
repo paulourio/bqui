@@ -86,6 +86,11 @@ func (f *FakeBackend) Query(ctx context.Context, req bq.QueryRequest) (res *bq.Q
 
 	res = &bq.QueryResult{Job: &job, JobDetails: fakeJob(job, fakeStages), SlotMs: 1234, BytesProc: 2 << 20, BytesBilled: 10 << 20}
 
+	if req.MaxBytesBilled > 0 && req.MaxBytesBilled < res.BytesBilled {
+		return nil, fmt.Errorf("%w: query exceeded limit for bytes billed: %d; %d or higher required",
+			bq.ErrQueryFailed, req.MaxBytesBilled, res.BytesBilled)
+	}
+
 	switch {
 	case req.SessionID != "":
 		res.SessionID = req.SessionID

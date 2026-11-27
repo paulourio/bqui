@@ -44,6 +44,11 @@ build-darwin-%: FORCE
 bundle-%: build-darwin-%
 	go run ./tools/bundle -bin $(DIST)/darwin-$*/bqui -o $(DIST)/darwin-$*/bqui.app -version $(VERSION:v%=%)
 
+# Release zip: the ad-hoc signed bundle (Go signs darwin/arm64 binaries).
+release-%: build-darwin-%
+	go run ./tools/bundle -bin $(DIST)/darwin-$*/bqui -o $(DIST)/darwin-$*/bqui.app -version $(VERSION:v%=%) \
+		-zip $(DIST)/bqui-$(VERSION)-darwin-$*.zip
+
 # Copy the amd64 bundle into the VM.
 vm-deploy: bundle-amd64
 	$(SSH) 'mkdir -p $(VM_DIR) && rm -rf $(VM_DIR)/bqui.app'

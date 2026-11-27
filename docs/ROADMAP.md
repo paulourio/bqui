@@ -478,6 +478,11 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M11 — BigQuery Studio saved queries (Dataform)
 
+**Status: blocked on the spike.**
+- The Dataform API is enabled for `ff-homelab`, but no repositories exist in any location, so there is no console-saved query to inspect yet.
+- The local side is ready: saved-query headers carry `link_id`.
+- Next step: save a query in BigQuery Studio, then document its representation (repository labels, workspace/file layout, commits) before writing the sync.
+
 1. **Spike first.** Create saved queries in the console, then inspect them through `dataform.googleapis.com/v1` (repositories, labels, workspaces, files, commits) and document the actual representation in `internal/dataform/README.md`.
 2. Add a **BigQuery** library per project and region in the sidebar: list, open, save (commit), create, rename and delete.
 3. **Link a local query to a remote one:** saving pushes to both. On conflict (the remote changed since the last pull, tracked by commit SHA or etag in SQLite), show a side-by-side diff with a choice.
@@ -523,6 +528,39 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 **Exit:** switching themes restyles the editor, grid, JSON and graph live without a restart.
 
 ### M13 — Hardening and release
+
+**Status: done for what can be verified without Apple hardware.**
+- **Settings window (⌘,):**
+  - Default location and default dataset.
+  - Maximum bytes billed: BigQuery enforces it, and the smoke test checks that a run over the limit fails.
+  - bqls cost warning in USD.
+  - Result spill limit.
+  - Values are validated with field-specific errors.
+  - Changes apply live to runs, to bqls (`didChangeConfiguration` always sends every field bqui owns, because bqls replaces client settings), and to the runner.
+- **Logs and crashes:**
+  - `~/Library/Logs/bqui/bqui.log`, rotated at 5 MiB and keeping 3 files.
+  - Go crash output goes to `crash.log` through `debug.SetCrashOutput`.
+  - When launched from Finder, stderr is redirected into the log.
+  - The logs close on terminate.
+- **Packaging:**
+  - `make release-arm64` writes `dist/bqui-<version>-darwin-arm64.zip`. Executable modes are kept, and Go's linker ad-hoc signs the darwin/arm64 binary.
+  - `CFBundleVersion` is numeric: a tag, or `0.0.0` for development builds, with the full `git describe` in `BQUIBuild`.
+  - CI uploads the zip and now fails when smoke checks fail (`open -W` always exits 0).
+- **README:** install (quarantine), file locations, and the build and test loop.
+- **Not done, because it needs real Apple silicon or an account:**
+  - Performance passes (scroll FPS, launch time, memory) and the 10 GiB export and 50M-row memory benchmarks.
+  - VoiceOver and keyboard audit.
+  - Notarization.
+- **Not done (scope):**
+  - Keybinding editor.
+  - Multiple editor tabs.
+  - Update checks.
+  - Charts, lineage and Vim mode.
+- **Open known issues:**
+  - AppKit table reentrancy warnings (M8).
+  - An invisible inspector segment label in the VM (glass rendering).
+  - Toolbar overflow at 1280 pt.
+  - Binary size (about 190 MB, mostly bqlang's wasm2go parser).
 
 - Performance passes on real M4 hardware (rental): scroll FPS, launch time, memory profiles.
 - Accessibility audit: VoiceOver and full keyboard navigation.

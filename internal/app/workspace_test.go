@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -198,5 +199,29 @@ func TestJobRowsFromRunsAndFilter(t *testing.T) {
 
 	if got := FilterJobRows(rows, " "); len(got) != 2 {
 		t.Errorf("empty filter = %d", len(got))
+	}
+}
+
+func TestApplyPreferencesAndBytesLimit(t *testing.T) {
+	p := store.Preferences{Location: "EU", DefaultDataset: "proj.ds", MaxBytesBilled: 1 << 20}
+
+	req := bq.QueryRequest{SQL: "SELECT 1 FROM orders"}
+	ApplyPreferences(p, &req)
+
+	if req.Location != "EU" || req.MaxBytesBilled != 1<<20 || req.DefaultDataset == nil || req.DefaultDataset.Dataset != "ds" {
+		t.Fatalf("req = %+v", req)
+	}
+
+	keep := bq.QueryRequest{Location: "US", MaxBytesBilled: 5}
+	ApplyPreferences(p, &keep)
+
+	if keep.Location != "US" || keep.MaxBytesBilled != 5 {
+		t.Errorf("explicit values overridden: %+v", keep)
+	}
+
+	// The fake bills 10 MiB: a 1 MiB limit fails like BigQuery does.
+	rn, _ := newTestRunner(t)
+	if s := wait(t, rn.Start(req)); s.State != RunFailed || !strings.Contains(s.Err.Error(), "exceeded limit for bytes billed") {
+		t.Errorf("limited run = %v %v", s.State, s.Err)
 	}
 }
