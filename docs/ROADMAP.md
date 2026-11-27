@@ -339,6 +339,15 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M7 — JSON results view + value inspector
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **JSON tab:** one compact JSON object per row, in the console's encoding, in a virtualized table. Each row is encoded on demand from the grid's chunk cache, so the result is never materialized as one string. Lines are truncated at 4,096 characters for display.
+- **Value inspector:** selecting a JSON row, or double-clicking a grid cell, shows the row in the inspector as a typed tree (name, value, type), expanded to the clicked element path. For example, the second visual line of `items.tags` maps to `items[0].tags[1]`. Values are shown in full up to 64 KiB, and the menu offers Copy Value, Copy Path and Insert Path in Editor.
+- **Copy All as JSON:** stops at 16 MiB and points to Export (M9), which streams to files.
+- **Not done:**
+  - Folding inside the JSON tab; the inspector tree serves that role.
+  - Syntax colors in the JSON tab; they arrive with themes (M12).
+  - Formatted/raw/JSON modes in the inspector; they're covered by its copy actions.
+
 **JSON view**
 - A virtualized `NSTextView`-free custom view. Each logical row is rendered lazily as pretty JSON, and only visible rows plus a margin are materialized.
 - Code folding per object or array, and syntax colors from the theme.

@@ -35,6 +35,9 @@ type ResultsPane struct {
 	View  objc.ID
 	Table *appkit.Table
 
+	// Inspect receives a double-clicked row and the clicked value's path.
+	Inspect func(fields []results.Field, row []any, index int64, path string)
+
 	status, empty objc.ID
 
 	run   *app.Run
@@ -50,7 +53,7 @@ func newResultsPane() *ResultsPane {
 	p := &ResultsPane{}
 	src := &gridSource{p: p}
 
-	p.Table = appkit.NewTable(src, appkit.TableOptions{Copy: p.copyLines, Menu: p.menu})
+	p.Table = appkit.NewTable(src, appkit.TableOptions{Copy: p.copyLines, Menu: p.menu, OnDoubleClick: p.inspectLine})
 	p.status = appkit.SecondaryLabel("")
 	objc.Msg(p.status, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", statusFontSize))
 	p.empty = appkit.SecondaryLabel("Run a query with ⌘↩ to see results here.")
@@ -338,6 +341,46 @@ func (s *gridSource) RowSeparator(row int) bool {
 	pos, err := s.p.grid.Locate(int64(row))
 
 	return err == nil && pos.Last()
+}
+
+// inspectLine opens the value inspector on the double-clicked cell.
+func (p *ResultsPane) inspectLine(line int) {
+	if p.grid == nil || p.Inspect == nil {
+		return
+	}
+
+	pos, err := p.grid.Locate(int64(line))
+	if err != nil {
+		return
+	}
+
+	row, err := p.grid.Row(pos.Row)
+	if err != nil {
+		return
+	}
+
+	path := ""
+	if i, ok := columnIndex(p.Table.ClickedColumn()); ok && i < len(p.cols) {
+		path = results.ColumnPath(p.grid.Fields(), row, p.cols[i], pos.Sub)
+	}
+
+	p.Inspect(p.grid.Fields(), row, pos.Row, path)
+}
+
+// InspectCell opens the value inspector for (line, column index) (smoke).
+func (p *ResultsPane) InspectCell(line, col int) {
+	if p.grid == nil || p.Inspect == nil {
+		return
+	}
+
+	pos, err := p.grid.Locate(int64(line))
+	if err != nil {
+		return
+	}
+
+	if row, err := p.grid.Row(pos.Row); err == nil {
+		p.Inspect(p.grid.Fields(), row, pos.Row, results.ColumnPath(p.grid.Fields(), row, p.cols[col], pos.Sub))
+	}
 }
 
 // copyLines renders selected visual lines as TSV, exactly as displayed.

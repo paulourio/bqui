@@ -103,6 +103,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	ex := exploreFlow(s)
 	rs := resultsFlow(s)
 	js := jobsFlow(s)
+	vs := valueFlow(s)
 
 	queued := time.Now()
 
@@ -126,6 +127,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 
 		resultsChecks(rep, rs)
 		jobsChecks(rep, js)
+		valueChecks(rep, vs)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -513,12 +515,12 @@ func jobsFlow(s *ui.Shell) jobsResult {
 			r.LastRun = run.Snapshot().Job.JobID
 		}
 
-		s.SelectTab(1)
+		s.SelectTab(ui.TabJob)
 	})
 	waitMain(loadTimeout, func() bool { return s.Job.Rows() > 5 })
 	onMain(func() { r.JobRows = s.Job.Rows() })
 
-	onMain(func() { s.SelectTab(2) })
+	onMain(func() { s.SelectTab(ui.TabHistory) })
 	waitMain(loadTimeout, func() bool { return len(s.History.Model.Rows()) > 0 && !s.History.Model.Loading() })
 	onMain(func() {
 		rows := s.History.Model.Rows()
@@ -552,6 +554,43 @@ func jobsFlow(s *ui.Shell) jobsResult {
 	onMain(func() { r.HistoryAll = len(s.History.Model.Rows()) })
 
 	return r
+}
+
+// valueResult captures the JSON view and value inspector flow.
+type valueResult struct {
+	JSONRows     int64
+	FirstJSON    string
+	ValueRows    int64
+	SelectedPath string
+}
+
+func valueFlow(s *ui.Shell) valueResult {
+	var r valueResult
+
+	onMain(func() { s.SelectTab(ui.TabJSON) })
+	waitMain(loadTimeout, func() bool { return s.JSON.Rows() == 5000 })
+	onMain(func() {
+		r.JSONRows = s.JSON.Rows()
+		r.FirstJSON = s.JSON.Line(0)
+	})
+
+	// Order 3 (row 2): item 0 has two tags, so its second visual line holds
+	// items[0].tags[1]. items.tags is leaf column 7.
+	onMain(func() {
+		g := s.Results.Current().Snapshot().Grid
+		if first, err := g.FirstLine(2); err == nil {
+			s.Results.InspectCell(int(first)+1, 7)
+		}
+	})
+	waitMain(loadTimeout, func() bool { _, p := s.Inspector.ValueRows(); return p != "" })
+	onMain(func() { r.ValueRows, r.SelectedPath = s.Inspector.ValueRows() })
+
+	return r
+}
+
+func valueChecks(rep *Report, r valueResult) {
+	rep.check("json-view", r.JSONRows == 5000 && strings.HasPrefix(r.FirstJSON, `{"order_id":"1",`), "%d rows; first %.60s", r.JSONRows, r.FirstJSON)
+	rep.check("value-inspector", r.SelectedPath == "items[0].tags[1]" && r.ValueRows >= 5, "selected %q, %d rows visible", r.SelectedPath, r.ValueRows)
 }
 
 func jobsChecks(rep *Report, r jobsResult) {

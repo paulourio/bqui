@@ -165,8 +165,8 @@ func (p *HistoryPane) menu(i int, _ string) []appkit.MenuItem {
 
 	items := []appkit.MenuItem{
 		{Title: "Open Query in Editor", Run: func() { p.openInEditor(i) }},
-		{Title: "Run Again", Run: func() { p.s.SelectTab(tabResults); p.s.RunSQL(r.SQL) }},
-		{Title: "Show Results", Run: func() { p.s.SelectTab(tabResults); p.s.Results.Show(p.s.Runner.OpenJob(r.Ref)) }},
+		{Title: "Run Again", Run: func() { p.s.SelectTab(TabResults); p.s.RunSQL(r.SQL) }},
+		{Title: "Show Results", Run: func() { p.s.SelectTab(TabResults); p.s.Results.Show(p.s.Runner.OpenJob(r.Ref)) }},
 		{Title: "Show Details", Run: func() { p.s.Inspector.ShowJob(r.Ref) }},
 	}
 

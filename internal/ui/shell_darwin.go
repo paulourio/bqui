@@ -19,6 +19,7 @@ import (
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/objc"
+	"github.com/paulourio/bqui/internal/results"
 	"github.com/paulourio/bqui/internal/store"
 )
 
@@ -76,6 +77,7 @@ type Shell struct {
 	Editor    *EditorPane
 	Cost      objc.ID // toolbar cost estimate label
 	Results   *ResultsPane
+	JSON      *JSONPane
 	Job       *JobPane
 	History   *HistoryPane
 	Runner    *app.Runner
@@ -124,6 +126,8 @@ func NewShell(opts Options) (*Shell, error) {
 	s.Explorer = newExplorerPane(s, opts.Backend)
 
 	s.Results = newResultsPane()
+	s.Results.Inspect = func(f []results.Field, row []any, i int64, path string) { s.Inspector.ShowRow(f, row, i, path) }
+	s.JSON = newJSONPane(s)
 	s.Job = newJobPane(opts.Jobs)
 	s.History = newHistoryPane(s, opts.Jobs)
 	s.Runner = app.NewRunner(app.RunnerOptions{
@@ -438,16 +442,17 @@ func (s *Shell) Preview(info app.ObjectInfo) {
 
 // Bottom-pane tabs.
 const (
-	tabResults = iota
-	tabJob
-	tabHistory
+	TabResults = iota
+	TabJSON
+	TabJob
+	TabHistory
 )
 
 // bottomPane stacks the Results, Job information and History tabs under a
 // segmented switcher.
 func (s *Shell) bottomPane() objc.ID {
-	s.tabs = appkit.NewSegmented([]string{"Results", "Job information", "History"}, s.SelectTab)
-	s.tabViews = []objc.ID{s.Results.View, s.Job.View, s.History.View}
+	s.tabs = appkit.NewSegmented([]string{"Results", "JSON", "Job information", "History"}, s.SelectTab)
+	s.tabViews = []objc.ID{s.Results.View, s.JSON.View, s.Job.View, s.History.View}
 
 	v := appkit.NewView()
 	appkit.UseAutoLayout(s.tabs.View)
@@ -470,7 +475,7 @@ func (s *Shell) bottomPane() objc.ID {
 		appkit.Equal(appkit.Anchor(content, "bottomAnchor"), appkit.Anchor(v, "bottomAnchor"), 0),
 	)
 
-	s.SelectTab(tabResults)
+	s.SelectTab(TabResults)
 
 	return v
 }
@@ -483,7 +488,7 @@ func (s *Shell) SelectTab(i int) {
 		appkit.SetHidden(tv, j != i)
 	}
 
-	if i == tabHistory {
+	if i == TabHistory {
 		s.History.Shown()
 	}
 }
@@ -497,6 +502,7 @@ func (s *Shell) onRunUpdate(r *app.Run) {
 	}
 
 	snap := r.Snapshot()
+	s.JSON.Update(snap)
 
 	switch snap.State {
 	case app.RunDone, app.RunFailed, app.RunCancelled:

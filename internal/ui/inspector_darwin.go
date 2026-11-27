@@ -5,6 +5,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/objc"
+	"github.com/paulourio/bqui/internal/results"
 )
 
 const (
@@ -35,7 +37,8 @@ type InspectorPane struct {
 
 	title, subtitle, status objc.ID
 	seg                     *appkit.Segmented
-	schema, details         *appkit.Outline
+	schema, details, values *appkit.Outline
+	valueSrc                *valueSource
 	schemaSrc               *schemaSource
 	detailsSrc              *detailsSource
 	s                       *Shell
@@ -93,6 +96,18 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 
 	appkit.AddFilling(content, p.schema.Scroll, 0)
 	appkit.AddFilling(content, p.details.Scroll, 0)
+
+	p.valueSrc = &valueSource{}
+	p.values = appkit.NewOutline(p.valueSrc, appkit.OutlineOptions{
+		Columns: []appkit.Column{
+			{ID: "name", Title: "Name", Width: 150, MinWidth: 60},
+			{ID: "value", Title: "Value", Width: 240, MinWidth: 80},
+			{ID: "type", Title: "Type", Width: 110, MinWidth: 40},
+		},
+		AutomaticRowHeights: true,
+		Menu:                p.valueMenu,
+	})
+	appkit.AddFilling(content, p.values.Scroll, 0)
 	appkit.AddCentered(content, p.status)
 
 	safeTop := objc.Msg(objc.Msg(p.View, "safeAreaLayoutGuide"), "topAnchor")
@@ -124,16 +139,123 @@ const (
 	stateLoading
 	stateError
 	stateReady
+	stateValue
 )
 
 func (p *InspectorPane) setState(st inspectorState) {
 	appkit.SetHidden(p.seg.View, st != stateReady)
-	appkit.SetHidden(p.status, st == stateReady)
+	appkit.SetHidden(p.status, st == stateReady || st == stateValue)
+	appkit.SetHidden(p.values.Scroll, st != stateValue)
 
 	if st != stateReady {
 		appkit.SetHidden(p.schema.Scroll, true)
 		appkit.SetHidden(p.details.Scroll, true)
 	}
+}
+
+// ShowRow shows one result row as a typed value tree, revealing and
+// selecting focus (a value path such as "items[1].sku"; "" for none).
+func (p *InspectorPane) ShowRow(fields []results.Field, row []any, index int64, focus string) {
+	p.gen++
+	p.current = app.ObjectInfo{Kind: app.KindPlaceholder, Name: "Row " + app.Count(uint64(index+1))} //nolint:gosec // non-negative
+
+	appkit.SetString(p.title, p.current.Name)
+	appkit.SetString(p.subtitle, "result row · "+strconv.Itoa(len(fields))+" fields")
+
+	p.valueSrc.set(results.Tree(fields, row))
+	p.values.Reload(0)
+	p.setState(stateValue)
+
+	if id, ok := p.valueSrc.byPath[focus]; ok {
+		for _, anc := range p.valueSrc.ancestors(id) {
+			p.values.Expand(anc, false)
+		}
+
+		p.values.Select(id)
+	}
+}
+
+// ValueRows reports visible value-tree rows and the selected path (smoke).
+func (p *InspectorPane) ValueRows() (int64, string) {
+	sel := p.values.Selected()
+	if n, ok := p.valueSrc.nodes[sel]; ok {
+		return p.values.Rows(), n.Path
+	}
+
+	return p.values.Rows(), ""
+}
+
+func (p *InspectorPane) valueMenu(item uint64) []appkit.MenuItem {
+	n, ok := p.valueSrc.nodes[item]
+	if !ok {
+		return nil
+	}
+
+	return []appkit.MenuItem{
+		{Title: "Copy Value", Run: func() { appkit.CopyToPasteboard(n.Display) }},
+		{Title: "Copy Path", Run: func() { appkit.CopyToPasteboard(n.Path) }},
+		{Title: "Insert Path in Editor", Run: func() { p.s.Editor.InsertText(n.Path) }},
+	}
+}
+
+// valueSource flattens a ValueNode tree into outline handles.
+type valueSource struct {
+	nodes    map[uint64]*results.ValueNode
+	children map[uint64][]uint64
+	parent   map[uint64]uint64
+	byPath   map[string]uint64
+}
+
+func (s *valueSource) set(tree []results.ValueNode) {
+	s.nodes = make(map[uint64]*results.ValueNode)
+	s.children = make(map[uint64][]uint64)
+	s.parent = make(map[uint64]uint64)
+	s.byPath = make(map[string]uint64)
+
+	next := uint64(1)
+
+	var add func(parent uint64, ns []results.ValueNode)
+
+	add = func(parent uint64, ns []results.ValueNode) {
+		for i := range ns {
+			id := next
+			next++
+			s.nodes[id], s.parent[id], s.byPath[ns[i].Path] = &ns[i], parent, id
+			s.children[parent] = append(s.children[parent], id)
+			add(id, ns[i].Children)
+		}
+	}
+
+	add(0, tree)
+}
+
+func (s *valueSource) ancestors(id uint64) []uint64 {
+	var out []uint64
+	for p := s.parent[id]; p != 0; p = s.parent[p] {
+		out = append([]uint64{p}, out...)
+	}
+
+	return out
+}
+
+func (s *valueSource) Children(parent uint64) []uint64 { return s.children[parent] }
+func (s *valueSource) Expandable(item uint64) bool     { return len(s.children[item]) > 0 }
+
+func (s *valueSource) Cell(item uint64) appkit.OutlineCell {
+	return appkit.OutlineCell{Title: s.nodes[item].Name}
+}
+
+func (s *valueSource) CellText(item uint64, column string) appkit.CellText {
+	n := s.nodes[item]
+
+	switch column {
+	case "value":
+		return appkit.CellText{Text: n.Display, Secondary: n.Null || len(n.Children) > 0, Italic: n.Null, Wrap: true, Mono: !n.Null && len(n.Children) == 0}
+	case "type":
+		return appkit.CellText{Text: n.Type, Secondary: true}
+	}
+
+	return appkit.CellText{}
 }
 
 func (p *InspectorPane) showSegment(i int) {

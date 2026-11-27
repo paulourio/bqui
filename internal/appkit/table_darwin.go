@@ -87,19 +87,20 @@ var (
 		}
 	})
 
-	fontsOnce               bool
-	fontRegular, fontItalic objc.ID
+	fontsOnce                         bool
+	fontRegular, fontItalic, fontMono objc.ID
 )
 
-func gridFonts() (regular, italic objc.ID) {
+func gridFonts() (regular, italic, mono objc.ID) {
 	if !fontsOnce {
 		fontsOnce = true
 		fontRegular = objc.Retain(objc.Msg(objc.Cls("NSFont"), "monospacedDigitSystemFontOfSize:weight:", gridFontSize, 0.0))
 		fm := objc.Msg(objc.Cls("NSFontManager"), "sharedFontManager")
 		fontItalic = objc.Retain(objc.Msg(fm, "convertFont:toHaveTrait:", fontRegular, italicFontMask))
+		fontMono = objc.Retain(objc.Msg(objc.Cls("NSFont"), "monospacedSystemFontOfSize:weight:", monoFontSize, 0.0))
 	}
 
-	return fontRegular, fontItalic
+	return fontRegular, fontItalic, fontMono
 }
 
 func tableMethods() []objc.Method {
@@ -235,6 +236,18 @@ func (t *Table) ScrollToTop() {
 	if t.Rows() > 0 {
 		objc.Msg(t.View, "scrollRowToVisible:", int64(0))
 	}
+}
+
+// ClickedColumn returns the identifier of the last clicked column ("" if none).
+func (t *Table) ClickedColumn() string {
+	i := objc.Send[int64](t.View, "clickedColumn")
+	if i < 0 {
+		return ""
+	}
+
+	c := objc.Msg(objc.Msg(t.View, "tableColumns"), "objectAtIndex:", uint64(i))
+
+	return objc.GoString(objc.Msg(c, "identifier"))
 }
 
 // ScrollToColumn scrolls horizontally so the column is visible.
@@ -378,10 +391,14 @@ func gridCell(tv objc.ID, c CellText) objc.ID {
 	SetString(tf, c.Text)
 	setSecondary(tf, c.Secondary)
 
-	regular, italic := gridFonts()
-	if c.Italic {
+	regular, italic, mono := gridFonts()
+
+	switch {
+	case c.Italic:
 		objc.Msg(tf, "setFont:", italic)
-	} else {
+	case c.Mono:
+		objc.Msg(tf, "setFont:", mono)
+	default:
 		objc.Msg(tf, "setFont:", regular)
 	}
 
