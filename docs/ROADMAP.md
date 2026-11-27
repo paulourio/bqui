@@ -687,6 +687,17 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M16 — Job browser
 
+**Status: done.** What shipped:
+- **Job History in the Workbooks tree:** your own jobs in the billing project, newest first, one page at a time, with a "Load older jobs…" row. Rows show a state icon, and the tree filter applies.
+  - The list refreshes when the billing project changes and after each run while the Workbooks tab is showing.
+- **Hover:** `app.JobTooltip` shows the first 10 lines of SQL, then state, created time, duration, bytes processed or "cached", statement type, project, location and job ID, plus the error if there is one.
+- **Double-click opens a read-only job document:**
+  - `Workspace.OpenJobDoc` saves the current query first. The document is never autosaved or persisted, so relaunching restores the last real query.
+  - The title is "Job History / <id>". Monaco is read-only and says so if you try to type.
+  - The job's details open in the inspector and the Job information tab.
+- **Turning it into a query:** File ▸ Save Job SQL to Workbook, or the job's context menu, copies the SQL (with a `-- From job …` header) into `Untitled-N` in the selected workbook and opens it for editing.
+- **Context menu:** Show Results, Show Details, Copy Job ID, Copy SQL, Open in BigQuery Console, Refresh.
+
 - **Where:** a special top-level node, **Job History**, in the Workbooks tree, listing the user's own BigQuery jobs in the current billing project (decided 2026-11-27) (`jobs.list`, `allUsers=false`, newest first).
 - **Rows:** one per job, named by **job ID**, with a state icon and the creation time as secondary text.
 - **Lazy listing:**
