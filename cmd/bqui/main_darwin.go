@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"google.golang.org/api/option"
@@ -50,6 +51,9 @@ func main() {
 
 	settings, settingsPath := loadSettings(*fake, *smokeDir != "")
 
+	workspace, closeDB := openWorkspace(*fake, *smokeDir)
+	defer closeDB()
+
 	var shell *ui.Shell
 
 	backends, err := newBackends(*fake, func() string { return shell.BillingProject() })
@@ -71,12 +75,17 @@ func main() {
 			Settings:      settings,
 			SettingsPath:  settingsPath,
 			SpillDir:      spillDir(),
+			Workspace:     workspace,
 		})
 		if err != nil {
 			fatal(err)
 		}
 
 		appkit.SetDelegate(shell.App, &appkit.AppDelegate{
+			WillTerminate: func() {
+				_ = workspace.Flush()
+				closeDB()
+			},
 			DidFinishLaunching: func() {
 				shell.ResolveBillingProject()
 
@@ -181,4 +190,55 @@ func loadSettings(fake, smoke bool) (*store.Settings, string) {
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, "bqui:", err)
 	os.Exit(1)
+}
+
+// openWorkspace opens the local database and saved-queries folder. Smoke
+// runs use a fresh database and folder under the smoke directory; fake runs
+// keep nothing.
+func openWorkspace(fake bool, smokeDir string) (*app.Workspace, func()) {
+	var dbPath, queries string
+
+	switch {
+	case smokeDir != "":
+		state := filepath.Join(smokeDir, "state")
+		_ = os.RemoveAll(state)
+		dbPath, queries = filepath.Join(state, "bqui.db"), filepath.Join(state, "queries")
+	case !fake:
+		var err error
+		if dbPath, err = store.DefaultDBPath(); err != nil {
+			fmt.Fprintln(os.Stderr, "bqui:", err)
+		}
+
+		if queries, err = store.DefaultQueriesDir(); err != nil {
+			fmt.Fprintln(os.Stderr, "bqui:", err)
+		}
+	default:
+		queries, _ = store.DefaultQueriesDir()
+	}
+
+	var db *store.DB
+
+	if dbPath != "" {
+		var err error
+		if db, err = store.Open(dbPath); err != nil {
+			fmt.Fprintln(os.Stderr, "bqui: local database unavailable, nothing will be restored:", err)
+		}
+	}
+
+	w, err := app.OpenWorkspace(app.WorkspaceOptions{DB: db, QueriesDir: queries, InitialSQL: ui.SampleSQL})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "bqui: restoring the workspace failed:", err)
+
+		w, _ = app.OpenWorkspace(app.WorkspaceOptions{QueriesDir: queries, InitialSQL: ui.SampleSQL})
+	}
+
+	var once sync.Once
+
+	return w, func() {
+		once.Do(func() {
+			if db != nil {
+				_ = db.Close()
+			}
+		})
+	}
 }

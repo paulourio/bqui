@@ -111,15 +111,93 @@ func SetHidden(v objc.ID, hidden bool) {
 const modalResponseOK int64 = 1
 
 // SaveFile runs a save panel and returns the chosen path.
-func SaveFile(title, defaultName string) (string, bool) {
+func SaveFile(title, defaultName string) (string, bool) { return SaveFileIn(title, "", defaultName) }
+
+func fileURL(path string) objc.ID {
+	return objc.Msg(objc.Cls("NSURL"), "fileURLWithPath:", objc.String(path))
+}
+
+// SaveFileIn runs a save panel starting in dir ("" = last used).
+func SaveFileIn(title, dir, defaultName string) (string, bool) {
 	panel := objc.Msg(objc.Cls("NSSavePanel"), "savePanel")
 	objc.Msg(panel, "setTitle:", objc.String(title))
 	objc.Msg(panel, "setNameFieldStringValue:", objc.String(defaultName))
 	objc.Msg(panel, "setCanCreateDirectories:", true)
+
+	if dir != "" {
+		objc.Msg(panel, "setDirectoryURL:", fileURL(dir))
+	}
 
 	if objc.Send[int64](panel, "runModal") != modalResponseOK {
 		return "", false
 	}
 
 	return objc.GoString(objc.Msg(objc.Msg(panel, "URL"), "path")), true
+}
+
+// OpenFile runs an open panel for one file with one of the extensions.
+func OpenFile(title, dir string, extensions ...string) (string, bool) {
+	panel := objc.Msg(objc.Cls("NSOpenPanel"), "openPanel")
+	objc.Msg(panel, "setTitle:", objc.String(title))
+	objc.Msg(panel, "setCanChooseFiles:", true)
+	objc.Msg(panel, "setCanChooseDirectories:", false)
+	objc.Msg(panel, "setAllowsMultipleSelection:", false)
+
+	if dir != "" {
+		objc.Msg(panel, "setDirectoryURL:", fileURL(dir))
+	}
+
+	if len(extensions) > 0 {
+		types := make([]objc.ID, 0, len(extensions))
+
+		for _, ext := range extensions {
+			if t := objc.Msg(objc.Cls("UTType"), "typeWithFilenameExtension:", objc.String(ext)); t != objc.Nil {
+				types = append(types, t)
+			}
+		}
+
+		if len(types) > 0 {
+			objc.Msg(panel, "setAllowedContentTypes:", objc.Array(types...))
+		}
+	}
+
+	if objc.Send[int64](panel, "runModal") != modalResponseOK {
+		return "", false
+	}
+
+	return objc.GoString(objc.Msg(objc.Msg(panel, "URL"), "path")), true
+}
+
+// Alert buttons returned by Confirm (first, second, third button).
+const (
+	AlertFirst  = 1000
+	AlertSecond = 1001
+	AlertThird  = 1002
+)
+
+// Confirm runs a modal alert and returns which button was clicked
+// (AlertFirst, AlertSecond, ...). The first button is the default.
+func Confirm(message, info string, buttons ...string) int {
+	alert := objc.New("NSAlert")
+	objc.Msg(alert, "setMessageText:", objc.String(message))
+	objc.Msg(alert, "setInformativeText:", objc.String(info))
+
+	for _, b := range buttons {
+		objc.Msg(alert, "addButtonWithTitle:", objc.String(b))
+	}
+
+	return int(objc.Send[int64](alert, "runModal"))
+}
+
+// RevealInFinder selects a file in a Finder window.
+func RevealInFinder(path string) {
+	ws := objc.Msg(objc.Cls("NSWorkspace"), "sharedWorkspace")
+	objc.Msg(ws, "activateFileViewerSelectingURLs:", objc.Array(fileURL(path)))
+}
+
+// SetWindowDocument shows a document title as the window subtitle and the
+// edited dot in the close button.
+func SetWindowDocument(window objc.ID, subtitle string, edited bool) {
+	objc.Msg(window, "setSubtitle:", objc.String(subtitle))
+	objc.Msg(window, "setDocumentEdited:", edited)
 }

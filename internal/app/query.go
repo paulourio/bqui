@@ -97,6 +97,7 @@ type RunSnapshot struct {
 	ID         int
 	Kind       string // "query" or "preview"
 	Title      string
+	SQL        string // full query text (queries only)
 	State      RunState
 	Err        error
 	Started    time.Time
@@ -278,6 +279,7 @@ func (rn *Runner) notify(r *Run) {
 // Start runs a query asynchronously.
 func (rn *Runner) Start(req bq.QueryRequest) *Run {
 	r, ctx := rn.newRun("query", firstLine(req.SQL))
+	r.snap.SQL = req.SQL
 
 	go func() {
 		defer close(r.done)

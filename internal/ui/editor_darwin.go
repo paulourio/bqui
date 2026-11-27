@@ -54,7 +54,9 @@ type EditorOptions struct {
 	OnRun       func(RunRequest)            // main thread
 	OnCost      func(summary string)        // main thread
 	OnConsole   func(level, message string) // main thread
-	Logger      *slog.Logger
+	// OnChange receives the text and cursor after edits (debounced; main thread).
+	OnChange func(text string, line, character int)
+	Logger   *slog.Logger
 }
 
 // EditorPane is the Monaco editor hosted in a WKWebView.
@@ -69,6 +71,7 @@ type EditorPane struct {
 
 	mu            sync.Mutex
 	uri           string
+	changes       int
 	consoleErrors []string
 	bootError     string
 }
@@ -134,6 +137,20 @@ func serveEditorAsset(_, path string) webkit.Response {
 // SetText replaces the editor contents (queued until the page is ready).
 func (p *EditorPane) SetText(text string) {
 	_ = p.Bridge.SendApp("setText", map[string]string{"text": text})
+}
+
+// SetTextAt replaces the contents and places the cursor (0-based), without
+// reporting a change.
+func (p *EditorPane) SetTextAt(text string, line, character int) {
+	_ = p.Bridge.SendApp("setText", map[string]any{"text": text, "line": line, "character": character})
+}
+
+// Changes counts change reports from the page (smoke checks).
+func (p *EditorPane) Changes() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.changes
 }
 
 // InsertText inserts text at the cursor (replacing the selection).
@@ -229,6 +246,22 @@ func (p *EditorPane) onApp(method string, params json.RawMessage) {
 		var req RunRequest
 		if err := json.Unmarshal(params, &req); err == nil {
 			p.resolveRun(req)
+		}
+	case "changed":
+		var c struct {
+			Text      string `json:"text"`
+			Line      int    `json:"line"`
+			Character int    `json:"character"`
+		}
+
+		if json.Unmarshal(params, &c) == nil {
+			p.mu.Lock()
+			p.changes++
+			p.mu.Unlock()
+
+			if p.opts.OnChange != nil {
+				p.opts.OnChange(c.Text, c.Line, c.Character)
+			}
 		}
 	case "selftest":
 		select {

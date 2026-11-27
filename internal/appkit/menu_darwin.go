@@ -36,6 +36,8 @@ type MenuItem struct {
 	Mods    uint64 // modifier mask; 0 means Command only (AppKit default)
 	Tag     int64
 	Submenu *Menu
+	// Checked, if set, shows a check mark (refreshed after each Run).
+	Checked func() bool
 }
 
 func (it MenuItem) separator() bool {
@@ -100,8 +102,18 @@ func buildItem(it MenuItem) objc.ID {
 		objc.String(it.Title), action, objc.String(it.Key))
 
 	if it.Run != nil {
-		run := it.Run
-		objc.Msg(mi, "setTarget:", objc.NewTarget(func(objc.ID) { run() }))
+		run, checked := it.Run, it.Checked
+		objc.Msg(mi, "setTarget:", objc.NewTarget(func(sender objc.ID) {
+			run()
+
+			if checked != nil {
+				objc.Msg(sender, "setState:", menuState(checked()))
+			}
+		}))
+	}
+
+	if it.Checked != nil {
+		objc.Msg(mi, "setState:", menuState(it.Checked()))
 	}
 
 	if it.Mods != 0 {
@@ -117,4 +129,12 @@ func buildItem(it MenuItem) objc.ID {
 	}
 
 	return mi
+}
+
+func menuState(on bool) int64 {
+	if on {
+		return 1 // NSControlStateValueOn
+	}
+
+	return 0
 }

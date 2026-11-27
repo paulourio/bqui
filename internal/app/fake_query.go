@@ -86,6 +86,13 @@ func (f *FakeBackend) Query(ctx context.Context, req bq.QueryRequest) (res *bq.Q
 
 	res = &bq.QueryResult{Job: &job, JobDetails: fakeJob(job, fakeStages), SlotMs: 1234, BytesProc: 2 << 20, BytesBilled: 10 << 20}
 
+	switch {
+	case req.SessionID != "":
+		res.SessionID = req.SessionID
+	case req.CreateSession:
+		res.SessionID = "fake_session_" + job.JobID
+	}
+
 	for _, kw := range []string{"CREATE", "INSERT", "UPDATE", "DELETE", "MERGE", "DROP", "ALTER"} {
 		if strings.HasPrefix(upper, kw) {
 			res.Statement = kw

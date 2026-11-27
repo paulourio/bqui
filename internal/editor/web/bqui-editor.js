@@ -11,6 +11,7 @@
   var DEFAULT_URI = 'file:///bqui/tab-1.sql';
   var FONT_FAMILY = '"bqui mono", ui-monospace, Menlo, monospace';
   var FONT_LOAD_TIMEOUT_MS = 3000;
+  var CHANGE_DEBOUNCE_MS = 300;
 
   // loadFonts resolves once the embedded font is usable (or after a timeout,
   // falling back to system monospace) so Monaco measures the right metrics.
@@ -92,7 +93,14 @@
     if (!ed) return;
     switch (method) {
       case 'setText':
+        state.quiet = true; // restoring text is not an edit
         ed.getModel().setValue(p.text || '');
+        state.quiet = false;
+        if (p.line !== undefined) {
+          var at = { lineNumber: (p.line || 0) + 1, column: (p.character || 0) + 1 };
+          ed.setPosition(at);
+          ed.revealPositionInCenter(at);
+        }
         break;
       case 'setTheme':
         monaco.editor.setTheme(p.dark ? 'bqui-dark' : 'bqui-light');
@@ -295,9 +303,18 @@
     ed.addCommand(K.CtrlCmd | K.Shift | C.Enter, function () { window.bqui.requestRun(true); });
     ed.addCommand(K.CtrlCmd | K.Shift | C.KeyF, function () { window.bqui.format(); });
 
-    model.onDidChangeContent(function () {
-      app('dirty', { uri: modelURI(model), version: model.getVersionId() });
-    });
+    // Report edits (debounced) so the app can autosave text and cursor.
+    var changeTimer = null;
+    function changed() {
+      if (changeTimer) clearTimeout(changeTimer);
+      changeTimer = setTimeout(function () {
+        changeTimer = null;
+        var pos = ed.getPosition() || { lineNumber: 1, column: 1 };
+        app('changed', { text: model.getValue(), line: pos.lineNumber - 1, character: pos.column - 1 });
+      }, CHANGE_DEBOUNCE_MS);
+    }
+    model.onDidChangeContent(function () { if (!state.quiet) changed(); });
+    ed.onDidChangeCursorPosition(function (e) { if (!state.quiet && e.source !== 'api') changed(); });
 
     // In case the font finished loading after layout (timeout path).
     document.fonts.ready.then(function () { monaco.editor.remeasureFonts(); });

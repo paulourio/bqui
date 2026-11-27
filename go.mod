@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	cloud.google.com/go/bigquery v1.86.4
+	github.com/BurntSushi/toml v1.6.0
 	github.com/apache/arrow-go/v18 v18.9.0
 	github.com/ebitengine/purego v0.11.3
 	github.com/paulourio/bqlang v1.2.0
@@ -11,13 +12,13 @@ require (
 	google.golang.org/api v0.317.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
+	modernc.org/sqlite v1.63.0
 )
 
 require (
 	cloud.google.com/go/auth v0.24.4 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.3.1 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
-	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/andybalholm/brotli v1.2.8 // indirect
 	github.com/apache/thrift v0.25.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -59,5 +60,4 @@ require (
 	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.63.0 // indirect
 )

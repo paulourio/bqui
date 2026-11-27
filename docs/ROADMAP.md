@@ -441,6 +441,31 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M10 — Local saved queries + sessions
 
+**Status: done (single tab).** What shipped, and where it differs from the plan below:
+- **`store.DB`:**
+  - SQLite (modernc, WAL) with versioned migrations.
+  - Stores tabs (text, cursor, linked file, session mode and ID, last job), small metadata, and local run history with FTS5 search. User input is always quoted, so it is never parsed as FTS syntax.
+- **Saved queries:**
+  - `.sql` files in `~/Documents/bqui/queries` with a `/* bqui … */` TOML header (title, project, default dataset, labels, link_id for M11).
+  - Atomic writes and a stable header order, so the files diff cleanly in git.
+- **`app.Workspace`:**
+  - Autosave with a debounce, and no explicit flush, so a killed app restores its text and cursor.
+  - Dirty tracking against the linked file. If the file is deleted, the text is kept and the link dropped.
+  - Open/Save/Save As/New.
+  - BigQuery session mode: the first run creates a session, later runs join it, and End Session calls `BQ.ABORT_SESSION`.
+  - Every run is recorded locally.
+- **UI:**
+  - File ▸ New, Open, Save, Save As, with save-changes prompts.
+  - The window subtitle and the edited dot show the file state.
+  - A sidebar Explorer | Saved switcher. The Saved list has a filter and actions: Open, Run, Show in Finder, Copy Path.
+  - Query ▸ BigQuery Session Mode (a checkmark) and End Session.
+  - History ▸ This Mac (local runs, full-text search), plus a search field for job lists.
+- **Not done:**
+  - Multiple editor tabs and named workspaces. The schema is ready, but the UI has one tab.
+  - Scroll position and split sizes; splits use AppKit autosave.
+  - Watching the folder with FSEvents; the list rereads on show and save.
+  - Query parameters in the header.
+
 **Saved queries:** a user-chosen folder (default `~/Documents/bqui/queries`) of `.sql` files with a TOML front-matter comment block (title, project, default dataset, params, labels, link ID). It is watched with FSEvents (via purego, or polling) and shown in the sidebar as **Local**.
 
 **Sessions:** the workspace state lives in SQLite: open tabs, editor text (including unsaved), cursor, scroll, selected project, result references (job IDs), split sizes. It is restored on launch and supports named sessions ("Workspaces"), with crash-safe autosave every few seconds.

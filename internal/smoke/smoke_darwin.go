@@ -113,6 +113,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	ps := planFlow(s)
 	phase("export")
 	xs := exportFlow(s, dir)
+	phase("workspace")
+	ws := workspaceFlow(s)
 	phase("checks")
 
 	queued := time.Now()
@@ -140,6 +142,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		valueChecks(rep, vs)
 		planChecks(rep, ps)
 		exportChecks(rep, xs)
+		workspaceChecks(rep, ws)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -678,6 +681,93 @@ func exportFlow(s *ui.Shell, dir string) exportResult {
 	r.JSONLines = countLines(exportOne("export.jsonl", export.NDJSON))
 
 	return r
+}
+
+// workspaceResult captures the saved-query, autosave, session and local
+// history flow.
+type workspaceResult struct {
+	Edited, Saved, Listed, Dirty, Reopened bool
+	Autosaves                              int
+	AutosaveErr, Title                     string
+	SessionID, SessionAfter                string
+	SessionEnded                           bool
+	LocalRuns, LocalMatches                int
+	LocalSQL                               string
+}
+
+func workspaceFlow(s *ui.Shell) workspaceResult {
+	const text = "SELECT 1 AS smoke_saved"
+
+	var r workspaceResult
+
+	sqlIs := func(want string) func() bool {
+		return func() bool { return s.Workspace.Tab().SQL == want }
+	}
+
+	// A real edit (insertText) must come back as a change and autosave.
+	onMain(func() { s.Editor.SetTextAt("", 0, 0); s.Editor.InsertText(text) })
+	r.Edited = waitMain(loadTimeout, sqlIs(text))
+
+	path := filepath.Join(s.Workspace.QueriesDir(), "smoke-saved.sql")
+
+	onMain(func() {
+		r.Saved = s.SaveQueryTo(path)
+		s.SelectSidebar(ui.SidebarSaved)
+		r.Listed = len(s.Saved.Queries()) == 1 && s.Saved.Queries()[0].Path == path
+		s.SelectSidebar(ui.SidebarExplorer)
+		s.Editor.InsertText(" -- edited")
+	})
+	waitMain(loadTimeout, func() bool { return s.Workspace.Dirty() })
+	onMain(func() { r.Dirty, r.Title = s.Workspace.Dirty(), s.Workspace.Title() })
+
+	_ = s.Workspace.Flush()
+	n, err := s.Workspace.Saves()
+	r.Autosaves = n
+
+	if err != nil {
+		r.AutosaveErr = err.Error()
+	}
+
+	onMain(func() { s.NewQuery(); s.OpenQuery(path) })
+	r.Reopened = waitMain(loadTimeout, sqlIs(text+"\n")) && !s.Workspace.Dirty()
+
+	// Session mode: the first run creates a session, the next joins it.
+	onMain(s.ToggleSessionMode)
+	waitRun(s, func() { s.RunSQL("CREATE TEMP TABLE smoke_t AS SELECT 1 AS x") })
+	_, r.SessionID = s.Workspace.SessionMode()
+	waitRun(s, func() { s.RunSQL("SELECT x FROM smoke_t") })
+	_, r.SessionAfter = s.Workspace.SessionMode()
+	waitRun(s, s.EndSession)
+	on, id := s.Workspace.SessionMode()
+	r.SessionEnded = !on && id == ""
+
+	// Local run history: everything above was recorded; FTS finds it.
+	onMain(s.RunHistory)
+	waitMain(loadTimeout, func() bool { return len(s.History.Rows()) >= 3 })
+	onMain(func() { r.LocalRuns = len(s.History.Rows()); s.History.SetFilter("smoke_t create") })
+	waitMain(loadTimeout, func() bool { return len(s.History.Rows()) == 1 })
+	onMain(func() {
+		r.LocalMatches = len(s.History.Rows())
+		if r.LocalMatches > 0 {
+			r.LocalSQL = s.History.Rows()[0].SQL
+		}
+
+		s.History.SetFilter("")
+		s.SelectTab(ui.TabResults)
+	})
+
+	return r
+}
+
+func workspaceChecks(rep *Report, r workspaceResult) {
+	rep.check("workspace-save", r.Edited && r.Saved && r.Listed, "edited %v, saved %v, listed in Saved %v", r.Edited, r.Saved, r.Listed)
+	rep.check("workspace-dirty", r.Dirty && strings.HasSuffix(r.Title, "— Edited"), "dirty %v, title %q", r.Dirty, r.Title)
+	rep.check("workspace-autosave", r.Autosaves > 0 && r.AutosaveErr == "", "%d autosaves %s", r.Autosaves, r.AutosaveErr)
+	rep.check("workspace-open", r.Reopened, "reopened saved query clean: %v", r.Reopened)
+	rep.check("workspace-session", r.SessionID != "" && r.SessionAfter == r.SessionID && r.SessionEnded,
+		"session %q, after second run %q, ended %v", r.SessionID, r.SessionAfter, r.SessionEnded)
+	rep.check("workspace-history", r.LocalRuns >= 3 && r.LocalMatches == 1 && strings.Contains(r.LocalSQL, "CREATE TEMP TABLE smoke_t"),
+		"%d local runs; search found %d: %q", r.LocalRuns, r.LocalMatches, r.LocalSQL)
 }
 
 func exportChecks(rep *Report, r exportResult) {

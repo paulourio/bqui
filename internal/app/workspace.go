@@ -1,0 +1,387 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/paulourio/bqui/internal/bq"
+	"github.com/paulourio/bqui/internal/store"
+)
+
+// DefaultTabID is the workspace's single editor tab (the schema already
+// supports several).
+const DefaultTabID = "main"
+
+const (
+	activeTabKey   = "active_tab"
+	autosaveDelay  = 2 * time.Second
+	searchRunLimit = 200
+	dbTimeout      = 5 * time.Second
+)
+
+// ErrNoFile is returned by Save when the tab is not linked to a file yet.
+var ErrNoFile = errors.New("app: query has no file yet; use Save As")
+
+// WorkspaceOptions configures a Workspace.
+type WorkspaceOptions struct {
+	DB         *store.DB // nil: nothing persists (fake/smoke runs)
+	QueriesDir string
+	// InitialSQL fills a brand-new workspace.
+	InitialSQL string
+	// Delay is the autosave debounce (0 = 2s).
+	Delay  time.Duration
+	Logger *slog.Logger
+}
+
+// Workspace is the persisted editor state: the tab text and cursor, its
+// linked saved-query file, BigQuery session mode, and local run history.
+// Methods are safe for concurrent use; disk writes happen off the caller's
+// goroutine after a debounce.
+type Workspace struct {
+	opts WorkspaceOptions
+
+	mu        sync.Mutex
+	tab       store.Tab
+	fileText  string // text as last read from/written to tab.File
+	timer     *time.Timer
+	pending   bool
+	saveErr   error
+	saveCount int
+}
+
+// OpenWorkspace restores the last workspace (or starts a new one).
+func OpenWorkspace(opts WorkspaceOptions) (*Workspace, error) {
+	if opts.Delay <= 0 {
+		opts.Delay = autosaveDelay
+	}
+
+	if opts.Logger == nil {
+		opts.Logger = slog.Default()
+	}
+
+	w := &Workspace{opts: opts, tab: store.Tab{ID: DefaultTabID, Title: "Untitled", SQL: opts.InitialSQL}}
+
+	if opts.DB == nil {
+		return w, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	tabs, err := opts.DB.Tabs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	active, _ := opts.DB.Meta(ctx, activeTabKey)
+
+	for i, t := range tabs {
+		if i == 0 || t.ID == active {
+			w.tab = t
+		}
+	}
+
+	if w.tab.File != "" {
+		if _, body, err := store.ReadQuery(w.tab.File); err == nil {
+			w.fileText = body
+		} else {
+			// The file went away: keep the text, drop the link.
+			w.tab.File = ""
+		}
+	}
+
+	return w, nil
+}
+
+// Tab returns a copy of the current tab state.
+func (w *Workspace) Tab() store.Tab {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.tab
+}
+
+// QueriesDir is the saved-queries folder.
+func (w *Workspace) QueriesDir() string { return w.opts.QueriesDir }
+
+// Edited records new editor text and cursor and schedules an autosave.
+func (w *Workspace) Edited(text string, line, col int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.tab.SQL, w.tab.CursorLine, w.tab.CursorCol = text, line, col
+	w.scheduleLocked()
+}
+
+func (w *Workspace) scheduleLocked() {
+	if w.opts.DB == nil {
+		return
+	}
+
+	w.pending = true
+
+	if w.timer == nil {
+		w.timer = time.AfterFunc(w.opts.Delay, func() { _ = w.Flush() })
+	} else {
+		w.timer.Reset(w.opts.Delay)
+	}
+}
+
+// Flush writes pending state now (also called on quit).
+func (w *Workspace) Flush() error {
+	w.mu.Lock()
+	if !w.pending || w.opts.DB == nil {
+		w.mu.Unlock()
+
+		return nil
+	}
+
+	w.pending = false
+	tab := w.tab
+	w.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	err := w.opts.DB.SaveTab(ctx, tab)
+	if err == nil {
+		err = w.opts.DB.SetMeta(ctx, activeTabKey, tab.ID)
+	}
+
+	w.mu.Lock()
+	w.saveErr = err
+	w.saveCount++
+	w.mu.Unlock()
+
+	if err != nil {
+		w.opts.Logger.Warn("workspace autosave failed", "err", err)
+	}
+
+	return err
+}
+
+// Saves reports how many autosaves ran and the last error (tests, smoke).
+func (w *Workspace) Saves() (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.saveCount, w.saveErr
+}
+
+// Dirty reports whether the text differs from the linked file (or, for an
+// unlinked tab, whether it has any text worth keeping).
+func (w *Workspace) Dirty() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.tab.File == "" {
+		return strings.TrimSpace(w.tab.SQL) != "" && w.tab.SQL != w.opts.InitialSQL
+	}
+
+	return strings.TrimRight(w.tab.SQL, "\n") != strings.TrimRight(w.fileText, "\n")
+}
+
+// Title is the window/tab title: file title plus an edited marker.
+func (w *Workspace) Title() string {
+	t := w.Tab()
+
+	title := t.Title
+	if t.File == "" {
+		title = "Untitled"
+	}
+
+	if w.Dirty() && t.File != "" {
+		title += " — Edited"
+	}
+
+	return title
+}
+
+// New starts an empty, unlinked query (the session is kept).
+func (w *Workspace) New() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = "", "", "Untitled", 0, 0
+	w.fileText = ""
+	w.scheduleLocked()
+}
+
+// Open loads a saved query into the tab and returns its SQL.
+func (w *Workspace) Open(path string) (string, error) {
+	q, body, err := store.ReadQuery(path)
+	if err != nil {
+		return "", err
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = body, path, q.Title, 0, 0
+	w.fileText = body
+	w.scheduleLocked()
+
+	return body, nil
+}
+
+// Save writes the tab to its linked file, keeping the file's metadata.
+func (w *Workspace) Save() error {
+	t := w.Tab()
+	if t.File == "" {
+		return ErrNoFile
+	}
+
+	meta, _, err := store.ReadQuery(t.File)
+	if err != nil {
+		meta = store.SavedQuery{Title: t.Title}
+	}
+
+	meta.Path = t.File
+
+	return w.write(meta, t.SQL)
+}
+
+// SaveAs writes the tab to a new file and links it. An empty title derives
+// one from the file name.
+func (w *Workspace) SaveAs(path, title, project string) error {
+	if title == "" {
+		title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+
+	return w.write(store.SavedQuery{Path: path, Title: title, Project: project}, w.Tab().SQL)
+}
+
+func (w *Workspace) write(q store.SavedQuery, sql string) error {
+	if err := store.WriteQuery(q, sql); err != nil {
+		return err
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.tab.File, w.tab.Title, w.fileText = q.Path, q.Title, sql
+	w.scheduleLocked()
+
+	return nil
+}
+
+// SavedQueries lists the saved-queries folder.
+func (w *Workspace) SavedQueries() ([]store.SavedQuery, error) {
+	if w.opts.QueriesDir == "" {
+		return nil, nil
+	}
+
+	return store.ListQueries(w.opts.QueriesDir)
+}
+
+// SessionMode reports whether runs join a BigQuery session, and its ID.
+func (w *Workspace) SessionMode() (on bool, id string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.tab.SessionMode, w.tab.SessionID
+}
+
+// SetSessionMode turns session mode on or off; turning it off forgets the
+// session (EndSessionSQL aborts it server-side).
+func (w *Workspace) SetSessionMode(on bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.tab.SessionMode = on
+	if !on {
+		w.tab.SessionID = ""
+	}
+
+	w.scheduleLocked()
+}
+
+// EndSessionSQL aborts the current BigQuery session.
+const EndSessionSQL = "CALL BQ.ABORT_SESSION();"
+
+// Prepare applies session mode to a query request.
+func (w *Workspace) Prepare(req *bq.QueryRequest) {
+	on, id := w.SessionMode()
+	if !on {
+		return
+	}
+
+	if id != "" {
+		req.SessionID = id
+	} else {
+		req.CreateSession = true
+	}
+}
+
+// Finished records a completed run: it keeps a new session ID, the last
+// job, and appends to the local run history.
+func (w *Workspace) Finished(snap RunSnapshot, project string) {
+	if snap.Kind != "query" {
+		return
+	}
+
+	w.mu.Lock()
+
+	if snap.Result != nil && snap.Result.SessionID != "" && w.tab.SessionMode {
+		w.tab.SessionID = snap.Result.SessionID
+	}
+
+	if snap.Job != nil {
+		w.tab.LastJob = snap.Job.Project + ":" + snap.Job.Location + "." + snap.Job.JobID
+	}
+
+	w.scheduleLocked()
+	w.mu.Unlock()
+
+	if w.opts.DB == nil {
+		return
+	}
+
+	r := store.Run{Started: snap.Started, Project: project, SQL: snap.SQL, State: snap.State.String(), Elapsed: snap.Elapsed}
+	if snap.Job != nil {
+		r.JobID, r.Location, r.Project = snap.Job.JobID, snap.Job.Location, snap.Job.Project
+	}
+
+	if snap.Grid != nil {
+		r.Rows, _, _ = snap.Grid.Size()
+	}
+
+	if snap.Result != nil {
+		r.Bytes = snap.Result.BytesProc
+	}
+
+	if snap.Err != nil {
+		r.Error = snap.Err.Error()
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+		defer cancel()
+
+		if err := w.opts.DB.RecordRun(ctx, r); err != nil {
+			w.opts.Logger.Warn("recording run failed", "err", err)
+		}
+	}()
+}
+
+// SearchRuns searches local run history (newest first).
+func (w *Workspace) SearchRuns(ctx context.Context, query string) ([]store.Run, error) {
+	if w.opts.DB == nil {
+		return nil, nil
+	}
+
+	return w.opts.DB.SearchRuns(ctx, query, searchRunLimit)
+}
+
+// String describes the workspace for logs.
+func (w *Workspace) String() string {
+	t := w.Tab()
+
+	return fmt.Sprintf("tab %s (%s, %d bytes)", t.ID, t.File, len(t.SQL))
+}

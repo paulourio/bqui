@@ -66,6 +66,9 @@ type Options struct {
 	Jobs app.JobsBackend
 	// SpillDir holds result spill files ("" = OS temp dir).
 	SpillDir string
+	// Workspace persists the editor text, saved queries and run history
+	// (nil: an in-memory workspace).
+	Workspace *app.Workspace
 }
 
 // Shell is the main window and its panes.
@@ -83,9 +86,14 @@ type Shell struct {
 	Graph     *GraphPane
 	Job       *JobPane
 	History   *HistoryPane
+	Saved     *SavedPane
 	Runner    *app.Runner
+	Workspace *app.Workspace
 	tabs      *appkit.Segmented
 	tabViews  []objc.ID
+	sideTabs  *appkit.Segmented
+	sideViews []objc.ID
+	recorded  map[*app.Run]bool
 
 	exportCancel func()
 	lastExport   app.ExportProgress
@@ -103,8 +111,17 @@ func NewShell(opts Options) (*Shell, error) {
 		opts.Settings = &store.Settings{PinnedProjects: []string{store.DefaultPinned}}
 	}
 
-	s := &Shell{App: appkit.SharedApplication(), opts: opts, settings: opts.Settings}
+	s := &Shell{App: appkit.SharedApplication(), opts: opts, settings: opts.Settings, Workspace: opts.Workspace}
 	s.billing.Store(&opts.Settings.BillingProject)
+
+	if s.Workspace == nil {
+		w, err := app.OpenWorkspace(app.WorkspaceOptions{InitialSQL: SampleSQL})
+		if err != nil {
+			return nil, err
+		}
+
+		s.Workspace = w
+	}
 
 	appkit.SetMainMenu(s.App, s.menus())
 
@@ -113,6 +130,7 @@ func NewShell(opts Options) (*Shell, error) {
 		Inspectable: opts.Inspectable,
 		OnRun:       s.onRun,
 		OnCost:      s.onCost,
+		OnChange:    s.onEdited,
 		OnConsole: func(level, msg string) {
 			if level == "error" || level == "warn" {
 				fmt.Fprintf(os.Stderr, "bqui editor [%s] %s\n", level, msg)
@@ -124,7 +142,6 @@ func NewShell(opts Options) (*Shell, error) {
 	}
 
 	s.Editor = ed
-	s.Editor.SetText(sampleSQL)
 	appkit.SetIdentifier(s.Editor.Web.View, "editor")
 
 	s.Inspector = newInspectorPane(s, opts.Backend)
@@ -163,7 +180,7 @@ func NewShell(opts Options) (*Shell, error) {
 	})
 
 	s.Split = appkit.SplitViewController(true, autosave("BQUIMainSplit"), []appkit.SplitItem{
-		{Kind: appkit.SplitSidebar, Controller: appkit.ViewController(s.Explorer.View), MinThickness: sidebarMin, MaxThickness: sidebarMax},
+		{Kind: appkit.SplitSidebar, Controller: appkit.ViewController(s.sidebar()), MinThickness: sidebarMin, MaxThickness: sidebarMax},
 		{Kind: appkit.SplitContent, Controller: content},
 		{Kind: appkit.SplitInspector, Controller: appkit.ViewController(s.Inspector.View), MinThickness: inspectorMin, MaxThickness: inspectorMax},
 	})
@@ -173,6 +190,7 @@ func NewShell(opts Options) (*Shell, error) {
 	objc.Msg(s.Window, "setContentSize:", appkit.Size{Width: defaultWidth, Height: defaultHeight})
 	objc.Msg(s.Window, "center")
 	appkit.SetToolbar(s.Window, "BQUIMainToolbar", s.toolbarItems())
+	s.restoreWorkspace()
 
 	// Give the editor ~55% of the content height on first launch; autosave
 	// restores the user's divider afterwards.
@@ -342,7 +360,12 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Quit " + AppName, Action: "terminate:", Key: "q"},
 		}},
 		{Title: "File", Items: []appkit.MenuItem{
-			{Title: "New Query Tab", Key: "t", Run: func() { s.status("Tabs arrive with sessions (M10).") }},
+			{Title: "New Query", Key: "n", Run: s.NewQuery},
+			{Title: "Open…", Key: "o", Run: s.ChooseQuery},
+			{},
+			{Title: "Save", Key: "s", Run: func() { s.SaveQuery() }},
+			{Title: "Save As…", Key: "s", Mods: cmd | shift, Run: func() { s.SaveQueryAs() }},
+			{Title: "Show Saved Queries", Key: "1", Mods: cmd | opt, Run: func() { s.SelectSidebar(SidebarSaved) }},
 			{},
 			{Title: "Close Window", Action: "performClose:", Key: "w"},
 		}},
@@ -367,6 +390,8 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Toggle Sidebar", Action: "toggleSidebar:", Key: "s", Mods: cmd | ctrl},
 			{Title: "Toggle Inspector", Action: "toggleInspector:", Key: "i", Mods: cmd | ctrl},
 			{},
+			{Title: "Run History", Key: "y", Run: s.RunHistory},
+			{},
 			{Title: "Enter Full Screen", Action: "toggleFullScreen:", Key: "f", Mods: cmd | ctrl},
 		}},
 		{Title: "Query", Items: []appkit.MenuItem{
@@ -375,6 +400,9 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Stop", Key: ".", Run: s.Stop},
 			{},
 			{Title: "Format", Key: "f", Mods: cmd | shift, Run: func() { s.Editor.Format() }},
+			{},
+			{Title: "BigQuery Session Mode", Run: s.ToggleSessionMode, Checked: s.sessionOn},
+			{Title: "End Session", Run: s.EndSession},
 			{},
 			s.exportMenu("Export Results", s.resultsExportSource),
 		}},
@@ -422,6 +450,13 @@ func (s *Shell) onRun(req RunRequest) {
 	s.RunSQL(req.SQL)
 }
 
+// RunHistory shows this Mac's run history in the History tab.
+func (s *Shell) RunHistory() {
+	s.History.scope.Select(historyScopeLocal)
+	s.SelectTab(TabHistory)
+	s.History.Reload()
+}
+
 // firstPageRows is how many rows the first jobs.query page returns inline;
 // larger results stream through the Storage Read API.
 const firstPageRows = 5000
@@ -441,9 +476,9 @@ func (s *Shell) RunSQL(sql string) {
 		return
 	}
 
-	s.Results.Show(s.Runner.Start(bq.QueryRequest{
-		SQL: sql, Project: s.settings.BillingProject, MaxInlineRows: firstPageRows,
-	}))
+	req := bq.QueryRequest{SQL: sql, Project: s.settings.BillingProject, MaxInlineRows: firstPageRows}
+	s.Workspace.Prepare(&req)
+	s.Results.Show(s.Runner.Start(req))
 }
 
 // Preview shows the first rows of a table (Storage Read API, no query cost).
@@ -510,11 +545,16 @@ func (s *Shell) SelectTab(i int) {
 func (s *Shell) onRunUpdate(r *app.Run) {
 	s.Results.Update(r)
 
+	snap := r.Snapshot()
+
+	if snap.State == app.RunDone || snap.State == app.RunFailed || snap.State == app.RunCancelled {
+		s.recordFinished(r, snap)
+	}
+
 	if r != s.Results.Current() {
 		return
 	}
 
-	snap := r.Snapshot()
 	s.JSON.Update(snap)
 
 	pl := plan.FromJob(snap.JobDetails)
@@ -609,7 +649,8 @@ func (s *Shell) ResolveBillingProject() {
 	}()
 }
 
-const sampleSQL = `-- Top words in Shakespeare's works
+// SampleSQL fills a brand-new workspace.
+const SampleSQL = `-- Top words in Shakespeare's works
 SELECT
   word,
   SUM(word_count) AS total

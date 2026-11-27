@@ -8,6 +8,7 @@ import (
 	bigquery "google.golang.org/api/bigquery/v2"
 
 	"github.com/paulourio/bqui/internal/bq"
+	"github.com/paulourio/bqui/internal/store"
 )
 
 // JobsBackend lists, inspects and cancels jobs.
@@ -346,4 +347,58 @@ func (h *History) fetch() {
 			h.changed()
 		})
 	}()
+}
+
+// LocalUser labels runs from the local history (they may predate jobs.list
+// retention, or have no job at all).
+const LocalUser = "this Mac"
+
+// JobRowsFromRuns converts local run history to job rows.
+func JobRowsFromRuns(runs []store.Run) []JobRow {
+	out := make([]JobRow, 0, len(runs))
+
+	for _, r := range runs {
+		state := r.State
+		if state == "failed" || state == "cancelled" {
+			state = "error"
+		}
+
+		out = append(out, JobRow{
+			Ref:   bq.JobRef{Project: r.Project, JobID: r.JobID, Location: r.Location},
+			State: state, Type: "QUERY", User: LocalUser, Created: r.Started, Duration: r.Elapsed,
+			Processed: r.Bytes, SQL: r.SQL, Error: r.Error,
+		})
+	}
+
+	return out
+}
+
+// FilterJobRows keeps rows whose SQL, job ID or user contain every word of
+// q (case-insensitive).
+func FilterJobRows(rows []JobRow, q string) []JobRow {
+	words := strings.Fields(strings.ToLower(q))
+	if len(words) == 0 {
+		return rows
+	}
+
+	var out []JobRow
+
+	for _, r := range rows {
+		hay := strings.ToLower(r.SQL + " " + r.Ref.JobID + " " + r.User)
+		match := true
+
+		for _, w := range words {
+			if !strings.Contains(hay, w) {
+				match = false
+
+				break
+			}
+		}
+
+		if match {
+			out = append(out, r)
+		}
+	}
+
+	return out
 }
