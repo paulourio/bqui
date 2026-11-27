@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/BurntSushi/toml"
 )
@@ -209,6 +210,19 @@ func QueryFileName(title string) string {
 	name := strings.Trim(b.String(), "-")
 	if name == "" {
 		name = "query"
+	}
+
+	const maxStemBytes = 255 - len(sqlExt)
+	if len(name) > maxStemBytes {
+		cut := maxStemBytes
+		for cut > 0 && !utf8.RuneStart(name[cut]) {
+			cut--
+		}
+
+		name = strings.TrimRight(name[:cut], "-")
+		if name == "" {
+			name = "query"
+		}
 	}
 
 	return name + sqlExt

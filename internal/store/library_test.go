@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestLibraryWorkbooksAndQueries(t *testing.T) {
@@ -124,6 +125,47 @@ func TestImportQueries(t *testing.T) {
 
 	if moved, _ := l.ImportQueries(old); moved {
 		t.Error("imported twice")
+	}
+}
+
+func TestValidNameAndQueryFileNameBoundaries(t *testing.T) {
+	for _, bad := range []string{"", "   ", " leading", "trailing ", "  spaced  ", "\ttab", ".dot", "a/b", "a:b"} {
+		if err := ValidName(bad); !errors.Is(err, ErrBadName) {
+			t.Errorf("ValidName(%q) = %v, want ErrBadName", bad, err)
+		}
+	}
+
+	if err := ValidName("valid name"); err != nil {
+		t.Errorf("ValidName(\"valid name\") = %v, want nil", err)
+	}
+
+	l, err := OpenLibrary(t.TempDir(), DefaultLibrary)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := l.CreateWorkbook("  spaced  ", time.Now()); !errors.Is(err, ErrBadName) {
+		t.Errorf("CreateWorkbook(\"  spaced  \") = %v, want ErrBadName", err)
+	}
+
+	for _, title := range []string{
+		strings.Repeat("a", 300),
+		strings.Repeat("é", 200),
+		strings.Repeat("🚀", 100),
+		strings.Repeat("a", 250) + "-tail",
+	} {
+		fn := QueryFileName(title)
+		if len(fn) > 255 {
+			t.Errorf("QueryFileName len = %d > 255 (%q)", len(fn), fn)
+		}
+
+		if !utf8.ValidString(fn) {
+			t.Errorf("QueryFileName invalid UTF-8: %q", fn)
+		}
+
+		if !strings.HasSuffix(fn, ".sql") {
+			t.Errorf("QueryFileName missing .sql: %q", fn)
+		}
 	}
 }
 

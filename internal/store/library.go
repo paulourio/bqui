@@ -74,7 +74,7 @@ func OpenLibrary(librariesDir, name string) (*Library, error) {
 
 // ValidName checks a workbook or query name typed by the user.
 func ValidName(name string) error {
-	if strings.TrimSpace(name) == "" || strings.HasPrefix(name, ".") || strings.ContainsAny(name, "/:\x00") {
+	if name == "" || strings.TrimSpace(name) != name || strings.HasPrefix(name, ".") || strings.ContainsAny(name, "/:\x00") {
 		return ErrBadName
 	}
 
