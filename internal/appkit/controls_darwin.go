@@ -210,6 +210,13 @@ func CopyToPasteboard(s string) {
 	objc.Send[bool](pb, "setString:forType:", objc.String(s), objc.String("public.utf8-plain-text"))
 }
 
+// PasteboardString returns the general pasteboard's plain text ("" if none).
+func PasteboardString() string {
+	pb := objc.Msg(objc.Cls("NSPasteboard"), "generalPasteboard")
+
+	return objc.GoString(objc.Msg(pb, "stringForType:", objc.String("public.utf8-plain-text")))
+}
+
 // OpenURL opens url with the default handler (browser for https).
 func OpenURL(url string) bool {
 	u := objc.Msg(objc.Cls("NSURL"), "URLWithString:", objc.String(url))

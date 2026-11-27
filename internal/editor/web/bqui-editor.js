@@ -66,9 +66,10 @@
     },
   };
 
-  var state = { editor: null, mode: 'system', pendingObjects: {}, nextObject: 1 };
+  var state = { editor: null, mode: 'system', pendingObjects: {}, nextObject: 1, pendingClips: {}, nextClip: 1 };
   var OBJECT_SCHEME = 'bqui-object';
   var OBJECT_LOOKUP_TIMEOUT_MS = 2000;
+  var CLIPBOARD_TIMEOUT_MS = 2000;
 
   function modelURI(model) {
     // Monaco's LSP client lowercases URIs; report them the same way.
@@ -157,6 +158,11 @@
       case 'runAction':
         window.bqui.action(p.id);
         break;
+      case 'clipboardText': {
+        var got = state.pendingClips[p.id];
+        if (got) { delete state.pendingClips[p.id]; got(p.text || ''); }
+        break;
+      }
       case 'objectAt': {
         var done = state.pendingObjects[p.id];
         if (!done) break;
@@ -344,6 +350,30 @@
     bootError(fmt(err));
   });
 
+  // Monaco's context-menu Paste reads navigator.clipboard, which WebKit
+  // guards with its own "Paste" button (a second menu the user must click).
+  // Ask bqui for the pasteboard text instead; Monaco then pastes as usual.
+  function nativeClipboardReads() {
+    if (!navigator.clipboard) return;
+    try {
+      Object.defineProperty(navigator.clipboard, 'readText', {
+        configurable: true,
+        value: function () {
+          return new Promise(function (resolve) {
+            var id = state.nextClip++;
+            state.pendingClips[id] = resolve;
+            app('readClipboard', { id: id });
+            setTimeout(function () {
+              if (state.pendingClips[id]) { delete state.pendingClips[id]; resolve(''); }
+            }, CLIPBOARD_TIMEOUT_MS);
+          });
+        },
+      });
+    } catch (e) {
+      console.warn('bqui: cannot route clipboard reads', fmt(e));
+    }
+  }
+
   function start() {
     defineThemes();
 
@@ -396,6 +426,8 @@
         return true;
       },
     });
+
+    nativeClipboardReads();
 
     var K = monaco.KeyMod, C = monaco.KeyCode;
     ed.addCommand(K.CtrlCmd | C.Enter, function () { window.bqui.requestRun(false); });

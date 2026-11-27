@@ -17,6 +17,7 @@ import (
 	"github.com/paulourio/bqlang/lsp"
 
 	"github.com/paulourio/bqui/internal/app"
+	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/editor"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/theme"
@@ -341,6 +342,16 @@ func (p *EditorPane) onApp(method string, params json.RawMessage) {
 			p.mu.Lock()
 			p.appliedTheme = t.Theme
 			p.mu.Unlock()
+		}
+	case "readClipboard":
+		// The page asks for the pasteboard instead of reading it itself:
+		// WebKit guards navigator.clipboard reads with its own Paste button.
+		var r struct {
+			ID int `json:"id"`
+		}
+
+		if json.Unmarshal(params, &r) == nil {
+			_ = p.Bridge.SendApp("clipboardText", map[string]any{"id": r.ID, "text": appkit.PasteboardString()})
 		}
 	case "menuProbe":
 		select {
