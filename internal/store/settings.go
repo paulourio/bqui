@@ -32,6 +32,27 @@ type Settings struct {
 	Theme string `json:"theme,omitempty"`
 	// Query preferences.
 	Prefs Preferences `json:"preferences"`
+	// Starred datasets ("project.dataset"), for quick filtering.
+	Starred []string `json:"starredDatasets,omitempty"`
+	// StarredOnly shows only starred datasets in the explorer.
+	StarredOnly bool `json:"starredOnly,omitempty"`
+}
+
+// ToggleStar stars or unstars a dataset and reports whether it is now
+// starred.
+func (s *Settings) ToggleStar(project, dataset string) bool {
+	key := project + "." + dataset
+
+	if i := slices.Index(s.Starred, key); i >= 0 {
+		s.Starred = slices.Delete(s.Starred, i, i+1)
+
+		return false
+	}
+
+	s.Starred = append(s.Starred, key)
+	slices.Sort(s.Starred)
+
+	return true
 }
 
 // DefaultThemesDir is ~/Library/Application Support/bqui/themes (or the OS

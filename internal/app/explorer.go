@@ -96,6 +96,9 @@ type Explorer struct {
 	filter string
 	vis    map[uint64]bool // nil when no filter
 
+	starred     map[string]bool // "project.dataset"
+	starredOnly bool
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -269,13 +272,108 @@ func (e *Explorer) SetFilter(q string) {
 	e.changed(RootID)
 }
 
-func (e *Explorer) refilter() {
-	if e.filter == "" {
-		e.vis = nil
+// SetStarred replaces the starred datasets ("project.dataset" keys).
+func (e *Explorer) SetStarred(keys []string) {
+	e.starred = make(map[string]bool, len(keys))
+	for _, k := range keys {
+		e.starred[k] = true
+	}
 
+	e.refilter()
+	e.changed(RootID)
+}
+
+// SetStarredOnly shows only starred datasets (and their projects).
+func (e *Explorer) SetStarredOnly(on bool) {
+	e.starredOnly = on
+	e.refilter()
+	e.changed(RootID)
+}
+
+// StarredOnly reports whether the starred filter is on.
+func (e *Explorer) StarredOnly() bool { return e.starredOnly }
+
+// IsStarred reports whether the node is a starred dataset.
+func (e *Explorer) IsStarred(id uint64) bool {
+	o, ok := e.info[id]
+
+	return ok && o.Kind == KindDataset && e.starred[o.Project+"."+o.Dataset]
+}
+
+// StarredProjects returns project nodes that hold starred datasets.
+func (e *Explorer) StarredProjects() []uint64 {
+	var out []uint64
+
+	for _, id := range e.tree.Children(RootID) {
+		if e.projectHasStar(e.info[id].Project) {
+			out = append(out, id)
+		}
+	}
+
+	return out
+}
+
+func (e *Explorer) projectHasStar(project string) bool {
+	for k := range e.starred {
+		if strings.HasPrefix(k, project+".") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// starVisible is the starred-only rule for one node.
+func (e *Explorer) starVisible(id uint64) bool {
+	n, _ := e.tree.Node(id)
+	o := e.info[id]
+
+	switch {
+	case id == RootID:
+		return true
+	case n.Kind == KindProject:
+		return e.projectHasStar(o.Project)
+	case n.Kind == KindPlaceholder:
+		return true // "Loading…" and errors under a visible parent
+	case o.Dataset != "":
+		return e.starred[o.Project+"."+o.Dataset]
+	}
+
+	return false
+}
+
+func (e *Explorer) refilter() {
+	e.vis = nil
+
+	if e.filter != "" {
+		e.textFilter()
+	}
+
+	if !e.starredOnly {
 		return
 	}
 
+	text := e.vis
+	e.vis = make(map[uint64]bool)
+
+	var walk func(id uint64)
+
+	walk = func(id uint64) {
+		if !e.starVisible(id) || text != nil && !text[id] && id != RootID {
+			return
+		}
+
+		e.vis[id] = true
+
+		for _, k := range e.tree.Children(id) {
+			walk(k)
+		}
+	}
+
+	walk(RootID)
+}
+
+func (e *Explorer) textFilter() {
 	e.vis = make(map[uint64]bool)
 
 	var walk func(id uint64, ancestorMatch bool) bool

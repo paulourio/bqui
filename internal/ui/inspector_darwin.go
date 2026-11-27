@@ -25,6 +25,7 @@ const (
 	metadataCacheTTL = 5 * time.Minute
 	segSchema        = 0
 	segDetails       = 1
+	segPreview       = 2
 )
 
 // InspectorPane shows the selected object's schema and details.
@@ -36,7 +37,7 @@ type InspectorPane struct {
 	fmt  app.Formatter
 
 	title, subtitle, status objc.ID
-	seg                     *appkit.Segmented
+	seg                     *appkit.TabBar
 	schema, details, values *appkit.Outline
 	valueSrc                *valueSource
 	schemaSrc               *schemaSource
@@ -45,6 +46,14 @@ type InspectorPane struct {
 
 	gen     uint64
 	current app.ObjectInfo
+	table   *bigquery.Table // current table/view metadata (nil otherwise)
+
+	preview       *ResultsPane
+	previewHolder objc.ID
+	viewPrompt    objc.ID
+	promptText    objc.ID
+	previewFor    string // FullID whose preview is loaded or offered
+	wantSeg       int    // tab the user last picked (kept across objects)
 
 	cacheMu sync.Mutex
 	cache   map[string]cached
@@ -84,7 +93,10 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 	p.title = appkit.BoldLabel("No selection", 14)
 	p.subtitle = appkit.SecondaryLabel("Select a table, view, routine or model in the explorer.")
 	p.status = appkit.SecondaryLabel("")
-	p.seg = appkit.NewSegmented([]string{"Schema", "Details"}, p.showSegment)
+	p.seg = appkit.NewTabBar([]string{"Schema", "Details", "Preview"}, func(i int) {
+		p.wantSeg = i
+		p.showSegment(i)
+	})
 
 	p.View = appkit.NewView()
 	content := appkit.NewView()
@@ -108,6 +120,7 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 		Menu:                p.valueMenu,
 	})
 	appkit.AddFilling(content, p.values.Scroll, 0)
+	appkit.AddFilling(content, p.newPreview(), 0)
 	appkit.AddCentered(content, p.status)
 
 	safeTop := objc.Msg(objc.Msg(p.View, "safeAreaLayoutGuide"), "topAnchor")
@@ -150,6 +163,7 @@ func (p *InspectorPane) setState(st inspectorState) {
 	if st != stateReady {
 		appkit.SetHidden(p.schema.Scroll, true)
 		appkit.SetHidden(p.details.Scroll, true)
+		appkit.SetHidden(p.previewHolder, true)
 	}
 }
 
@@ -166,6 +180,9 @@ func (p *InspectorPane) ShowSections(title, subtitle string, sections []app.Sect
 	p.details.Reload(0)
 	p.details.Expand(0, true)
 	p.seg.SetEnabled(segSchema, false)
+	p.seg.SetEnabled(segPreview, false)
+	p.table = nil
+	p.resetPreview()
 	p.setState(stateReady)
 	p.seg.Select(segDetails)
 	p.showSegment(segDetails)
@@ -279,6 +296,11 @@ func (s *valueSource) CellText(item uint64, column string) appkit.CellText {
 func (p *InspectorPane) showSegment(i int) {
 	appkit.SetHidden(p.schema.Scroll, i != segSchema)
 	appkit.SetHidden(p.details.Scroll, i != segDetails)
+	appkit.SetHidden(p.previewHolder, i != segPreview)
+
+	if i == segPreview {
+		p.preparePreview()
+	}
 }
 
 // Current returns the object being shown.
@@ -302,9 +324,9 @@ func (p *InspectorPane) StatusText() string { return objc.GoString(objc.Msg(p.st
 // SegmentGeometry describes the segmented control (smoke diagnostics).
 func (p *InspectorPane) SegmentGeometry() string {
 	f := objc.Send[appkit.Rect](p.seg.View, "frame")
-	w0 := objc.Send[float64](p.seg.View, "widthForSegment:", int64(0))
-	w1 := objc.Send[float64](p.seg.View, "widthForSegment:", int64(1))
-	en := objc.Send[bool](p.seg.View, "isEnabledForSegment:", int64(1))
+	w0 := objc.Send[appkit.Rect](p.seg.Button(0), "frame").Size.Width
+	w1 := objc.Send[appkit.Rect](p.seg.Button(1), "frame").Size.Width
+	en := p.seg.Enabled(1)
 
 	return fmt.Sprintf("frame %.0fx%.0f at %.0f,%.0f; widths %.0f/%.0f; details enabled %v; hidden %v",
 		f.Size.Width, f.Size.Height, f.Origin.X, f.Origin.Y, w0, w1, en, objc.Send[bool](p.seg.View, "isHidden"))
@@ -343,6 +365,13 @@ func (p *InspectorPane) ShowJob(ref bq.JobRef) {
 func (p *InspectorPane) Show(info app.ObjectInfo) {
 	p.gen++
 	gen := p.gen
+
+	// Re-selecting the same object keeps its preview (and running query).
+	if info.FullID() != p.current.FullID() {
+		p.table = nil
+		p.resetPreview()
+	}
+
 	p.current = info
 
 	appkit.SetString(p.title, displayName(info))
@@ -439,6 +468,7 @@ func (p *InspectorPane) apply(gen uint64, info app.ObjectInfo, v any, err error)
 
 	switch x := v.(type) {
 	case *bigquery.Table:
+		p.table = x
 		fields = app.SchemaTree(x)
 		sections = p.fmt.TableSections(x)
 
@@ -472,16 +502,24 @@ func (p *InspectorPane) apply(gen uint64, info app.ObjectInfo, v any, err error)
 	p.details.Expand(0, true)
 
 	hasSchema := len(fields) > 0
+	canPreview := p.table != nil && info.Kind != app.KindShardGroup
 	p.seg.SetEnabled(segSchema, hasSchema)
+	p.seg.SetEnabled(segPreview, canPreview)
 	p.setState(stateReady)
 
-	if hasSchema {
-		p.seg.Select(segSchema)
-		p.showSegment(segSchema)
-	} else {
-		p.seg.Select(segDetails)
-		p.showSegment(segDetails)
+	// Keep the tab the user picked when the new object has it.
+	seg := segDetails
+
+	switch {
+	case p.wantSeg == segPreview && canPreview:
+		seg = segPreview
+	case p.wantSeg == segDetails:
+	case hasSchema:
+		seg = segSchema
 	}
+
+	p.seg.Select(seg)
+	p.showSegment(seg)
 }
 
 func (p *InspectorPane) schemaMenu(item uint64) []appkit.MenuItem {
@@ -640,4 +678,106 @@ func (s *detailsSource) CellText(item uint64, column string) appkit.CellText {
 	}
 
 	return appkit.CellText{Text: r.Value, Mono: r.Mono, Wrap: strings.Contains(r.Value, "\n"), ToolTip: r.Value}
+}
+
+// newPreview builds the Preview tab: a results grid, and a prompt with a
+// Load Preview button for views (whose preview runs a query).
+func (p *InspectorPane) newPreview() objc.ID {
+	p.preview = newResultsPane()
+	p.preview.SetEmptyText("Select a table to preview its rows.")
+
+	p.promptText = appkit.SecondaryLabel("")
+	objc.Msg(p.promptText, "setAlignment:", int64(1)) // centered
+	objc.Msg(p.promptText, "setMaximumNumberOfLines:", int64(0))
+	objc.Msg(p.promptText, "setPreferredMaxLayoutWidth:", previewPromptWidth)
+
+	button := appkit.Button("Load Preview", func() { p.LoadViewPreview() })
+	p.viewPrompt = objc.Msg(objc.Cls("NSStackView"), "stackViewWithViews:", objc.Array(p.promptText, button))
+	objc.Msg(p.viewPrompt, "setOrientation:", int64(1)) // vertical
+	objc.Msg(p.viewPrompt, "setAlignment:", int64(9))   // NSLayoutAttributeCenterX
+	objc.Msg(p.viewPrompt, "setSpacing:", 10.0)
+	appkit.UseAutoLayout(p.promptText)
+	appkit.Activate(appkit.Equal(appkit.Anchor(p.promptText, "widthAnchor"), appkit.Anchor(p.viewPrompt, "widthAnchor"), 0))
+
+	p.previewHolder = appkit.NewView()
+	appkit.AddFilling(p.previewHolder, p.preview.View, 0)
+	appkit.UseAutoLayout(p.viewPrompt)
+	objc.Msg(p.previewHolder, "addSubview:", p.viewPrompt)
+	appkit.Activate(
+		appkit.Equal(appkit.Anchor(p.viewPrompt, "centerXAnchor"), appkit.Anchor(p.previewHolder, "centerXAnchor"), 0),
+		appkit.Equal(appkit.Anchor(p.viewPrompt, "centerYAnchor"), appkit.Anchor(p.previewHolder, "centerYAnchor"), 0),
+		appkit.EqualConst(appkit.Anchor(p.viewPrompt, "widthAnchor"), previewPromptWidth),
+	)
+	appkit.SetHidden(p.viewPrompt, true)
+	appkit.SetHidden(p.previewHolder, true)
+
+	return p.previewHolder
+}
+
+const previewPromptWidth = 300.0
+
+// isView reports whether the current object previews through a query.
+func (p *InspectorPane) isView() bool {
+	return p.table != nil && (p.table.Type == "VIEW" || p.table.Type == "MATERIALIZED_VIEW")
+}
+
+// resetPreview stops any preview of the previous object.
+func (p *InspectorPane) resetPreview() {
+	p.previewFor = ""
+	p.preview.Reset()
+	appkit.SetHidden(p.viewPrompt, true)
+}
+
+// preparePreview starts a table preview (Storage Read API, free) or offers
+// to run the view's query.
+func (p *InspectorPane) preparePreview() {
+	id := p.current.FullID()
+	if p.table == nil || p.previewFor == id {
+		return
+	}
+
+	p.previewFor = id
+
+	if p.isView() {
+		p.preview.Reset()
+		appkit.SetString(p.promptText, fmt.Sprintf(
+			"Previewing a %s runs its query (up to %s rows, billed to %s). It is cancelled if it takes more than %s.",
+			strings.ToLower(strings.ReplaceAll(p.table.Type, "_", " ")), app.Count(app.PreviewQueryRows),
+			p.s.BillingProject(), seconds(app.PreviewQueryTimeout)))
+		appkit.SetHidden(p.viewPrompt, false)
+
+		return
+	}
+
+	appkit.SetHidden(p.viewPrompt, true)
+	p.preview.Show(p.s.Runner.Preview(p.current.ObjectRef()))
+}
+
+// LoadViewPreview runs the view preview query (capped at 1,024 rows and 10
+// seconds).
+func (p *InspectorPane) LoadViewPreview() {
+	if p.table == nil {
+		return
+	}
+
+	appkit.SetHidden(p.viewPrompt, true)
+	p.preview.Show(p.s.Runner.PreviewQuery(p.current.ObjectRef(), p.s.BillingProject(), app.PreviewQueryTimeout))
+}
+
+// TableLoaded reports whether the current table's metadata has arrived.
+func (p *InspectorPane) TableLoaded() bool {
+	return p.table != nil && p.table.TableReference != nil && p.table.TableReference.TableId == p.current.Name
+}
+
+// PreviewPane is the Preview tab's results pane (smoke checks).
+func (p *InspectorPane) PreviewPane() *ResultsPane { return p.preview }
+
+// ViewPromptVisible reports whether the Load Preview prompt is shown.
+func (p *InspectorPane) ViewPromptVisible() bool { return !objc.Send[bool](p.viewPrompt, "isHidden") }
+
+// SelectSegment switches tabs as if clicked (smoke checks).
+func (p *InspectorPane) SelectSegment(i int) {
+	p.seg.Select(i)
+	p.wantSeg = i
+	p.showSegment(i)
 }

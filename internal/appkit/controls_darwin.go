@@ -42,6 +42,14 @@ func segmentWidth(label string) float64 {
 	return max(minWidth, float64(len([]rune(label)))*perChar+padding)
 }
 
+// SetRounded uses the classic rounded style. The automatic style draws no
+// unselected labels in inspector panes on macOS 26.
+func (s *Segmented) SetRounded() {
+	const segmentStyleRounded = int64(1)
+
+	objc.Msg(s.View, "setSegmentStyle:", segmentStyleRounded)
+}
+
 // Selected returns the selected segment index (-1 when none).
 func (s *Segmented) Selected() int {
 	return int(objc.Send[int64](s.View, "selectedSegment"))

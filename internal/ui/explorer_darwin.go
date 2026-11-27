@@ -21,6 +21,7 @@ type ExplorerPane struct {
 
 	s      *Shell
 	filter bool
+	star   objc.ID // starred-only toggle button
 
 	// LastReload / MaxReload measure main-thread time spent reloading the
 	// outline after a load (smoke checks keep this bounded).
@@ -43,17 +44,27 @@ func newExplorerPane(s *Shell, be app.Backend) *ExplorerPane {
 
 	search := appkit.NewSearchField("Filter", p.SetFilter)
 
+	p.star = objc.Msg(objc.Cls("NSButton"), "buttonWithImage:target:action:",
+		appkit.SymbolImage("star", "Starred only"), objc.NewTarget(func(objc.ID) { p.SetStarredOnly(!p.Model.StarredOnly()) }),
+		objc.Sel(objc.ActionSelector))
+	objc.Msg(p.star, "setBordered:", false)
+	objc.Msg(p.star, "setToolTip:", objc.String("Show only starred datasets"))
+
 	p.View = appkit.NewView()
 	appkit.UseAutoLayout(search)
+	appkit.UseAutoLayout(p.star)
 	appkit.UseAutoLayout(p.Outline.Scroll)
 	objc.Msg(p.View, "addSubview:", search)
+	objc.Msg(p.View, "addSubview:", p.star)
 	objc.Msg(p.View, "addSubview:", p.Outline.Scroll)
 
 	safeTop := objc.Msg(objc.Msg(p.View, "safeAreaLayoutGuide"), "topAnchor")
 	appkit.Activate(
 		appkit.Equal(appkit.Anchor(search, "topAnchor"), safeTop, sidebarInset),
 		appkit.Equal(appkit.Anchor(search, "leadingAnchor"), appkit.Anchor(p.View, "leadingAnchor"), sidebarInset),
-		appkit.Equal(appkit.Anchor(search, "trailingAnchor"), appkit.Anchor(p.View, "trailingAnchor"), -sidebarInset),
+		appkit.Equal(appkit.Anchor(p.star, "trailingAnchor"), appkit.Anchor(p.View, "trailingAnchor"), -sidebarInset),
+		appkit.Equal(appkit.Anchor(p.star, "centerYAnchor"), appkit.Anchor(search, "centerYAnchor"), 0),
+		appkit.Equal(appkit.Anchor(search, "trailingAnchor"), appkit.Anchor(p.star, "leadingAnchor"), -sidebarInset/2),
 		appkit.Equal(appkit.Anchor(p.Outline.Scroll, "topAnchor"), appkit.Anchor(search, "bottomAnchor"), sidebarInset/2),
 		appkit.Equal(appkit.Anchor(p.Outline.Scroll, "leadingAnchor"), appkit.Anchor(p.View, "leadingAnchor"), 0),
 		appkit.Equal(appkit.Anchor(p.Outline.Scroll, "trailingAnchor"), appkit.Anchor(p.View, "trailingAnchor"), 0),
@@ -61,6 +72,36 @@ func newExplorerPane(s *Shell, be app.Backend) *ExplorerPane {
 	)
 
 	return p
+}
+
+// ToggleStar stars or unstars a dataset and saves the choice.
+func (p *ExplorerPane) ToggleStar(info app.ObjectInfo) {
+	p.s.settings.ToggleStar(info.Project, info.Dataset)
+	p.s.saveSettings()
+	p.Model.SetStarred(p.s.settings.Starred)
+}
+
+// SetStarredOnly shows only starred datasets (saved across launches) and
+// loads the projects that hold them.
+func (p *ExplorerPane) SetStarredOnly(on bool) {
+	p.s.settings.StarredOnly = on
+	p.s.saveSettings()
+	p.Model.SetStarredOnly(on)
+
+	symbol := "star"
+	if on {
+		symbol = "star.fill"
+		objc.Msg(p.star, "setContentTintColor:", appkit.SystemColor("systemYellowColor"))
+
+		for _, id := range p.Model.StarredProjects() {
+			p.Model.Expand(id)
+			p.Outline.Expand(id, false)
+		}
+	} else {
+		objc.Msg(p.star, "setContentTintColor:", objc.Nil)
+	}
+
+	objc.Msg(p.star, "setImage:", appkit.SymbolImage(symbol, "Starred only"))
 }
 
 // SetFilter filters the tree (the search field calls this as the user types).
@@ -145,7 +186,18 @@ func (p *ExplorerPane) menu(id uint64) []appkit.MenuItem {
 			copyID, console,
 		}
 	case app.KindDataset:
-		return []appkit.MenuItem{refresh, {}, copyID, copySQL, console}
+		star := "Add to Starred"
+		if p.Model.IsStarred(id) {
+			star = "Remove from Starred"
+		}
+
+		return []appkit.MenuItem{
+			{Title: star, Run: func() { p.ToggleStar(info) }},
+			{},
+			refresh,
+			{},
+			copyID, copySQL, console,
+		}
 	case app.KindTable, app.KindView, app.KindMaterializedView, app.KindExternalTable,
 		app.KindSnapshot, app.KindShardGroup:
 		items := []appkit.MenuItem{
@@ -226,9 +278,14 @@ func (s explorerSource) Expandable(item uint64) bool { return s.p.Model.Expandab
 func (s explorerSource) Cell(item uint64) appkit.OutlineCell {
 	n, _ := s.p.Model.Tree().Node(item)
 
+	symbol := kindSymbol(n.Kind)
+	if s.p.Model.IsStarred(item) {
+		symbol = "star.fill"
+	}
+
 	return appkit.OutlineCell{
 		Title:     n.Title,
-		Symbol:    kindSymbol(n.Kind),
+		Symbol:    symbol,
 		ToolTip:   n.Detail,
 		Secondary: n.Kind == app.KindPlaceholder,
 	}

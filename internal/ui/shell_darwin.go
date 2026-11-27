@@ -237,6 +237,11 @@ func NewShell(opts Options) (*Shell, error) {
 	}
 
 	s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
+	s.Explorer.Model.SetStarred(s.settings.Starred)
+
+	if s.settings.StarredOnly {
+		s.Explorer.SetStarredOnly(true)
+	}
 	s.LoadProjects()
 
 	objc.Msg(s.Window, "makeKeyAndOrderFront:", objc.Nil)
@@ -276,6 +281,11 @@ func (s *Shell) SetBillingProject(project string) {
 
 	if s.settings.Pin(project) {
 		s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
+		s.Explorer.Model.SetStarred(s.settings.Starred)
+
+		if s.settings.StarredOnly {
+			s.Explorer.SetStarredOnly(true)
+		}
 	}
 
 	s.Editor.ConfigureLSP(s.lspOptions())
@@ -291,6 +301,11 @@ func (s *Shell) SetBillingProject(project string) {
 func (s *Shell) UnpinProject(project string) {
 	if s.settings.Unpin(project) {
 		s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
+		s.Explorer.Model.SetStarred(s.settings.Starred)
+
+		if s.settings.StarredOnly {
+			s.Explorer.SetStarredOnly(true)
+		}
 		s.rebuildProjectPicker()
 		s.saveSettings()
 	}
@@ -644,6 +659,7 @@ func (s *Shell) SelectTab(i int) {
 // onRunUpdate routes runner updates to the panes.
 func (s *Shell) onRunUpdate(r *app.Run) {
 	s.Results.Update(r)
+	s.Inspector.PreviewPane().Update(r)
 
 	snap := r.Snapshot()
 

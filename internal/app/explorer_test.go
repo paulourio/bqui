@@ -322,3 +322,58 @@ func TestBuildDatasetEntriesSingleShardNotGrouped(t *testing.T) {
 		t.Fatalf("entries = %v", got)
 	}
 }
+
+func TestExplorerStarredOnly(t *testing.T) {
+	e, l := newTestExplorer(t, &FakeBackend{})
+	l.do(func() {
+		e.SetProjects([]string{FakeProject, "bigquery-public-data"})
+		e.SetStarred([]string{"bigquery-public-data.samples"})
+	})
+
+	pub := find(t, e, l, "bigquery-public-data", "", "")
+
+	// Before loading, the project with a star stays visible; the other hides.
+	l.do(func() { e.SetStarredOnly(true) })
+
+	if got := titles(e, l, RootID); len(got) != 1 || got[0] != "bigquery-public-data" {
+		t.Fatalf("starred roots = %v", got)
+	}
+
+	var projects []uint64
+
+	l.do(func() { projects = e.StarredProjects() })
+
+	if len(projects) != 1 || projects[0] != pub {
+		t.Fatalf("starred projects = %v", projects)
+	}
+
+	expandAndWait(t, e, l, pub)
+
+	if got := titles(e, l, pub); len(got) != 1 || got[0] != "samples" {
+		t.Fatalf("starred datasets = %v", got)
+	}
+
+	samples := find(t, e, l, "bigquery-public-data", "samples", "")
+	expandAndWait(t, e, l, samples)
+
+	var starred bool
+
+	l.do(func() { starred = e.IsStarred(samples) })
+
+	if n := len(titles(e, l, samples)); n != 7 || !starred {
+		t.Fatalf("starred dataset children = %d, starred %v", n, starred)
+	}
+
+	// Text filter and star filter combine.
+	l.do(func() { e.SetFilter("shakes") })
+
+	if got := titles(e, l, samples); len(got) != 1 || got[0] != "shakespeare" {
+		t.Errorf("combined = %v", got)
+	}
+
+	l.do(func() { e.SetFilter(""); e.SetStarredOnly(false) })
+
+	if n := len(titles(e, l, RootID)); n != 2 {
+		t.Errorf("cleared = %d roots", n)
+	}
+}

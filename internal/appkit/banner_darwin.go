@@ -9,7 +9,7 @@ import "github.com/paulourio/bqui/internal/objc"
 type Banner struct {
 	View objc.ID
 
-	title, detail, hint objc.ID
+	title, detail, hint, icon objc.ID
 }
 
 const (
@@ -42,6 +42,7 @@ func NewBanner() *Banner {
 	icon := objc.Msg(objc.Cls("NSImageView"), "imageViewWithImage:", SymbolImage("exclamationmark.triangle.fill", "Error"))
 	objc.Msg(icon, "setContentTintColor:", red)
 	UseAutoLayout(icon)
+	b.icon = icon
 
 	b.title = Label("", 0)
 	objc.Msg(b.title, "setFont:", objc.Msg(objc.Cls("NSFont"), "boldSystemFontOfSize:", 13.0))
@@ -90,8 +91,22 @@ func wrappingLabel(color string) objc.ID {
 	return l
 }
 
-// Show fills and reveals the banner (empty hint hides that line).
-func (b *Banner) Show(title, detail, hint string) {
+// Show fills and reveals the banner as an error (red).
+func (b *Banner) Show(title, detail, hint string) { b.ShowStyled(title, detail, hint, false) }
+
+// ShowStyled reveals the banner as an error (red) or a warning (orange).
+// An empty detail or hint hides that line.
+func (b *Banner) ShowStyled(title, detail, hint string, warning bool) {
+	color := SystemColor("systemRedColor")
+	if warning {
+		color = SystemColor("systemOrangeColor")
+	}
+
+	objc.Msg(b.View, "setBorderColor:", color)
+	objc.Msg(b.View, "setFillColor:", objc.Msg(color, "colorWithAlphaComponent:", bannerFill))
+	objc.Msg(b.title, "setTextColor:", color)
+	objc.Msg(b.icon, "setContentTintColor:", color)
+
 	SetString(b.title, title)
 	SetString(b.detail, detail)
 	SetString(b.hint, hint)

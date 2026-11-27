@@ -661,3 +661,51 @@ func lowerType(t string) string {
 
 	return string(b)
 }
+
+// View previews run a query, so they are capped in rows and time.
+const (
+	PreviewQueryRows    = 1024
+	PreviewQueryTimeout = 10 * time.Second
+)
+
+// ErrPreviewTimeout means a view preview query did not finish in time; its
+// job was cancelled.
+var ErrPreviewTimeout = errors.New("app: preview did not load in time")
+
+// PreviewQuery previews a view (or any table) with a LIMIT query billed to
+// project. If it takes longer than timeout the job is cancelled and the run
+// fails with ErrPreviewTimeout.
+func (rn *Runner) PreviewQuery(ref bq.TableRef, project string, timeout time.Duration) *Run {
+	r, ctx := rn.newRun("preview", "Preview of "+ref.String())
+
+	go func() {
+		defer close(r.done)
+
+		var timedOut atomic.Bool
+
+		timer := time.AfterFunc(timeout, func() {
+			timedOut.Store(true)
+			r.Cancel() // stops local work and cancels the BigQuery job
+		})
+
+		//nolint:unqueryvet // previews show every column, like the console
+		err := rn.execute(ctx, r, bq.QueryRequest{
+			SQL:     fmt.Sprintf("SELECT * FROM %s LIMIT %d", ref.SQL(), PreviewQueryRows),
+			Project: project, MaxInlineRows: PreviewQueryRows,
+		})
+
+		timer.Stop()
+
+		if timedOut.Load() {
+			r.finish(context.Background(), fmt.Errorf("%w (%s)", ErrPreviewTimeout, timeout))
+
+			return
+		}
+
+		r.finish(ctx, err)
+	}()
+
+	rn.notify(r)
+
+	return r
+}

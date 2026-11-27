@@ -14,6 +14,8 @@ type Problem struct {
 	Title  string
 	Detail string
 	Hint   string
+	// Warning marks problems that are not failures (shown in orange).
+	Warning bool
 }
 
 var (
@@ -35,6 +37,13 @@ func Explain(err error) Problem {
 	lower := strings.ToLower(msg)
 
 	switch {
+	case errors.Is(err, ErrPreviewTimeout):
+		return Problem{
+			Title:   "Could not load the preview in under 10 seconds",
+			Detail:  "Previewing a view runs its query. It was still running after 10 seconds, so the job was cancelled.",
+			Hint:    "Query the view yourself (with filters) to wait longer.",
+			Warning: true,
+		}
 	case strings.Contains(lower, "could not find default credentials") ||
 		strings.Contains(lower, "gcloud") && strings.Contains(lower, "executable file not found"):
 		return Problem{

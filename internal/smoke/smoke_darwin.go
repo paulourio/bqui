@@ -125,6 +125,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	pr := prefsFlow(s, dir)
 	phase("studio")
 	st := studioFlow(s, dir)
+	phase("inspect")
+	is := inspectFlow(s, dir)
 	phase("checks")
 
 	queued := time.Now()
@@ -156,6 +158,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		themeChecks(rep, ts)
 		prefsChecks(rep, pr)
 		studioChecks(rep, st)
+		inspectChecks(rep, is)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -1027,6 +1030,140 @@ func studioFlow(s *ui.Shell, dir string) studioResult {
 	})
 
 	return r
+}
+
+// inspectResult captures inspector previews and starred datasets.
+type inspectResult struct {
+	TablePreview, ViewPreview      app.RunState
+	TableRows, ViewRows            int64
+	ViewPrompt, StayedOnPreview    bool
+	WarningTitle, Shot, Err        string
+	StarredRoots, StarredDatasets  int
+	StarredIcon, UnstarredRestored bool
+}
+
+func inspectFlow(s *ui.Shell, dir string) inspectResult {
+	var r inspectResult
+
+	m, out := s.Explorer.Model, s.Explorer.Outline
+
+	load := func(project, dataset string) {
+		var id uint64
+
+		onMain(func() {
+			id, _ = m.Find(project, dataset, "")
+			m.Expand(id)
+			out.Expand(id, false)
+		})
+		waitMain(loadTimeout, func() bool { return m.Loaded(id) })
+	}
+
+	sel := func(project, dataset, name string) bool {
+		var (
+			id uint64
+			ok bool
+		)
+
+		onMain(func() {
+			if id, ok = m.Find(project, dataset, name); ok {
+				out.Select(id)
+			}
+		})
+
+		return ok && waitMain(loadTimeout, func() bool { return s.Inspector.Current().Name == name && s.Inspector.TableLoaded() })
+	}
+
+	runDone := func() (app.RunState, int64) {
+		waitMain(loadTimeout, func() bool {
+			run := s.Inspector.PreviewPane().Current()
+
+			return run != nil && run.Snapshot().State != app.RunRunning && run.Snapshot().State != app.RunFetching
+		})
+
+		run := s.Inspector.PreviewPane().Current()
+		if run == nil {
+			return app.RunCancelled, 0
+		}
+
+		snap := run.Snapshot()
+
+		var rows int64
+		if snap.Grid != nil {
+			rows, _, _ = snap.Grid.Size()
+		}
+
+		return snap.State, rows
+	}
+
+	// A table previews right away when the Preview tab is chosen.
+	if !sel("bigquery-public-data", "samples", "shakespeare") {
+		r.Err = "shakespeare not selectable"
+
+		return r
+	}
+
+	onMain(func() { s.Inspector.SelectSegment(2) })
+	r.TablePreview, r.TableRows = runDone()
+
+	// A view keeps the Preview tab but asks before running its query.
+	load(app.FakeProject, "")
+	load(app.FakeProject, "analytics")
+
+	if !sel(app.FakeProject, "analytics", "v_active_users") {
+		r.Err = "view not selectable"
+
+		return r
+	}
+
+	onMain(func() {
+		r.StayedOnPreview = s.Inspector.Segment() == 2
+		r.ViewPrompt = s.Inspector.ViewPromptVisible()
+		s.Inspector.LoadViewPreview()
+	})
+	r.ViewPreview, r.ViewRows = runDone()
+
+	// The timeout warning (the 10 s path itself is covered by unit tests).
+	onMain(func() {
+		s.Inspector.PreviewPane().ShowProblem(app.Explain(app.ErrPreviewTimeout))
+		r.WarningTitle, _, _ = s.Inspector.PreviewPane().Banner.Text()
+	})
+	time.Sleep(settleDelay)
+	onMain(func() {
+		r.Shot = "inspector-preview.png"
+		if err := appkit.WriteWindowPNG(s.Window, filepath.Join(dir, r.Shot)); err != nil {
+			r.Shot = "✕ " + err.Error()
+		}
+	})
+
+	// Star a dataset and show only starred ones.
+	onMain(func() {
+		id, _ := m.Find("bigquery-public-data", "samples", "")
+		info, _ := m.Info(id)
+		s.Explorer.ToggleStar(info)
+		r.StarredIcon = m.IsStarred(id)
+		s.Explorer.SetStarredOnly(true)
+		r.StarredRoots = len(m.Children(0))
+
+		pub, _ := m.Find("bigquery-public-data", "", "")
+		r.StarredDatasets = len(m.Children(pub))
+
+		s.Explorer.ToggleStar(info)
+		s.Explorer.SetStarredOnly(false)
+		r.UnstarredRestored = len(m.Children(0)) == 2 && !m.IsStarred(id)
+	})
+
+	return r
+}
+
+func inspectChecks(rep *Report, r inspectResult) {
+	rep.check("inspect-table-preview", r.Err == "" && r.TablePreview == app.RunDone && r.TableRows > 0,
+		"table preview %v, %d rows %s", r.TablePreview, r.TableRows, r.Err)
+	rep.check("inspect-view-preview", r.StayedOnPreview && r.ViewPrompt && r.ViewPreview == app.RunDone && r.ViewRows > 0 && r.ViewRows <= app.PreviewQueryRows,
+		"stayed on Preview %v, prompt %v, view preview %v with %d rows", r.StayedOnPreview, r.ViewPrompt, r.ViewPreview, r.ViewRows)
+	rep.check("inspect-preview-warning", strings.Contains(r.WarningTitle, "10 seconds") && !strings.HasPrefix(r.Shot, "✕"),
+		"warning %q, %s", r.WarningTitle, r.Shot)
+	rep.check("explorer-starred", r.StarredIcon && r.StarredRoots == 1 && r.StarredDatasets == 1 && r.UnstarredRestored,
+		"starred %v, starred-only roots %d datasets %d, restored %v", r.StarredIcon, r.StarredRoots, r.StarredDatasets, r.UnstarredRestored)
 }
 
 func studioChecks(rep *Report, r studioResult) {

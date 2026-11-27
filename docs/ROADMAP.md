@@ -608,7 +608,7 @@ These are pending items, collected from the milestone notes above.
 
 ### Known issues
 - AppKit "reentrant operation in its NSTableView delegate" warnings (6 per smoke run). These need `lldb` with a symbolic breakpoint (M8).
-- The inspector segment label is invisible in the VM (Liquid Glass rendering); check on real hardware.
+- In the macOS 26 inspector pane, bezeled controls (segmented controls, push buttons) draw only their selected or accent parts, at least in the VM. The inspector now uses `appkit.TabBar` (borderless buttons with colored titles). Check on real hardware whether other bezeled controls there need the same treatment.
 - The toolbar overflows at 1280 pt width.
 - The binary is about 190 MB, mostly bqlang's wasm2go parser.
 

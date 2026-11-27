@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"iter"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -236,6 +237,31 @@ func TestRunnerPreviewFallsBackToQueryWithoutStorage(t *testing.T) {
 	}
 
 	if rows, _, _ := s.Grid.Size(); rows != previewRows {
+		t.Errorf("preview rows = %d", rows)
+	}
+}
+
+func TestPreviewQueryTimesOutAndCancels(t *testing.T) {
+	be := &FakeBackend{}
+	rn := NewRunner(RunnerOptions{Backend: be, Post: func(fn func()) { fn() }, SpillDir: t.TempDir()})
+	ref := bq.TableRef{Project: FakeProject, Dataset: "analytics", Table: "orders_view"}
+
+	// The fake takes fakeRunTime to run; a shorter cap must time out.
+	s := wait(t, rn.PreviewQuery(ref, FakeProject, 20*time.Millisecond))
+	if s.State != RunFailed || !errors.Is(s.Err, ErrPreviewTimeout) {
+		t.Fatalf("timed-out preview = %v %v", s.State, s.Err)
+	}
+
+	if p := Explain(s.Err); !p.Warning || !strings.Contains(p.Title, "10 seconds") {
+		t.Errorf("explained = %+v", p)
+	}
+
+	s = wait(t, rn.PreviewQuery(ref, FakeProject, PreviewQueryTimeout))
+	if s.State != RunDone || s.Grid == nil {
+		t.Fatalf("preview = %v %v", s.State, s.Err)
+	}
+
+	if rows, _, _ := s.Grid.Size(); rows == 0 || rows > PreviewQueryRows {
 		t.Errorf("preview rows = %d", rows)
 	}
 }

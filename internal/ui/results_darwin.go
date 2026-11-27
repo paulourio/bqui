@@ -134,8 +134,26 @@ func (p *ResultsPane) ShowProblem(pr app.Problem) {
 	appkit.SetString(p.status, "✕ "+pr.Title)
 	appkit.SetHidden(p.status, true)
 	appkit.SetHidden(p.empty, true)
-	p.Banner.Show(pr.Title, pr.Detail, pr.Hint)
+	p.Banner.ShowStyled(pr.Title, pr.Detail, pr.Hint, pr.Warning)
 }
+
+// Reset stops and forgets the current run (the pane shows its empty text).
+func (p *ResultsPane) Reset() {
+	if old := p.run; old != nil {
+		go old.Close()
+	}
+
+	p.run, p.grid, p.cols, p.lines = nil, nil, nil, 0
+	p.Table.SetColumns(nil)
+	p.Table.Reload()
+	appkit.SetHidden(p.Table.Scroll, true)
+	p.Banner.Hide()
+	appkit.SetString(p.status, "")
+	appkit.SetHidden(p.empty, false)
+}
+
+// SetEmptyText changes the text shown before anything runs.
+func (p *ResultsPane) SetEmptyText(text string) { appkit.SetString(p.empty, text) }
 
 // Current returns the run being shown (nil before the first run).
 func (p *ResultsPane) Current() *app.Run { return p.run }
@@ -225,7 +243,7 @@ func (p *ResultsPane) setStatus() {
 		if p.bannerRun != p.run {
 			p.bannerRun = p.run
 			pr := app.Explain(s.Err)
-			p.Banner.Show(pr.Title, pr.Detail, pr.Hint)
+			p.Banner.ShowStyled(pr.Title, pr.Detail, pr.Hint, pr.Warning)
 		}
 
 		text = "Failed after " + seconds(s.Elapsed)

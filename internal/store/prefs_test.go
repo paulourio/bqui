@@ -53,3 +53,27 @@ func TestPreferencesRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestToggleStarPersists(t *testing.T) {
+	s := &Settings{}
+
+	if !s.ToggleStar("p", "b") || !s.ToggleStar("p", "a") || len(s.Starred) != 2 || s.Starred[0] != "p.a" {
+		t.Fatalf("starred = %v", s.Starred)
+	}
+
+	if s.ToggleStar("p", "b") || len(s.Starred) != 1 {
+		t.Fatalf("unstar = %v", s.Starred)
+	}
+
+	path := t.TempDir() + "/settings.json"
+	s.StarredOnly = true
+
+	if err := s.Save(path); err != nil {
+		t.Fatal(err)
+	}
+
+	back, err := LoadSettings(path)
+	if err != nil || len(back.Starred) != 1 || !back.StarredOnly {
+		t.Errorf("reloaded = %+v %v", back, err)
+	}
+}
