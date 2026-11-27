@@ -6,6 +6,8 @@
 package appkit
 
 import (
+	"runtime"
+
 	"github.com/paulourio/bqui/internal/objc"
 )
 
@@ -32,11 +34,26 @@ func MakeRect(x, y, w, h float64) Rect {
 	return Rect{Origin: Point{X: x, Y: y}, Size: Size{Width: w, Height: h}}
 }
 
-// NSTextAlignment values.
-const (
-	TextAlignmentLeft   int64 = 0
-	TextAlignmentCenter int64 = 1
+// TextAlignmentLeft is NSTextAlignmentLeft.
+const TextAlignmentLeft int64 = 0
+
+// NSTextAlignment Center and Right values swap between darwin/amd64
+// (Right=1, Center=2) and darwin/arm64 (Center=1, Right=2) per Apple's
+// <AppKit/NSText.h> TARGET_ABI_USES_IOS_VALUES.
+var (
+	// TextAlignmentCenter is NSTextAlignmentCenter for the target Darwin architecture.
+	TextAlignmentCenter = textAlignmentForArch(2, 1)
+	// TextAlignmentRight is NSTextAlignmentRight for the target Darwin architecture.
+	TextAlignmentRight = textAlignmentForArch(1, 2)
 )
+
+func textAlignmentForArch(amd64Val, arm64Val int64) int64 {
+	if runtime.GOARCH == "amd64" {
+		return amd64Val
+	}
+
+	return arm64Val
+}
 
 const lineBreakByTruncatingTail uint64 = 4
 

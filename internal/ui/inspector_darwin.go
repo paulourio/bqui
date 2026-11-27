@@ -687,7 +687,7 @@ func (p *InspectorPane) newPreview() objc.ID {
 	p.preview.SetEmptyText("Select a table to preview its rows.")
 
 	p.promptText = appkit.SecondaryLabel("")
-	objc.Msg(p.promptText, "setAlignment:", int64(1)) // centered
+	objc.Msg(p.promptText, "setAlignment:", appkit.TextAlignmentCenter)
 	objc.Msg(p.promptText, "setMaximumNumberOfLines:", int64(0))
 	objc.Msg(p.promptText, "setPreferredMaxLayoutWidth:", previewPromptWidth)
 

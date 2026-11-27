@@ -57,7 +57,6 @@ const (
 	autoresizeMinY    uint64 = 1 << 3
 	autoresizeMaxY    uint64 = 1 << 5
 	columnNoAutoSize  uint64 = 0
-	textAlignRight    int64  = 2
 	italicFontMask    uint64 = 1
 )
 
@@ -488,7 +487,7 @@ func gridCell(tv objc.ID, c CellText) objc.ID {
 
 	align := TextAlignmentLeft
 	if c.Right {
-		align = textAlignRight
+		align = TextAlignmentRight
 	}
 
 	objc.Msg(tf, "setAlignment:", align)

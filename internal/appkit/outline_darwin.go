@@ -472,7 +472,7 @@ func textCell(ov objc.ID, c CellText, auto bool) objc.ID {
 
 	align := TextAlignmentLeft
 	if c.Right {
-		align = textAlignRight
+		align = TextAlignmentRight
 	}
 
 	objc.Msg(tf, "setAlignment:", align)
