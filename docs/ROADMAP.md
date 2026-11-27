@@ -156,7 +156,7 @@ Each milestone lists deliverables, then tests, then the exit criteria (**Exit**)
 ### M3 — Explorer (dataset/table browser + metadata)
 
 **Status: done.** What shipped, and where it differs from the plan below:
-- **Explorer** (`app.Explorer`, UI-agnostic and tested on Linux): pinned projects → datasets → tables, views, materialized views, external tables, snapshots, routines and models, loaded lazily through the `app.Backend` interface (`*bq.Client`, or `app.FakeBackend`). Date-sharded tables are grouped like the console (`ga_sessions_(366)`). Includes a client-side filter, error placeholders with retry, Refresh, and per-kind context menus (Query, Insert Reference, Copy ID, Copy SQL Reference, Open in BigQuery Console, Use as Billing Project, Unpin). Double-click inserts the reference into the editor.
+- **Explorer** (`app.Explorer`, UI-agnostic and tested on Linux): pinned projects → datasets → tables, views, materialized views, external tables, snapshots, routines and models, loaded lazily through the `app.Backend` interface (`*bq.Client`, or `app.FakeBackend`). Date-sharded tables are grouped like the console (`ga_sessions_(366)`). Includes a client-side filter, error placeholders with retry, Refresh, and per-kind context menus (Query, Insert Reference, Copy ID, Copy SQL Reference, Open in BigQuery Console, Use as Billing Project, Unpin). Selecting or double-clicking an object never edits the buffer. The inspector header offers Query and Insert Reference instead, plus a copy button next to the name.
 - **Metadata goes in the inspector pane, not in table tabs.** The inspector has Schema and Details tabs; per-object tabs arrive with tabs and sessions (M10).
   - Schema: a nested tree (name, type, mode, key badges, description). Parameterized types are shown, and partition, cluster and policy-tag badges appear in a Key column that is hidden when no field has any.
   - Details: the console's sections for tables, views, materialized views, external tables, snapshots and clones, plus datasets, routines and models. View SQL is formatted with bqfmt. A view whose SQL is hidden from the account says so instead of showing an empty value.
@@ -743,7 +743,7 @@ These come from a user's hands-on testing. Each item must be discussed and agree
 - **Editor, stale schema in hover:** after a table's schema changes, the bqls hover still shows the old schema. The app needs a way to refresh the cached metadata, per table and for the whole catalog.
 
 **Requests**
-- **Inspector, copy the table name:** add a copy button next to the table name in the right-hand details pane.
+- **Inspector, copy the table name:** done. A copy button next to the name copies the object's full ID (a job's ID for jobs). The header also gained Query and Insert Reference actions, replacing the editor insert that double-clicking a table used to do.
 - **Results, copy or export the output:** add a button to copy or export the results.
 - **Editor, expose Monaco configuration:** give access to editor settings, keymaps and snippets, in the style of VS Code.
   - User-defined snippets matter most: users write their own in VS Code's snippet format (prefix, body with `$1`/`${2:default}` placeholders, description), and they appear in completion.
