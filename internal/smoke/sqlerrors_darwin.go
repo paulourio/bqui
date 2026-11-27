@@ -24,6 +24,7 @@ type sqlErrorsResult struct {
 	GutterErrors     int
 	JumpedLine       int  // 0-based cursor line after clicking the first link
 	JumpFocused      bool // the editor has focus after the click
+	LinkCursor       bool // the link is a pointing-hand link button
 	ClearedBar       bool
 	ClearedGutter    bool
 	ClearedCost      string
@@ -70,6 +71,7 @@ func sqlErrorsFlow(s *ui.Shell, dir string) sqlErrorsResult {
 		// Clicking "Line 2, column 1" moves the cursor there and focuses
 		// the editor (focus starts in the explorer to prove the move).
 		s.Explorer.Outline.Focus()
+		r.LinkCursor = appkit.IsLinkButton(s.SQLErrors.LinkButton(0))
 		objc.Msg(s.SQLErrors.LinkButton(0), "performClick:", objc.Nil)
 	})
 
@@ -92,8 +94,8 @@ func sqlErrorsChecks(rep *Report, r sqlErrorsResult) {
 	rep.check("sql-errors-shown", r.Err == "" && r.BarShown && r.BarTitle == "1 error in this query" &&
 		strings.HasPrefix(r.Detail, "Line 2, column 1 Syntax error") && r.GutterErrors == 1 && strings.Contains(r.Cost, "1 error") && !strings.HasPrefix(r.Shot, "✕"),
 		"bar %v %q %q, gutter error lines %d, toolbar %q, %s %s", r.BarShown, r.BarTitle, r.Detail, r.GutterErrors, r.Cost, r.Shot, r.Err)
-	rep.check("sql-errors-link", r.JumpedLine == 1 && r.JumpFocused,
-		"cursor line %d (want 1, 0-based), editor focused %v", r.JumpedLine, r.JumpFocused)
+	rep.check("sql-errors-link", r.JumpedLine == 1 && r.JumpFocused && r.LinkCursor,
+		"cursor line %d (want 1, 0-based), editor focused %v, pointing-hand link %v", r.JumpedLine, r.JumpFocused, r.LinkCursor)
 	rep.check("sql-errors-cleared", r.ClearedBar && r.ClearedGutter && !strings.Contains(r.ClearedCost, "error"),
 		"bar hidden %v, gutter cleared %v, toolbar %q", r.ClearedBar, r.ClearedGutter, r.ClearedCost)
 }

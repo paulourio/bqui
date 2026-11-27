@@ -210,12 +210,11 @@ func (b *Banner) LinkButton(i int) objc.ID {
 // sharing a baseline. Its button runs b.runs[i].
 func (b *Banner) newLinkRow(i int) bannerLink {
 	r := bannerLink{row: NewView(), text: wrappingLabel("labelColor")}
-	r.button = Button("", func() {
+	r.button = LinkButton(func() {
 		if i < len(b.runs) && b.runs[i] != nil {
 			b.runs[i]()
 		}
 	})
-	objc.Msg(r.button, "setBordered:", false)
 	UseAutoLayout(r.button)
 	SetHuggingPriority(r.button, OrientHorizontal, PriorityRequired)
 	SetCompressionResistance(r.button, OrientHorizontal, PriorityRequired)
@@ -236,6 +235,39 @@ func (b *Banner) newLinkRow(i int) bannerLink {
 	)
 
 	return r
+}
+
+// linkButtonClass is an NSButton that shows the pointing-hand cursor over
+// itself, like a link (registered once; see objc.LazyClass).
+var linkButtonClass = objc.LazyClass("BQUILinkButton", "NSButton", nil, func() []objc.Method {
+	return []objc.Method{{Sel: "resetCursorRects", Fn: func(self objc.ID, _ objc.SEL) {
+		objc.Msg(self, "addCursorRect:cursor:", objc.Send[Rect](self, "bounds"),
+			objc.Msg(objc.Cls("NSCursor"), "pointingHandCursor"))
+	}}}
+})
+
+// LinkButton creates a borderless button that runs fn and shows the
+// pointing-hand cursor; style its title with setLinkTitle.
+func LinkButton(fn func()) objc.ID {
+	b := objc.Msg(linkButtonClass(), "buttonWithTitle:target:action:",
+		objc.String(""), objc.NewTarget(func(objc.ID) { fn() }), objc.Sel(objc.ActionSelector))
+	objc.Msg(b, "setBordered:", false)
+
+	return b
+}
+
+// IsLinkButton reports whether button was made by LinkButton (smoke
+// checks); it also rebuilds the button's cursor rects, exercising the
+// resetCursorRects override.
+func IsLinkButton(button objc.ID) bool {
+	if button == objc.Nil || !objc.Send[bool](button, "isKindOfClass:", linkButtonClass()) {
+		return false
+	}
+
+	objc.Msg(button, "discardCursorRects")
+	objc.Msg(button, "resetCursorRects")
+
+	return true
 }
 
 // setLinkTitle styles a borderless button's title as a link: accent color,
