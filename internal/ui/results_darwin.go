@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
@@ -22,7 +21,6 @@ const (
 	gutterWidth         = 56.0
 	colMinWidth         = 48.0
 	colMaxWidth         = 360.0
-	charWidth           = 7.2
 	colPadding          = 18.0
 	sampleLines         = 200
 	statusInset         = 10.0
@@ -345,7 +343,6 @@ func (p *ResultsPane) columns() []appkit.TableColumn {
 	}
 
 	scale := fs / defaultGridFontSize
-	cw := charWidth * scale
 	maxW := max(colMaxWidth, colMaxWidth*scale)
 	gutterW := max(gutterWidth, gutterWidth*scale)
 
@@ -353,12 +350,14 @@ func (p *ResultsPane) columns() []appkit.TableColumn {
 
 	sample := min(p.lines, sampleLines)
 
+	// Auto-fit: the widest of the header and the sampled cells, measured in
+	// the fonts they render with (proportional, so not by character count).
 	for i, c := range p.cols {
-		w := float64(utf8.RuneCountInString(c.Name))*cw + colPadding
+		w := appkit.TextWidth(c.Name, appkit.FontHeader) + colPadding
 
 		for line := range sample {
 			if cell, _, err := p.grid.Cell(line, i); err == nil && cell.Kind == results.Value {
-				w = max(w, float64(utf8.RuneCountInString(results.FormatCell(c.Type, cell.V)))*cw+colPadding)
+				w = max(w, appkit.TextWidth(results.FormatCell(c.Type, cell.V), appkit.FontRegular)+colPadding)
 			}
 		}
 
@@ -600,6 +599,8 @@ func (p *ResultsPane) menu(row int, column string) []appkit.MenuItem {
 	}
 
 	items := []appkit.MenuItem{
+		{Title: "Auto-fit Column Widths", Run: p.AutoFit},
+		{},
 		{Title: "Copy", Run: func() { appkit.CopyToPasteboard(p.copyLines(lines)) }},
 		{Title: "Copy Rows as JSON", Run: func() { appkit.CopyToPasteboard(p.copyJSON(lines)) }},
 	}
@@ -645,6 +646,14 @@ func (p *ResultsPane) requestMore() {
 		p.asking = false
 		run.FetchMore(app.DefaultFetchWindow)
 	})
+}
+
+// AutoFit re-sizes the columns to the header and the visible/sampled rows.
+func (p *ResultsPane) AutoFit() {
+	if p.grid != nil {
+		p.Table.SetColumns(p.columns())
+		p.Table.Reload()
+	}
 }
 
 // rowsText describes the loaded rows (and whether more can be fetched).

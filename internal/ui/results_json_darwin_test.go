@@ -200,14 +200,15 @@ func TestResultsAndJSONPaneNestedRendering(t *testing.T) {
 			t.Fatalf("ResultsPane nested visual lines = %d, want 3", resPane.Table.Rows())
 		}
 
-		// Verify UTF-8 header width uses rune count (15 runes, not 23 UTF-8 bytes).
+		// The UTF-8 header is measured as rendered text (not bytes), so its
+		// column is at least the header's measured width plus padding.
 		c1ColIdx := objc.Send[int64](resPane.Table.View, "columnWithIdentifier:", objc.String("c1"))
 		c1Col := objc.Msg(objc.Msg(resPane.Table.View, "tableColumns"), "objectAtIndex:", uint64(c1ColIdx))
 		gotC1Width := objc.Send[float64](c1Col, "width")
-		wantC1Width := float64(len([]rune("descrição 日本語")))*charWidth + colPadding
+		minC1Width := max(appkit.TextWidth("descrição 日本語", appkit.FontHeader)+colPadding, colMinWidth)
 
-		if gotC1Width != wantC1Width {
-			t.Errorf("UTF-8 header column width = %v, want %v", gotC1Width, wantC1Width)
+		if gotC1Width < minC1Width || gotC1Width > colMaxWidth {
+			t.Errorf("UTF-8 header column width = %v, want in [%v, %v]", gotC1Width, minC1Width, colMaxWidth)
 		}
 
 		// Force cell instantiation on nested columns and embedded-newline column.
@@ -597,7 +598,10 @@ func TestJSONPaneLargeNestedRowAndFontResize(t *testing.T) {
 			t.Errorf("font 20 json column width = %v, want >= %v", colW20, needW20)
 		}
 
-		wantC1W20 := float64(utf8.RuneCountInString("descrição 日本語"))*(charWidth*20.0/defaultGridFontSize) + colPadding
+		// Columns are measured in the current grid font: the c1 cell text at
+		// 20pt sets the floor (capped like the pane caps wide columns).
+		cellW20 := appkit.TextWidth(results.FormatCell("STRING", "descrição"), appkit.FontRegular) + colPadding
+		wantC1W20 := min(cellW20, colMaxWidth*20.0/defaultGridFontSize)
 		if gotC1W20 := objc.Send[float64](c1Col, "width"); gotC1W20 < wantC1W20 {
 			t.Errorf("font 20 ResultsPane c1 width = %v, want >= %v", gotC1W20, wantC1W20)
 		}
