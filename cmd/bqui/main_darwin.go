@@ -116,6 +116,7 @@ func main() {
 			},
 			DidFinishLaunching: func() {
 				shell.ResolveBillingProject()
+				ui.WatchStalls(slog.Default())
 
 				if *smokeDir == "" {
 					return
@@ -320,23 +321,13 @@ func themesDir(smokeDir string) string {
 	return dir
 }
 
-const shellPathTimeout = 3 * time.Second
+const shellPathTimeout = 10 * time.Second
 
 // fixGUIPath gives a Finder-launched app the user's PATH (so the gcloud
-// credential fallback and bqls can find gcloud).
+// credential fallback and bqls can find gcloud). The usual gcloud
+// locations apply at once; the login shell's PATH, which can take seconds
+// with a heavy shell setup, is added in the background.
 func fixGUIPath() {
-	shellPath := ""
-
-	if sh := os.Getenv("SHELL"); sh != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), shellPathTimeout)
-		defer cancel()
-
-		//nolint:gosec // G204: the user's own login shell, fixed arguments.
-		if out, err := exec.CommandContext(ctx, sh, "-l", "-c", `printf %s "$PATH"`).Output(); err == nil {
-			shellPath = strings.TrimSpace(string(out))
-		}
-	}
-
 	home, _ := os.UserHomeDir()
 	exists := func(d string) bool {
 		info, err := os.Stat(d)
@@ -344,7 +335,26 @@ func fixGUIPath() {
 		return err == nil && info.IsDir()
 	}
 
-	_ = os.Setenv("PATH", app.GUIPath(os.Getenv("PATH"), shellPath, home, exists))
+	inherited := os.Getenv("PATH")
+	_ = os.Setenv("PATH", app.GUIPath(inherited, "", home, exists))
+
+	sh := os.Getenv("SHELL")
+	if sh == "" {
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), shellPathTimeout)
+		defer cancel()
+
+		//nolint:gosec // G204: the user's own login shell, fixed arguments.
+		out, err := exec.CommandContext(ctx, sh, "-l", "-c", `printf %s "$PATH"`).Output()
+		if err != nil {
+			return
+		}
+
+		_ = os.Setenv("PATH", app.GUIPath(inherited, strings.TrimSpace(string(out)), home, exists))
+	}()
 }
 
 // openLibrary opens the workbook library; the default library adopts the

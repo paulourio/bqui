@@ -54,8 +54,15 @@ type Bridge struct {
 
 	toServer   *io.PipeWriter
 	fromServer *io.PipeReader
-	writeMu    sync.Mutex
 	serveDone  chan error
+
+	// Frames for bqls are queued and written by one goroutine: pipe writes
+	// block until bqls reads, and callers include the main thread (every
+	// keystroke), which must never wait on the language server.
+	sendMu   sync.Mutex
+	sendQ    [][]byte
+	sendWake chan struct{}
+	sendDone chan struct{}
 
 	nextID  atomic.Int64
 	pendMu  sync.Mutex
@@ -114,7 +121,11 @@ func New(opts Options) (*Bridge, error) {
 		toServer: cw, fromServer: cr,
 		serveDone: make(chan error, 1),
 		pending:   make(map[string]chan rpcMessage),
+		sendWake:  make(chan struct{}, 1),
+		sendDone:  make(chan struct{}),
 	}
+
+	go b.writeLoop()
 
 	go func() {
 		err := srv.Serve(context.Background(), sr, sw)
@@ -133,6 +144,8 @@ func (b *Bridge) Close() error {
 		return nil
 	}
 
+	b.wake()
+	<-b.sendDone
 	_ = b.toServer.Close()
 	err := <-b.serveDone
 	_ = b.fromServer.Close()
@@ -273,21 +286,60 @@ func (b *Bridge) Call(ctx context.Context, method string, params, out any) error
 	}
 }
 
+// writeServer queues one framed message for bqls and returns at once;
+// frames are written in order by writeLoop.
 func (b *Bridge) writeServer(body []byte) error {
-	b.writeMu.Lock()
-	defer b.writeMu.Unlock()
-
 	if b.closed.Load() {
 		return ErrClosed
 	}
 
-	if _, err := fmt.Fprintf(b.toServer, "Content-Length: %d\r\n\r\n", len(body)); err != nil {
-		return err
+	frame := make([]byte, 0, len(body)+32)
+	frame = fmt.Appendf(frame, "Content-Length: %d\r\n\r\n", len(body))
+	frame = append(frame, body...)
+
+	b.sendMu.Lock()
+	b.sendQ = append(b.sendQ, frame)
+	b.sendMu.Unlock()
+	b.wake()
+
+	return nil
+}
+
+func (b *Bridge) wake() {
+	select {
+	case b.sendWake <- struct{}{}:
+	default:
 	}
+}
 
-	_, err := b.toServer.Write(body)
+// writeLoop writes queued frames to bqls until the bridge closes.
+func (b *Bridge) writeLoop() {
+	defer close(b.sendDone)
 
-	return err
+	for range b.sendWake {
+		for {
+			b.sendMu.Lock()
+			q := b.sendQ
+			b.sendQ = nil
+			b.sendMu.Unlock()
+
+			if len(q) == 0 {
+				break
+			}
+
+			for _, frame := range q {
+				if _, err := b.toServer.Write(frame); err != nil {
+					b.log.Warn("editor: write to bqls", slog.Any("error", err))
+
+					return
+				}
+			}
+		}
+
+		if b.closed.Load() {
+			return
+		}
+	}
 }
 
 // readServer routes every frame bqls writes.

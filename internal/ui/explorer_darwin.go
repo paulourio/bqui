@@ -142,6 +142,13 @@ func (p *ExplorerPane) onSelect(id uint64) {
 	}
 
 	p.s.Inspector.Show(info)
+
+	// Clicking a project or dataset name expands it (not only the arrow).
+	// Selection callbacks are already deferred, so expanding is safe here.
+	if (info.Kind == app.KindProject || info.Kind == app.KindDataset || info.Kind == app.KindShardGroup) && !p.Outline.IsExpanded(id) {
+		p.Model.Expand(id)
+		p.Outline.Expand(id, false)
+	}
 }
 
 func (p *ExplorerPane) onDoubleClick(id uint64) {

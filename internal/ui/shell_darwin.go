@@ -602,7 +602,9 @@ func (s *Shell) RunSQL(sql string) {
 		return
 	}
 
-	req := bq.QueryRequest{SQL: sql, Project: s.settings.BillingProject, MaxInlineRows: firstPageRows}
+	// Always create a job (like the console): without one BigQuery returns
+	// no query plan, and the run has no job ID for history.
+	req := bq.QueryRequest{SQL: sql, Project: s.settings.BillingProject, MaxInlineRows: firstPageRows, RequireJob: true}
 	app.ApplyPreferences(s.settings.Prefs, &req)
 	s.Workspace.Prepare(&req)
 
