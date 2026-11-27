@@ -592,6 +592,59 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ---
 
+## Next milestones (planned 2026-11-27)
+
+### M14 — Go to definition from the editor
+
+- **Trigger:** right-click a table reference in the editor and choose **Go to Definition** (Monaco's action, also F12 / ⌘-click).
+  - bqls already resolves `textDocument/definition` for tables. bqui intercepts results that point at BigQuery objects instead of opening a document.
+- **Result:**
+  1. The inspector shows that object's **Schema** tab.
+  2. The explorer reveals it: it expands the project and dataset (loading lazily), selects the node and scrolls to it.
+  3. A project that isn't pinned is pinned temporarily, or the user is told how to pin it.
+- **Same treatment:** views, routines (Details tab) and models.
+- **Tests:**
+  - Bridge test: a definition result maps to a `TableRef`.
+  - Smoke: go to definition on `bigquery-public-data.samples.shakespeare` selects the node and shows the schema.
+
+### M15 — Sessions: a folder/file workspace (replaces the Saved sidebar)
+
+**Goal:** an IDE-like tree where each **session is a folder** and each **query is a `.sql` file** inside it.
+
+- **Model:**
+  - Sessions are folders under the queries directory (default `~/Documents/bqui/sessions/`). Folders and files on disk are the source of truth, so the tree is git-friendly and editable in Finder.
+  - On first launch bqui creates a default session named `session-YYYY-MM-DD`.
+  - A **New Session** button (sidebar toolbar, ⇧⌘N) creates another session with the same naming pattern, plus `-2`, `-3`… on collisions. Sessions can be renamed (this renames the folder) and deleted (to the Trash).
+  - Files: **New Query** (⌘N) creates `Untitled-1.sql`, `Untitled-2.sql`… in the selected session. Files can be renamed, moved between sessions by drag, duplicated and deleted (to the Trash).
+- **Display:**
+  - The tree shows names without `.sql`, and lists only `.sql` files.
+  - Renaming edits the bare name; bqui adds the extension and rejects `/`.
+- **Editor binding:**
+  - The file selected in the tree is the file shown in the editor. Selecting another file autosaves the current one first, replacing the M10 save prompts.
+  - The window subtitle shows `session / file`.
+  - Restore on launch: the last selected file, cursor and BigQuery session mode, reusing the M10 workspace tables, keyed by file path.
+- **BigQuery session mode:** stays a per-file toggle. Whether a whole sidebar session should share one BigQuery session is an open question.
+- **Migration:**
+  - The existing `queries/*.sql` move into a session named `imported`.
+  - BigQuery Studio saved queries (M11) become a read-only-ish top-level node, "BigQuery Studio", opened and saved as today.
+  - The local `link_id` header keeps working.
+- **Replaces:** the Saved tab. The sidebar switcher becomes Explorer | Sessions.
+- **Tests:** session/file naming and collisions, rename and move on disk, migration from `queries/`, and restoring the selection (Linux). Smoke: create a session, create a file, rename both, switch files with autosave.
+
+### M16 — Job browser
+
+- **Where:** a special top-level folder, **Job History**, in the Sessions tree, listing the user's own BigQuery jobs (`jobs.list`, `allUsers=false`, newest first).
+- **Rows:** one per job, named by **job ID**, with a state icon and the creation time as secondary text.
+- **Lazy listing:**
+  - It shows a recent window (for example the last 50, or the last 7 days) and loads the next page when scrolled to the end.
+  - It is never listed in full.
+  - A filter field searches the loaded jobs. The local run history (FTS) can back the search.
+- **Hover:** a tooltip with the first ~10 lines of the SQL, state, duration, bytes processed, statement type and project/location.
+- **Double-click:** opens the job's SQL in the editor as a **read-only job document**, a virtual file `Job History/<job id>`. Its job details and results are reachable from the bottom tabs, through the existing Job information and results reopening.
+  - Editing turns it into a normal file: **Save to Session…** copies the SQL into `Untitled-N.sql` in the chosen session.
+- **Overlap:** the History bottom tab (M6) stays for project-wide and filtered browsing. This folder is the quick, personal path.
+- **Tests:** tooltip text formatting and pagination (Linux, fake jobs). Smoke: hover text, then double-click opens the read-only job SQL.
+
 ## Follow-ups (open after M0–M13)
 
 These are pending items, collected from the milestone notes above.
