@@ -7,12 +7,19 @@ DIST      := dist
 # QEMU macOS VM (x86_64). Override on the command line as needed.
 VM_HOST   ?= mac@localhost
 VM_PORT   ?= 2222
-VM_DIR    ?= bqui-dev
+# Each linked git worktree deploys to its own VM folder (bqui-dev-<dir>);
+# the main checkout keeps bqui-dev.
+GIT_DIR_ABS := $(shell git rev-parse --absolute-git-dir 2>/dev/null)
+GIT_COMMON  := $(abspath $(shell git rev-parse --git-common-dir 2>/dev/null))
+VM_DIR    ?= bqui-dev$(if $(filter-out $(GIT_COMMON),$(GIT_DIR_ABS)),-$(notdir $(CURDIR)))
+# Host-side lock shared by all worktrees: smoke and screen runs take the
+# whole VM (timing limits, pkill, full-screen capture), so they run one at a time.
+VM_LOCK   := $(or $(GIT_COMMON),$(CURDIR))/bqui-vm.lock
 SSH       := ssh -p $(VM_PORT) -o BatchMode=yes $(VM_HOST)
 
 export CGO_ENABLED := 0
 
-.PHONY: all test vet lint update-assets build-linux vm-deploy vm-run vm-smoke vm-screen vm-test clean
+.PHONY: all test vet lint update-assets build-linux vm-deploy vm-run vm-smoke vm-smoke-locked vm-screen vm-screen-locked vm-test clean
 
 all: test build-darwin-arm64 build-darwin-amd64
 
@@ -60,6 +67,10 @@ vm-run: vm-deploy
 
 # Run the offscreen smoke test in the VM and fetch screenshots + report.
 vm-smoke: vm-deploy
+	@flock -n $(VM_LOCK) true || echo "waiting for another worktree's VM run ($(VM_LOCK))"
+	flock $(VM_LOCK) $(MAKE) --no-print-directory vm-smoke-locked
+
+vm-smoke-locked:
 	$(SSH) 'rm -rf $(VM_DIR)/smoke && : > $(VM_DIR)/smoke.log && open -W -n --stdout $$HOME/$(VM_DIR)/smoke.log --stderr $$HOME/$(VM_DIR)/smoke.log \
 		$(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/smoke; rc=$$?; cat $(VM_DIR)/smoke.log; \
 		n=$$(grep -c "WARNING: Application performed" $(VM_DIR)/smoke.log); \
@@ -83,6 +94,10 @@ vm-test:
 # permission for /usr/libexec/sshd-keygen-wrapper in the VM (one-time, GUI).
 # Runs the smoke flow (fixture data) and captures the state it leaves behind.
 vm-screen: vm-deploy
+	@flock -n $(VM_LOCK) true || echo "waiting for another worktree's VM run ($(VM_LOCK))"
+	flock $(VM_LOCK) $(MAKE) --no-print-directory vm-screen-locked
+
+vm-screen-locked:
 	$(SSH) 'pkill -x bqui; rm -f $(VM_DIR)/shot/report.json; \
 		: > $(VM_DIR)/shot.log; \
 		open -n --stdout $$HOME/$(VM_DIR)/shot.log --stderr $$HOME/$(VM_DIR)/shot.log \
