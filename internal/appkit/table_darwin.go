@@ -305,7 +305,7 @@ func (t *Table) SelectRows(from, to int) {
 // SeparatorGeometry reports, for the row view currently displaying row, the
 // separator's frame and whether it is visible (smoke checks).
 func (t *Table) SeparatorGeometry(row int) (rowView, separator Rect, visible bool) {
-	rv := objc.Msg(t.View, "rowViewAtRow:makeIfNecessary:", int64(row), false)
+	rv := objc.Msg(t.View, "rowViewAtRow:makeIfNecessary:", int64(row), true)
 	if rv == objc.Nil {
 		return Rect{}, Rect{}, false
 	}
