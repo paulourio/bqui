@@ -135,6 +135,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	pg := pagingFlow(s)
 	phase("sql errors")
 	se := sqlErrorsFlow(s, dir)
+	phase("active query")
+	ac := activeFlow(s, dir)
 	phase("checks")
 
 	queued := time.Now()
@@ -171,6 +173,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		layoutChecks(rep, ly)
 		menuChecks(rep, mn)
 		sqlErrorsChecks(rep, se)
+		activeChecks(rep, ac)
 		pagingChecks(rep, pg)
 
 		if err := run(s, dir, rep, done); err != nil {
