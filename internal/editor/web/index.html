@@ -30,7 +30,11 @@
   #boot-error { display: none; font: 13px -apple-system, sans-serif; padding: 16px; color: #c00; }
 </style>
 </head>
-<body>
+<!-- Monaco defines its theme colors as CSS variables on .monaco-editor,
+     .monaco-diff-editor and .monaco-component. Context menus render in a
+     shadow root attached outside the editor element, so without this class
+     they inherit no colors and draw with a transparent background. -->
+<body class="monaco-component">
 <div id="editor"></div>
 <div id="boot-error"></div>
 <script src="monaco/vs/loader.js"></script>
