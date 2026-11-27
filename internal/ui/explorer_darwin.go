@@ -179,7 +179,8 @@ func (p *ExplorerPane) onDoubleClick(id uint64) {
 func (p *ExplorerPane) menu(id uint64) []appkit.MenuItem {
 	info, ok := p.Model.Info(id)
 	if !ok {
-		return nil
+		// Empty space: add a project.
+		return []appkit.MenuItem{p.s.addProjectMenu()}
 	}
 
 	copyID := appkit.MenuItem{Title: "Copy ID", Run: func() { appkit.CopyToPasteboard(info.FullID()) }}
@@ -194,6 +195,7 @@ func (p *ExplorerPane) menu(id uint64) []appkit.MenuItem {
 			{},
 			{Title: "Use as Billing Project", Run: func() { p.s.SetBillingProject(info.Project) }},
 			{Title: "Unpin Project", Run: func() { p.s.UnpinProject(info.Project) }},
+			p.s.addProjectMenu(),
 			{},
 			copyID, console,
 		}
