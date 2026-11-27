@@ -55,7 +55,7 @@ type EditorOptions struct {
 	LSP         *bqconfig.LSPOptions
 	Inspectable bool
 	OnRun       func(RunRequest)            // main thread
-	OnCost      func(summary string)        // main thread
+	OnCost      func(cost app.DocCost)      // main thread
 	OnConsole   func(level, message string) // main thread
 	// OnChange receives the text and cursor after edits (debounced; main thread).
 	OnChange func(text string, line, character int)
@@ -115,13 +115,9 @@ func NewEditorPane(opts EditorOptions) (*EditorPane, error) {
 		Schedule: objc.Main,
 		OnApp:    p.onApp,
 		OnCost: func(params json.RawMessage) {
-			var c struct {
-				Summary string `json:"summary"`
-				Status  string `json:"status"`
-			}
-
+			var c app.DocCost
 			if json.Unmarshal(params, &c) == nil && opts.OnCost != nil {
-				objc.Main(func() { opts.OnCost(c.Summary) })
+				objc.Main(func() { opts.OnCost(c) })
 			}
 		},
 		Logger: opts.Logger,

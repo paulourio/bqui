@@ -87,13 +87,16 @@ type Options struct {
 
 // Shell is the main window and its panes.
 type Shell struct {
-	App          objc.ID
-	Window       objc.ID
-	Split        objc.ID // outer NSSplitViewController (sidebar | content | inspector)
-	Explorer     *ExplorerPane
-	Inspector    *InspectorPane
-	Editor       *EditorPane
-	Cost         objc.ID // toolbar cost estimate label
+	App       objc.ID
+	Window    objc.ID
+	Split     objc.ID // outer NSSplitViewController (sidebar | content | inspector)
+	Explorer  *ExplorerPane
+	Inspector *InspectorPane
+	Editor    *EditorPane
+	Cost      objc.ID // toolbar cost estimate label
+	// SQLErrors explains bqls' SQL errors under the editor (hidden when
+	// there are none).
+	SQLErrors    *appkit.Banner
 	Results      *ResultsPane
 	JSON         *JSONPane
 	Plan         *PlanPane
@@ -109,6 +112,7 @@ type Shell struct {
 	tabResizeObs objc.ID
 	tabViews     []objc.ID
 	runsCount    int
+	sqlErrorBar  objc.ID // holds SQLErrors with its margin
 	tabsCompact  bool
 	fittingTabs  bool
 	sideTabs     *appkit.Segmented
@@ -220,7 +224,7 @@ func NewShell(opts Options) (*Shell, error) {
 	}
 
 	content := appkit.SplitViewController(false, autosave("BQUIEditorResults"), []appkit.SplitItem{
-		{Controller: appkit.ViewController(s.Editor.Web.View), MinThickness: editorMin, HoldingWeight: editorHolding},
+		{Controller: appkit.ViewController(s.editorArea()), MinThickness: editorMin, HoldingWeight: editorHolding},
 		{Controller: appkit.ViewController(s.bottomPane()), MinThickness: resultsMin, HoldingWeight: resultsHolding},
 	})
 
@@ -895,15 +899,73 @@ func (s *Shell) Stop() {
 // Status returns the results-pane status text. Main thread only.
 func (s *Shell) Status() string { return s.Results.StatusText() }
 
-func (s *Shell) onCost(summary string) {
-	if summary == "" {
-		summary = "—"
+// editorArea stacks the editor over the SQL error bar.
+func (s *Shell) editorArea() objc.ID {
+	s.SQLErrors = appkit.NewBanner()
+	s.SQLErrors.Hide()
+
+	bar := appkit.NewView()
+	appkit.AddFilling(bar, s.SQLErrors.View, sqlErrorInset)
+	appkit.SetHidden(bar, true)
+	s.sqlErrorBar = bar
+
+	// The editor stretches; the bar takes its natural height.
+	appkit.SetHuggingPriority(s.Editor.Web.View, appkit.OrientVertical, appkit.PriorityDefaultLow)
+	appkit.SetCompressionResistance(s.Editor.Web.View, appkit.OrientVertical, appkit.PriorityDefaultLow)
+
+	stack := appkit.VStack(0, 0, s.Editor.Web.View, bar)
+	objc.Msg(stack, "setDistribution:", int64(0)) // NSStackViewDistributionFill
+
+	area := appkit.NewView()
+	appkit.AddFilling(area, stack, 0)
+
+	return area
+}
+
+const sqlErrorInset = 8.0
+
+// onCost shows bqls' estimate in the toolbar and its SQL errors in the
+// error bar. The estimate matches the editor's code lenses even when some
+// statement has an error; the error count is shown next to it in red.
+func (s *Shell) onCost(c app.DocCost) {
+	var runs []appkit.TextRun
+
+	if est := c.Estimate(); est != "" {
+		runs = append(runs, appkit.TextRun{Text: est, Color: "secondaryLabelColor"})
 	}
 
-	appkit.SetString(s.Cost, summary)
+	if badge := c.ErrorBadge(); badge != "" {
+		if len(runs) > 0 {
+			runs = append(runs, appkit.TextRun{Text: " · ", Color: "secondaryLabelColor"})
+		}
+
+		runs = append(runs, appkit.TextRun{Text: badge, Color: "systemRedColor"})
+	}
+
+	if len(runs) == 0 {
+		runs = []appkit.TextRun{{Text: "—", Color: "secondaryLabelColor"}}
+	}
+
+	appkit.SetColoredText(s.Cost, runs...)
 	objc.Msg(s.Cost, "sizeToFit")
 	objc.Msg(s.Cost, "invalidateIntrinsicContentSize")
+
+	tip := "Estimated bytes processed (bqls dry run)"
+	detail, more := c.ErrorDetail()
+
+	if c.Errored() {
+		tip = c.ErrorTitle() + "\n" + detail
+		s.SQLErrors.Show(c.ErrorTitle(), detail, more)
+	} else {
+		s.SQLErrors.Hide()
+	}
+
+	objc.Msg(s.Cost, "setToolTip:", objc.String(tip))
+	appkit.SetHidden(s.sqlErrorBar, !c.Errored())
 }
+
+// CostText returns the toolbar estimate text (smoke checks).
+func (s *Shell) CostText() string { return appkit.StringValue(s.Cost) }
 
 func (s *Shell) status(msg string) { s.Results.Notice(msg) }
 

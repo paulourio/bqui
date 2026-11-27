@@ -798,7 +798,7 @@ func TestShellTabsToolbarSplitThemeAndImmediateJSON(t *testing.T) {
 
 		// 2. Toolbar overflow at 1280px with long project and cost estimate.
 		s.SetBillingProject("very-long-billing-project-identifier-2026")
-		s.onCost("~14.2 GiB ($0.09) · cached 0 B")
+		s.onCost(app.DocCost{Statements: []app.CostStatement{{Label: "~14.2 GiB ($0.09) · cached 0 B"}}})
 		objc.Msg(objc.Msg(s.Window, "contentView"), "layoutSubtreeIfNeeded")
 
 		total, vis, overflowed := appkit.ToolbarOverflow(s.Window)

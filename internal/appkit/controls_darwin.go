@@ -358,3 +358,27 @@ func Trash(path string) error {
 
 	return nil
 }
+
+// TextRun is a piece of text in one color (a system color name such as
+// "secondaryLabelColor").
+type TextRun struct {
+	Text, Color string
+}
+
+// SetColoredText sets a label to runs of colored text in its own font.
+func SetColoredText(label objc.ID, runs ...TextRun) {
+	fontKey, colorKey := attributeKeys()
+	font := objc.Msg(label, "font")
+	out := objc.Msg(objc.Msg(objc.Cls("NSMutableAttributedString"), "alloc"), "init")
+
+	for _, r := range runs {
+		attrs := objc.Msg(objc.Cls("NSDictionary"), "dictionaryWithObjects:forKeys:",
+			objc.Array(font, SystemColor(r.Color)), objc.Array(fontKey, colorKey))
+		part := objc.Msg(objc.Msg(objc.Cls("NSAttributedString"), "alloc"), "initWithString:attributes:", objc.String(r.Text), attrs)
+		objc.Msg(out, "appendAttributedString:", part)
+		objc.Msg(part, "release")
+	}
+
+	objc.Msg(label, "setAttributedStringValue:", out)
+	objc.Msg(out, "release")
+}
