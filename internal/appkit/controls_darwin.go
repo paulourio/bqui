@@ -319,9 +319,10 @@ func RevealInFinder(path string) {
 	objc.Msg(ws, "activateFileViewerSelectingURLs:", objc.Array(fileURL(path)))
 }
 
-// SetWindowDocument shows a document title as the window subtitle and the
-// edited dot in the close button.
-func SetWindowDocument(window objc.ID, subtitle string, edited bool) {
+// SetWindowDocument sets the window title and subtitle and the edited dot
+// in the close button.
+func SetWindowDocument(window objc.ID, title, subtitle string, edited bool) {
+	objc.Msg(window, "setTitle:", objc.String(title))
 	objc.Msg(window, "setSubtitle:", objc.String(subtitle))
 	objc.Msg(window, "setDocumentEdited:", edited)
 }

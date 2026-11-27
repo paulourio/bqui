@@ -310,28 +310,40 @@ func (w *Workspace) Dirty() bool {
 	return strings.TrimRight(w.tab.SQL, "\n") != strings.TrimRight(w.fileText, "\n")
 }
 
-// Title is the window/tab title: file title plus an edited marker.
+// Title is the tab title: "workbook / query" plus an edited marker.
 func (w *Workspace) Title() string {
+	group, name := w.Heading()
+	if group == "" {
+		return name
+	}
+
+	return group + " / " + name
+}
+
+// Heading splits the title for the window: the workbook (or Job History)
+// is the title and the query name, with the edited marker, the subtitle.
+// group is "" for a file outside the library.
+func (w *Workspace) Heading() (group, name string) {
 	t := w.Tab()
 
-	title := t.Title
+	name = t.Title
 	if t.File == "" {
-		title = "Untitled"
+		name = "Untitled"
 	}
 
 	if q, ok := w.libraryQuery(t.File); ok {
-		title = q.Workbook + " / " + q.Name
+		group, name = q.Workbook, q.Name
 	}
 
 	if ref, ok := w.JobDoc(); ok {
-		title = JobHistoryTitle + " / " + ref.JobID
+		group, name = JobHistoryTitle, ref.JobID
 	}
 
 	if w.Dirty() && t.File != "" {
-		title += " — Edited"
+		name += " — Edited"
 	}
 
-	return title
+	return group, name
 }
 
 // New starts an empty, unlinked query (the session is kept).

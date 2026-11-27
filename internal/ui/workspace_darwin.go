@@ -86,7 +86,12 @@ func (s *Shell) updateTitle() {
 	s.syncReadOnly()
 
 	edited := s.Workspace.Dirty() && s.Workspace.Tab().File != ""
-	appkit.SetWindowDocument(s.Window, s.Workspace.Title(), edited)
+	group, name := s.Workspace.Heading()
+	if group == "" {
+		group = AppName
+	}
+
+	appkit.SetWindowDocument(s.Window, group, name, edited)
 }
 
 // keepChanges asks before replacing edited text; false cancels.
