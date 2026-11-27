@@ -49,4 +49,39 @@ func TestObjectRefAt(t *testing.T) {
 	if _, ok := ObjectRefAt("x", 5, 0, "p", "d"); ok {
 		t.Error("line out of range resolved")
 	}
+
+	// Domain-scoped project references (GAP-9).
+	domSQL := "SELECT a FROM `example.com:proj.d.t`\n" +
+		"JOIN example.com:proj.d2.t2 ON TRUE\n" +
+		"JOIN example.com:proj:d3.t3 ON TRUE\n" +
+		"JOIN bare_tbl ON TRUE\n" +
+		"JOIN `example.com:proj.d` ON TRUE\n" +
+		"JOIN `example.com:proj` ON TRUE"
+
+	domCases := []struct {
+		name            string
+		line, character int
+		want            string
+		start, end      int
+	}{
+		{"backticked domain-scoped", 0, 20, "example.com:proj.d.t", 14, 36},
+		{"unquoted domain-scoped", 1, 15, "example.com:proj.d2.t2", 5, 27},
+		{"legacy colon domain-scoped", 2, 15, "example.com:proj.d3.t3", 5, 27},
+		{"bare table with domain-scoped default dataset", 3, 7, "example.com:proj.def.bare_tbl", 5, 13},
+		{"incomplete 2-part domain-scoped is rejected", 4, 15, "", 0, 0},
+		{"project-only domain-scoped is rejected", 5, 15, "", 0, 0},
+	}
+
+	for _, c := range domCases {
+		got, ok := ObjectRefAt(domSQL, c.line, c.character, "defp", "example.com:proj.def")
+
+		name := ""
+		if ok {
+			name = got.Ref.Project + "." + got.Ref.Dataset + "." + got.Ref.Table
+		}
+
+		if name != c.want || ok && (got.Start != c.start || got.End != c.end) {
+			t.Errorf("%s: got %q [%d,%d), want %q [%d,%d)", c.name, name, got.Start, got.End, c.want, c.start, c.end)
+		}
+	}
 }

@@ -539,8 +539,8 @@ func ApplyPreferences(p store.Preferences, req *bq.QueryRequest) {
 	}
 
 	if req.DefaultDataset == nil && p.DefaultDataset != "" {
-		if project, dataset, ok := strings.Cut(p.DefaultDataset, "."); ok {
-			req.DefaultDataset = &bq.DatasetRef{Project: project, Dataset: dataset}
+		if ds, err := bq.ParseDatasetRef(p.DefaultDataset, ""); err == nil {
+			req.DefaultDataset = &ds
 		}
 	}
 }

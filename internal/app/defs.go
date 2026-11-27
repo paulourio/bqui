@@ -44,28 +44,34 @@ func ObjectRefAt(text string, line, character int, defProject, defDataset string
 	}
 
 	raw := string(src[start:end])
-	parts := splitName(raw)
-
-	if !quoted && len(parts) < 3 && !afterTableKeyword(lines, line, start) {
-		return ObjectAt{}, false
-	}
 
 	var ref bq.TableRef
 
-	switch len(parts) {
-	case 3:
-		ref = bq.TableRef{Project: parts[0], Dataset: parts[1], Table: parts[2]}
-	case 2:
-		ref = bq.TableRef{Project: defProject, Dataset: parts[0], Table: parts[1]}
-	case 1:
-		project, dataset, ok := strings.Cut(defDataset, ".")
-		if !ok || isCTE(text, parts[0]) {
+	if parsed, err := bq.ParseTableRef(raw, ""); err == nil {
+		ref = parsed
+	} else if strings.Contains(raw, ":") {
+		return ObjectAt{}, false
+	} else {
+		parts := splitName(raw)
+		if !quoted && len(parts) < 3 && !afterTableKeyword(lines, line, start) {
 			return ObjectAt{}, false
 		}
 
-		ref = bq.TableRef{Project: project, Dataset: dataset, Table: parts[0]}
-	default:
-		return ObjectAt{}, false
+		switch len(parts) {
+		case 3:
+			ref = bq.TableRef{Project: parts[0], Dataset: parts[1], Table: parts[2]}
+		case 2:
+			ref = bq.TableRef{Project: defProject, Dataset: parts[0], Table: parts[1]}
+		case 1:
+			ds, err := bq.ParseDatasetRef(defDataset, "")
+			if err != nil || isCTE(text, parts[0]) {
+				return ObjectAt{}, false
+			}
+
+			ref = bq.TableRef{Project: ds.Project, Dataset: ds.Dataset, Table: parts[0]}
+		default:
+			return ObjectAt{}, false
+		}
 	}
 
 	if ref.Project == "" || ref.Dataset == "" || ref.Table == "" {
@@ -75,10 +81,10 @@ func ObjectRefAt(text string, line, character int, defProject, defDataset string
 	return ObjectAt{Ref: ref, Line: line, Start: utf16Len(src[:start]), End: utf16Len(src[:end])}, true
 }
 
-// nameSpan finds the (possibly backticked, dotted) name around col.
+// nameSpan finds the (possibly backticked, dotted, domain-scoped) name around col.
 func nameSpan(src []rune, col int) (start, end int, quoted, ok bool) {
 	isName := func(r rune) bool {
-		return r == '_' || r == '-' || r == '.' || r == '`' || unicode.IsLetter(r) || unicode.IsDigit(r)
+		return r == '_' || r == '-' || r == '.' || r == ':' || r == '`' || unicode.IsLetter(r) || unicode.IsDigit(r)
 	}
 
 	if col > len(src) {
@@ -103,12 +109,12 @@ func nameSpan(src []rune, col int) (start, end int, quoted, ok bool) {
 		end++
 	}
 
-	// Trim stray dots (a trailing "." while typing, "x.").
-	for start < end && src[start] == '.' {
+	// Trim stray dots or colons (e.g. a trailing "." while typing, "x.").
+	for start < end && (src[start] == '.' || src[start] == ':') {
 		start++
 	}
 
-	for end > start && src[end-1] == '.' {
+	for end > start && (src[end-1] == '.' || src[end-1] == ':') {
 		end--
 	}
 

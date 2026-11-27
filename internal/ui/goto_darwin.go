@@ -4,10 +4,10 @@ package ui
 
 import (
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/paulourio/bqui/internal/app"
+	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/objc"
 )
 
@@ -26,12 +26,12 @@ func (s *Shell) objectAt(text string, line, character int) (app.ObjectAt, bool) 
 // project and dataset as needed, and shows its schema in the inspector.
 // Unpinned projects are added to the explorer for this launch.
 func (s *Shell) RevealObject(ref string) {
-	parts := strings.SplitN(ref, ".", 3)
-	if len(parts) != 3 {
+	parsed, err := bq.ParseTableRef(ref, "")
+	if err != nil {
 		return
 	}
 
-	project, dataset, name := parts[0], parts[1], parts[2]
+	project, dataset, name := parsed.Project, parsed.Dataset, parsed.Table
 	m := s.Explorer.Model
 
 	s.SelectSidebar(SidebarExplorer)
