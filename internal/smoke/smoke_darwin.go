@@ -133,6 +133,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	jb := jobTreeFlow(s, dir)
 	phase("layout")
 	ly := layoutFlow(s, dir)
+	phase("menu")
+	mn := menuFlow(s, dir)
 	phase("paging")
 	pg := pagingFlow(s)
 	phase("checks")
@@ -170,6 +172,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		definitionChecks(rep, gd)
 		jobTreeChecks(rep, jb)
 		layoutChecks(rep, ly)
+		menuChecks(rep, mn)
 		pagingChecks(rep, pg)
 
 		if err := run(s, dir, rep, done); err != nil {

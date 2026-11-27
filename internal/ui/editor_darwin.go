@@ -74,6 +74,7 @@ type EditorPane struct {
 	ready     chan struct{}
 	readyOnce sync.Once
 	selfTest  chan json.RawMessage
+	menuProbe chan json.RawMessage
 
 	mu            sync.Mutex
 	uri           string
@@ -87,7 +88,7 @@ type EditorPane struct {
 
 // NewEditorPane creates the WebView and starts the in-process bqls bridge.
 func NewEditorPane(opts EditorOptions) (*EditorPane, error) {
-	p := &EditorPane{opts: opts, ready: make(chan struct{}), selfTest: make(chan json.RawMessage, 1)}
+	p := &EditorPane{opts: opts, ready: make(chan struct{}), selfTest: make(chan json.RawMessage, 1), menuProbe: make(chan json.RawMessage, 1)}
 
 	web, err := webkit.New(webkit.Options{
 		Scheme:      editorScheme,
@@ -253,6 +254,22 @@ func (p *EditorPane) RunSelfTest(sql string, line, column int, timeout time.Dura
 	}
 }
 
+// ProbeContextMenu opens the editor's context menu and returns how it is
+// styled (smoke checks). The menu stays open until CloseContextMenu.
+func (p *EditorPane) ProbeContextMenu(timeout time.Duration) (json.RawMessage, error) {
+	objc.Main(func() { p.Web.Eval("window.bqui.menuProbe()") })
+
+	select {
+	case r := <-p.menuProbe:
+		return r, nil
+	case <-time.After(timeout):
+		return nil, errors.New("editor context menu probe timed out")
+	}
+}
+
+// CloseContextMenu dismisses the editor's context menu.
+func (p *EditorPane) CloseContextMenu() { p.Web.Eval("window.bqui.closeMenu()") }
+
 // Diagnostics returns console errors and the boot error seen so far.
 func (p *EditorPane) Diagnostics() (consoleErrors []string, bootError string) {
 	p.mu.Lock()
@@ -324,6 +341,11 @@ func (p *EditorPane) onApp(method string, params json.RawMessage) {
 			p.mu.Lock()
 			p.appliedTheme = t.Theme
 			p.mu.Unlock()
+		}
+	case "menuProbe":
+		select {
+		case p.menuProbe <- params:
+		default:
 		}
 	case "selftest":
 		select {

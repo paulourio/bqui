@@ -197,6 +197,49 @@
     },
     // selfTest is used by the smoke harness: it exercises completion, markers
     // and semantic tokens end to end and reports what Monaco actually shows.
+    // menuProbe opens the editor context menu and reports how its menu
+    // element is styled (smoke checks); closeMenu dismisses it.
+    menuProbe: function () {
+      var ed = state.editor;
+      ed.focus();
+      ed.trigger('bqui', 'editor.action.showContextMenu', {});
+      setTimeout(function () {
+        var menu = document.querySelector('.monaco-menu');
+        var shadow = false;
+        if (!menu) {
+          document.querySelectorAll('*').forEach(function (n) {
+            if (!menu && n.shadowRoot) {
+              menu = n.shadowRoot.querySelector('.monaco-menu');
+              shadow = !!menu;
+            }
+          });
+        }
+        var info = { found: !!menu, shadow: shadow };
+        if (menu) {
+          var cs = getComputedStyle(menu);
+          var host = menu.getRootNode().host;
+          // The painted background is on the menu or one of its containers.
+          info.background = '';
+          for (var el = menu; el && !info.background; el = el.parentElement) {
+            var bg = getComputedStyle(el).backgroundColor;
+            if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') info.background = bg;
+          }
+          info.color = cs.color;
+          info.menuVar = cs.getPropertyValue('--vscode-menu-background').trim();
+          info.hostClass = host ? String(host.className) : '';
+          info.inEditor = !!(host || menu).closest && !!(host || menu).closest('.monaco-editor');
+          info.items = menu.querySelectorAll('.action-item').length;
+        }
+        app('menuProbe', info);
+      }, 400);
+    },
+    closeMenu: function () {
+      // A press outside the menu dismisses Monaco's context view.
+      ['mousedown', 'mouseup'].forEach(function (type) {
+        document.body.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+      });
+      state.editor.focus();
+    },
     selfTest: function (sql, line, column) {
       var ed = state.editor;
       var model = ed.getModel();
