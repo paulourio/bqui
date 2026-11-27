@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -107,7 +108,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	phase("explorer")
 	ex := exploreFlow(s)
 	phase("results")
-	rs := resultsFlow(s)
+	rs := resultsFlow(s, dir)
 	phase("jobs")
 	js := jobsFlow(s)
 	phase("value")
@@ -407,17 +408,20 @@ func runAtCursor(s *ui.Shell) string {
 
 // resultsResult captures what the results flow observed.
 type resultsResult struct {
-	ErrorStatus, CancelStatus, PreviewStatus, DoneStatus string
-	PreviewRows                                          int64
-	Rows, Lines                                          int64
-	TableRows                                            int
-	Gutter                                               []string
-	NestedLines                                          int
-	NullText                                             appkit.CellText
-	Separators                                           int
-	JSONRow                                              string
-	SepInside                                            bool
-	SepDetail                                            string
+	ErrorStatus, CancelStatus, PreviewStatus, DoneStatus       string
+	BannerTitle, BannerDetail, AuthTitle, AuthHint, BannerShot string
+	BannerHiddenAfter                                          bool
+	ProjectChoices                                             []string
+	PreviewRows                                                int64
+	Rows, Lines                                                int64
+	TableRows                                                  int
+	Gutter                                                     []string
+	NestedLines                                                int
+	NullText                                                   appkit.CellText
+	Separators                                                 int
+	JSONRow                                                    string
+	SepInside                                                  bool
+	SepDetail                                                  string
 }
 
 // waitRun runs start on the main thread and waits for the resulting run.
@@ -447,11 +451,28 @@ func waitRun(s *ui.Shell, start func()) *app.Run {
 
 // resultsFlow runs queries through the shell and inspects the grid exactly
 // as the table renders it.
-func resultsFlow(s *ui.Shell) resultsResult {
+func resultsFlow(s *ui.Shell, dir string) resultsResult {
 	var r resultsResult
 
+	onMain(func() { r.ProjectChoices = s.ProjectChoices() })
+
 	waitRun(s, func() { s.RunSQL("SELEC broken") })
-	onMain(func() { r.ErrorStatus = s.Status() })
+	onMain(func() {
+		r.ErrorStatus = s.Status()
+		r.BannerTitle, r.BannerDetail, _ = s.Results.Banner.Text()
+	})
+
+	// A long credentials error is explained and wraps inside the banner.
+	onMain(func() { s.Results.Notice("✕ " + smokeAuthError) })
+	time.Sleep(settleDelay)
+	onMain(func() {
+		r.AuthTitle, _, r.AuthHint = s.Results.Banner.Text()
+		r.BannerShot = "error-banner.png"
+
+		if err := appkit.WriteWindowPNG(s.Window, filepath.Join(dir, r.BannerShot)); err != nil {
+			r.BannerShot = "✕ " + err.Error()
+		}
+	})
 
 	onMain(func() { s.RunSQL("SELECT order_id FROM orders LIMIT 10") })
 	time.Sleep(100 * time.Millisecond)
@@ -482,6 +503,7 @@ func resultsFlow(s *ui.Shell) resultsResult {
 // inspectGrid reads the finished grid back through the table (main thread).
 func inspectGrid(s *ui.Shell, run *app.Run, r *resultsResult) {
 	r.DoneStatus = s.Status()
+	r.BannerHiddenAfter = !s.Results.Banner.Visible()
 	g := run.Snapshot().Grid
 
 	if g == nil {
@@ -1068,7 +1090,13 @@ func jobsChecks(rep *Report, r jobsResult) {
 }
 
 func resultsChecks(rep *Report, r resultsResult) {
-	rep.check("results-error", strings.HasPrefix(r.ErrorStatus, "✕") && strings.Contains(r.ErrorStatus, "Syntax error"), "status %q", r.ErrorStatus)
+	rep.check("results-error", strings.HasPrefix(r.ErrorStatus, "Failed after") && r.BannerTitle == "Query failed" && strings.Contains(r.BannerDetail, "Syntax error"),
+		"status %q, banner %q / %q", r.ErrorStatus, r.BannerTitle, r.BannerDetail)
+	rep.check("project-choices", slices.Contains(r.ProjectChoices, app.FakeProject) && !slices.Contains(r.ProjectChoices, "bigquery-public-data"),
+		"billing choices %q", r.ProjectChoices)
+	rep.check("results-error-banner", r.AuthTitle == "Not signed in to Google Cloud" && strings.Contains(r.AuthHint, "gcloud auth application-default login") &&
+		!strings.HasPrefix(r.BannerShot, "✕") && r.BannerHiddenAfter,
+		"auth banner %q, hint %q, %s, hidden after next run %v", r.AuthTitle, r.AuthHint, r.BannerShot, r.BannerHiddenAfter)
 	rep.check("results-cancel", strings.HasPrefix(r.CancelStatus, "Cancelled"), "status %q", r.CancelStatus)
 	rep.check("results-preview", r.PreviewRows == 1000 && strings.Contains(r.PreviewStatus, "Preview of"), "%d rows; status %q", r.PreviewRows, r.PreviewStatus)
 	rep.check("results-done", strings.Contains(r.DoneStatus, "✓ 5,000 rows"), "status %q", r.DoneStatus)
@@ -1224,3 +1252,8 @@ func writeJSON(path string, v any) error {
 
 	return nil
 }
+
+// smokeAuthError is the real error bqui got in a VM without credentials.
+const smokeAuthError = `bq: list projects: Get "https://bigquery.googleapis.com/bigquery/v2/projects?alt=json&maxResults=1000&prettyPrint=false": ` +
+	`bq: token: adc (find default credentials: google: could not find default credentials. See https://cloud.google.com/docs/authentication/external/set-up-adc for more information) ` +
+	`and gcloud print-access-token failed: gcloud (gcloud) auth application-default print-access-token: exec: "gcloud": executable file not found in $PATH`

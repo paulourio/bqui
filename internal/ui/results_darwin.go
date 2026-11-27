@@ -3,6 +3,7 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -39,6 +40,9 @@ type ResultsPane struct {
 	Inspect func(fields []results.Field, row []any, index int64, path string)
 	// ExportMenu builds the Export submenu for the context menu.
 	ExportMenu func() appkit.MenuItem
+	// Banner explains failures (red box under the status line).
+	Banner    *appkit.Banner
+	bannerRun *app.Run // run whose failure the banner showed
 	// NullColor and NumberColor come from the theme (nil = system colors).
 	NullColor, NumberColor objc.ID
 
@@ -62,19 +66,26 @@ func newResultsPane() *ResultsPane {
 	objc.Msg(p.status, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", statusFontSize))
 	p.empty = appkit.SecondaryLabel("Run a query with ⌘↩ to see results here.")
 
+	p.Banner = appkit.NewBanner()
+
+	// Status line, error banner (hidden unless something failed), grid.
+	// The stack drops hidden views from the layout.
+	top := appkit.VStack(6, statusInset, p.status, p.Banner.View)
 	p.View = appkit.NewView()
-	appkit.UseAutoLayout(p.status)
-	appkit.UseAutoLayout(p.Table.Scroll)
-	objc.Msg(p.View, "addSubview:", p.status)
-	objc.Msg(p.View, "addSubview:", p.Table.Scroll)
+
+	for _, v := range []objc.ID{top, p.Table.Scroll} {
+		appkit.UseAutoLayout(v)
+		objc.Msg(p.View, "addSubview:", v)
+	}
+
 	appkit.AddCentered(p.View, p.empty)
 
 	lead, trail := appkit.Anchor(p.View, "leadingAnchor"), appkit.Anchor(p.View, "trailingAnchor")
 	appkit.Activate(
-		appkit.Equal(appkit.Anchor(p.status, "topAnchor"), appkit.Anchor(p.View, "topAnchor"), 6),
-		appkit.Equal(appkit.Anchor(p.status, "leadingAnchor"), lead, statusInset),
-		appkit.Equal(appkit.Anchor(p.status, "trailingAnchor"), trail, -statusInset),
-		appkit.Equal(appkit.Anchor(p.Table.Scroll, "topAnchor"), appkit.Anchor(p.status, "bottomAnchor"), 6),
+		appkit.Equal(appkit.Anchor(top, "topAnchor"), appkit.Anchor(p.View, "topAnchor"), 6),
+		appkit.Equal(appkit.Anchor(top, "leadingAnchor"), lead, 0),
+		appkit.Equal(appkit.Anchor(top, "trailingAnchor"), trail, 0),
+		appkit.Equal(appkit.Anchor(p.Table.Scroll, "topAnchor"), appkit.Anchor(top, "bottomAnchor"), 6),
 		appkit.Equal(appkit.Anchor(p.Table.Scroll, "leadingAnchor"), lead, 0),
 		appkit.Equal(appkit.Anchor(p.Table.Scroll, "trailingAnchor"), trail, 0),
 		appkit.Equal(appkit.Anchor(p.Table.Scroll, "bottomAnchor"), appkit.Anchor(p.View, "bottomAnchor"), 0),
@@ -97,13 +108,33 @@ func (p *ResultsPane) Show(r *app.Run) {
 	p.Table.Reload()
 	appkit.SetHidden(p.Table.Scroll, true)
 	appkit.SetHidden(p.empty, true)
+	p.Banner.Hide()
 	p.Update(r)
 }
 
-// Notice shows a message in the status line without a run.
+// Notice shows a message in the status line without a run. Messages
+// starting with "✕ " are errors: they also open the error banner.
 func (p *ResultsPane) Notice(msg string) {
+	if detail, isErr := strings.CutPrefix(msg, "✕ "); isErr {
+		p.ShowProblem(app.Explain(errors.New(detail)))
+
+		return
+	}
+
+	p.Banner.Hide()
+	appkit.SetHidden(p.status, false)
 	appkit.SetString(p.status, msg)
 	objc.Msg(p.status, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
+}
+
+// ShowProblem shows an explained error: a short red status line and the
+// banner with details and what to do.
+func (p *ResultsPane) ShowProblem(pr app.Problem) {
+	// The banner says it all; the status line keeps the text for checks.
+	appkit.SetString(p.status, "✕ "+pr.Title)
+	appkit.SetHidden(p.status, true)
+	appkit.SetHidden(p.empty, true)
+	p.Banner.Show(pr.Title, pr.Detail, pr.Hint)
 }
 
 // Current returns the run being shown (nil before the first run).
@@ -190,12 +221,19 @@ func (p *ResultsPane) setStatus() {
 	case app.RunDone:
 		text = p.doneText()
 	case app.RunFailed:
-		color = "systemRedColor"
-		text = "✕ " + strings.TrimPrefix(fmt.Sprint(s.Err), "bq: query failed: ")
+		// Once per run: later updates must not cover a newer notice.
+		if p.bannerRun != p.run {
+			p.bannerRun = p.run
+			pr := app.Explain(s.Err)
+			p.Banner.Show(pr.Title, pr.Detail, pr.Hint)
+		}
+
+		text = "Failed after " + seconds(s.Elapsed)
 	case app.RunCancelled:
 		text = "Cancelled after " + seconds(s.Elapsed)
 	}
 
+	appkit.SetHidden(p.status, false)
 	appkit.SetString(p.status, text)
 	objc.Msg(p.status, "setTextColor:", objc.Msg(objc.Cls("NSColor"), color))
 }

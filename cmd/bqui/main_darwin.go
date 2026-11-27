@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,6 +66,10 @@ func main() {
 		}
 
 		slog.Default().Info("bqui", "version", version, "fake", *fake)
+	}
+
+	if !*fake {
+		fixGUIPath()
 	}
 
 	settings, settingsPath := loadSettings(*fake, *smokeDir != "")
@@ -296,4 +302,31 @@ func themesDir(smokeDir string) string {
 	}
 
 	return dir
+}
+
+const shellPathTimeout = 3 * time.Second
+
+// fixGUIPath gives a Finder-launched app the user's PATH (so the gcloud
+// credential fallback and bqls can find gcloud).
+func fixGUIPath() {
+	shellPath := ""
+
+	if sh := os.Getenv("SHELL"); sh != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), shellPathTimeout)
+		defer cancel()
+
+		//nolint:gosec // G204: the user's own login shell, fixed arguments.
+		if out, err := exec.CommandContext(ctx, sh, "-l", "-c", `printf %s "$PATH"`).Output(); err == nil {
+			shellPath = strings.TrimSpace(string(out))
+		}
+	}
+
+	home, _ := os.UserHomeDir()
+	exists := func(d string) bool {
+		info, err := os.Stat(d)
+
+		return err == nil && info.IsDir()
+	}
+
+	_ = os.Setenv("PATH", app.GUIPath(os.Getenv("PATH"), shellPath, home, exists))
 }

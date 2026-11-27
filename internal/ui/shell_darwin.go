@@ -118,12 +118,20 @@ type Shell struct {
 	billing  atomic.Pointer[string] // readable from any goroutine
 	projects objc.ID                // toolbar project picker (NSPopUpButton)
 	all      []string
+
+	projectsLoading bool
+	projectsErr     error
 }
 
 // NewShell builds the application menu, main window, toolbar and panes.
 func NewShell(opts Options) (*Shell, error) {
 	if opts.Settings == nil {
 		opts.Settings = &store.Settings{PinnedProjects: []string{store.DefaultPinned}}
+	}
+
+	// The public datasets project is browsable but cannot bill jobs.
+	if opts.Settings.BillingProject == store.DefaultPinned {
+		opts.Settings.BillingProject = ""
 	}
 
 	s := &Shell{App: appkit.SharedApplication(), opts: opts, settings: opts.Settings, Workspace: opts.Workspace}
@@ -229,8 +237,7 @@ func NewShell(opts Options) (*Shell, error) {
 	}
 
 	s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
-	s.rebuildProjectPicker()
-	s.loadProjects()
+	s.LoadProjects()
 
 	objc.Msg(s.Window, "makeKeyAndOrderFront:", objc.Nil)
 	objc.Msg(s.Window, "makeFirstResponder:", s.Editor.Web.View)
@@ -299,18 +306,25 @@ func (s *Shell) saveSettings() {
 	}
 }
 
-// loadProjects lists all accessible projects in the background for the picker.
-func (s *Shell) loadProjects() {
+// Project picker item tags (0 = a project).
+const (
+	pickEnterID = 1
+	pickRefresh = 2
+	pickNone    = 3
+)
+
+// LoadProjects lists the user's projects in the background for the picker.
+// Failures are explained in the results pane and offered for retry; a
+// project ID can always be typed in.
+func (s *Shell) LoadProjects() {
+	s.projectsLoading, s.projectsErr = true, nil
+	s.rebuildProjectPicker()
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), projectsTimeout)
 		defer cancel()
 
 		ps, err := s.opts.Backend.ListProjects(ctx)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "bqui: list projects:", err)
-
-			return
-		}
 
 		ids := make([]string, 0, len(ps))
 		for _, p := range ps {
@@ -320,14 +334,40 @@ func (s *Shell) loadProjects() {
 		slices.Sort(ids)
 
 		objc.Main(func() {
-			s.all = ids
+			s.projectsLoading = false
+
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "bqui: list projects:", err)
+				s.projectsErr = err
+				s.Results.ShowProblem(app.Explain(err))
+			} else {
+				s.all = ids
+			}
+
 			s.rebuildProjectPicker()
 		})
 	}()
 }
 
-// rebuildProjectPicker lists pinned projects first, then every other
-// accessible project; the selection is the billing project.
+// ProjectChoices are the billing projects offered: listed projects plus
+// pinned ones the user chose, never the public datasets project.
+func (s *Shell) ProjectChoices() []string {
+	out := slices.Clone(s.all)
+
+	for _, p := range s.settings.PinnedProjects {
+		if !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+
+	out = slices.DeleteFunc(out, func(p string) bool { return p == store.DefaultPinned })
+	slices.Sort(out)
+
+	return out
+}
+
+// rebuildProjectPicker lists the user's projects; the selection is the
+// billing project.
 func (s *Shell) rebuildProjectPicker() {
 	if s.projects == objc.Nil {
 		return
@@ -336,41 +376,67 @@ func (s *Shell) rebuildProjectPicker() {
 	objc.Msg(s.projects, "removeAllItems")
 	menu := objc.Msg(s.projects, "menu")
 
-	add := func(title string, enabled bool) {
+	add := func(title string, enabled bool, tag int64, tip string) {
 		item := objc.Msg(menu, "addItemWithTitle:action:keyEquivalent:", objc.String(title), objc.SEL(0), objc.String(""))
 		objc.Msg(item, "setEnabled:", enabled)
-	}
+		objc.Msg(item, "setTag:", tag)
 
-	if s.settings.BillingProject == "" {
-		add("Choose billing project…", true)
-	}
-
-	for _, p := range s.settings.PinnedProjects {
-		add(p, true)
-	}
-
-	others := slices.DeleteFunc(slices.Clone(s.all), func(p string) bool { return slices.Contains(s.settings.PinnedProjects, p) })
-	if len(others) > 0 {
-		objc.Msg(menu, "addItem:", objc.Msg(objc.Cls("NSMenuItem"), "separatorItem"))
-		add("Other projects", false)
-
-		for _, p := range others {
-			add(p, true)
+		if tip != "" {
+			objc.Msg(item, "setToolTip:", objc.String(tip))
 		}
 	}
 
+	if s.settings.BillingProject == "" {
+		add("Choose billing project…", true, pickNone, "")
+	}
+
+	choices := s.ProjectChoices()
+	for _, p := range choices {
+		add(p, true, 0, "")
+	}
+
+	switch {
+	case s.projectsLoading:
+		add("Loading projects…", false, pickNone, "")
+	case s.projectsErr != nil:
+		pr := app.Explain(s.projectsErr)
+		add("⚠︎ "+pr.Title, false, pickNone, pr.Detail)
+	case len(choices) == 0:
+		add("No projects found", false, pickNone, "")
+	}
+
+	objc.Msg(menu, "addItem:", objc.Msg(objc.Cls("NSMenuItem"), "separatorItem"))
+	add("Enter Project ID…", true, pickEnterID, "Use any project you can run BigQuery jobs in")
+	add("Refresh Project List", true, pickRefresh, "")
+
 	if s.settings.BillingProject != "" {
 		objc.Msg(s.projects, "selectItemWithTitle:", objc.String(s.settings.BillingProject))
+	} else {
+		objc.Msg(s.projects, "selectItemAtIndex:", int64(0))
 	}
 }
 
 func (s *Shell) onProjectPicked() {
-	title := objc.GoString(objc.Msg(s.projects, "titleOfSelectedItem"))
-	if title == "" || strings.HasSuffix(title, "…") {
-		return
-	}
+	item := objc.Msg(s.projects, "selectedItem")
+	tag := objc.Send[int64](item, "tag")
+	title := objc.GoString(objc.Msg(item, "title"))
 
-	s.SetBillingProject(title)
+	switch tag {
+	case 0:
+		s.SetBillingProject(title)
+	case pickEnterID:
+		s.rebuildProjectPicker() // restore the selection while the prompt is up
+
+		if id, ok := appkit.Prompt("Billing Project", "Enter the ID of a project you can run BigQuery jobs in (for example my-project-123).", s.settings.BillingProject); ok {
+			if id = strings.TrimSpace(id); id != "" {
+				s.SetBillingProject(id)
+			}
+		}
+	case pickRefresh:
+		s.LoadProjects()
+	default:
+		s.rebuildProjectPicker()
+	}
 }
 
 func (s *Shell) menus() []appkit.Menu {
