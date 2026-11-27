@@ -36,6 +36,8 @@ type CellText struct {
 	Secondary bool
 	Mono      bool
 	Wrap      bool // multi-line (needs OutlineOptions.AutomaticRowHeights)
+	Italic    bool // grid cells (NULL)
+	Right     bool // right-aligned (numbers)
 	ToolTip   string
 }
 

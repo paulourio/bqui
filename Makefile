@@ -55,7 +55,7 @@ vm-run: vm-deploy
 
 # Run the offscreen smoke test in the VM and fetch screenshots + report.
 vm-smoke: vm-deploy
-	$(SSH) 'rm -rf $(VM_DIR)/smoke && open -W -n --stdout $$HOME/$(VM_DIR)/smoke.log --stderr $$HOME/$(VM_DIR)/smoke.log \
+	$(SSH) 'rm -rf $(VM_DIR)/smoke && : > $(VM_DIR)/smoke.log && open -W -n --stdout $$HOME/$(VM_DIR)/smoke.log --stderr $$HOME/$(VM_DIR)/smoke.log \
 		$(VM_DIR)/bqui.app --args --smoke-test=$$HOME/$(VM_DIR)/smoke; rc=$$?; cat $(VM_DIR)/smoke.log; exit $$rc'
 	rm -rf $(DIST)/smoke-vm && scp -q -P $(VM_PORT) -r $(VM_HOST):$(VM_DIR)/smoke $(DIST)/smoke-vm
 	cat $(DIST)/smoke-vm/report.json

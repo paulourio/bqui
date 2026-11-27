@@ -8,12 +8,16 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
+
+	"google.golang.org/api/option"
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
+	"github.com/paulourio/bqui/internal/bqstorage"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/smoke"
 	"github.com/paulourio/bqui/internal/store"
@@ -44,21 +48,28 @@ func main() {
 		fatal(err)
 	}
 
-	backend, err := newBackend(*fake)
+	settings, settingsPath := loadSettings(*fake, *smokeDir != "")
+
+	var shell *ui.Shell
+
+	backends, err := newBackends(*fake, func() string { return shell.BillingProject() })
 	if err != nil {
 		fatal(err)
 	}
 
-	settings, settingsPath := loadSettings(*fake, *smokeDir != "")
-
 	objc.WithPool(func() {
-		shell, err := ui.NewShell(ui.Options{
+		var err error
+
+		shell, err = ui.NewShell(ui.Options{
 			Deterministic: *smokeDir != "",
 			Inspectable:   *inspect,
-			Backend:       backend,
+			Backend:       backends.metadata,
+			Queries:       backends.queries,
+			Storage:       backends.storage,
 			Live:          !*fake,
 			Settings:      settings,
 			SettingsPath:  settingsPath,
+			SpillDir:      spillDir(),
 		})
 		if err != nil {
 			fatal(err)
@@ -86,12 +97,59 @@ func main() {
 	})
 }
 
-func newBackend(fake bool) (app.Backend, error) {
+type backends struct {
+	metadata app.Backend
+	queries  app.QueryBackend
+	storage  app.StorageOpener
+}
+
+// newBackends wires BigQuery (REST + Storage Read API) or the fixture fake.
+// billing is read when a Storage Read session opens (any goroutine).
+func newBackends(fake bool, billing func() string) (backends, error) {
 	if fake {
-		return &app.FakeBackend{Latency: fakeLatency}, nil
+		f := &app.FakeBackend{Latency: fakeLatency}
+
+		return backends{metadata: f, queries: f}, nil
 	}
 
-	return bq.New(context.Background(), bq.Options{})
+	ctx := context.Background()
+
+	client, err := bq.New(ctx, bq.Options{})
+	if err != nil {
+		return backends{}, err
+	}
+
+	sc, err := bqstorage.New(ctx, option.WithTokenSource(client.Tokens()))
+	if err != nil {
+		return backends{}, err
+	}
+
+	return backends{metadata: client, queries: client, storage: app.NewStorageOpener(sc, billing)}, nil
+}
+
+const staleSpill = 24 * time.Hour
+
+// spillDir returns the result spill directory, removing spill files left by
+// crashed sessions.
+func spillDir() string {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+
+	dir := filepath.Join(base, "bqui", "results")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return ""
+	}
+
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if info, err := e.Info(); err == nil && time.Since(info.ModTime()) > staleSpill {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
+
+	return dir
 }
 
 // loadSettings reads the user's settings. Fake and smoke runs use an

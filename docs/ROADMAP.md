@@ -241,6 +241,29 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M5 — Query results: store + console-style grid
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **`internal/results` (Linux-tested):**
+  - Flattening to leaf columns and the console sub-row layout at any depth. A randomized check compares the renderer with the line counter.
+  - Console value formatting and JSON row encoding.
+  - Arrow → value conversion that matches the REST decoder for every type. A live parity test (`-tags live`) proves REST and the Storage Read API produce identical rows, including INTERVAL, RANGE, DATETIME and TIME edge cases probed against BigQuery.
+- **Grid:** indexes visual lines per chunk and keeps only per-chunk metadata for the whole result, behind LRU caches of decoded chunks and rendered rows.
+- **Storage path:** instead of re-encoding Arrow IPC, the spill file stores the raw LZ4 batches BigQuery sent and decodes them on demand.
+- **`app.Runner`:**
+  - Picks inline (first page of 5,000 rows), REST paging (script results without a destination; capped at 1M rows) or Storage Read API streaming (spilled, capped at 8 GiB).
+  - Reports progress, cancels the BigQuery job on Stop, and throttles UI updates.
+  - Table Preview reads 1,000 rows through the Storage Read API, at no query cost.
+- **UI:**
+  - The grid is a view-based `NSTableView` with one row per visual line, rather than the custom `NSView` planned, which gives native selection, resizing, reordering and accessibility for free.
+  - It has a row-number gutter, 1pt logical-row separators, right-aligned numbers, italic `null`, ⌘C copy as TSV, and Copy Rows as JSON or Copy Cell Value.
+  - A status line shows running, loading, done/failed/cancelled, plus bytes, slot time and elapsed time.
+- **Deferred:**
+  - Cell-level selection and find-in-results.
+  - The value inspector (M7).
+  - The Execution details and Execution graph tabs (M8) and the Job information tab (M6).
+  - The 50M-row memory benchmark, which needs real hardware.
+- **AppKit findings:** `NSView.tag` is read-only; it can only be set on controls. A separator-style `NSBox` forces a 4pt frame and centers its line, so use a custom box with `separatorColor`.
+- **Exit:** the VM smoke test (38 checks) covers a nested 5,000-row result shown as 11,250 lines, gutter and separator geometry, NULL styling, JSON copy, syntax errors, cancel, preview, and run-at-cursor executing only the statement under the cursor.
+
 **Result store (`internal/results`)**
 - **Small results** (inline from `jobs.query`): kept in memory as Arrow record batches.
 - **Large results** (destination temp table): Storage Read API with parallel streams into **Arrow IPC spill files** at `~/Library/Caches/bqui/results/<jobId>/`. An in-memory **LRU page cache** of record batches has a configurable budget (default 256 MiB). Files are evicted on tab close or by age or size quota.

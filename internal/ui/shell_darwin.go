@@ -10,6 +10,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/paulourio/bqlang/bqconfig"
@@ -55,6 +56,12 @@ type Options struct {
 	// Settings and SettingsPath persist pinned projects and the billing project.
 	Settings     *store.Settings
 	SettingsPath string
+	// Queries runs queries; Storage (optional) streams large results and
+	// previews through the Storage Read API.
+	Queries app.QueryBackend
+	Storage app.StorageOpener
+	// SpillDir holds result spill files ("" = OS temp dir).
+	SpillDir string
 }
 
 // Shell is the main window and its panes.
@@ -66,11 +73,13 @@ type Shell struct {
 	Inspector *InspectorPane
 	Editor    *EditorPane
 	Cost      objc.ID // toolbar cost estimate label
-	Results   objc.ID // results placeholder label
+	Results   *ResultsPane
+	Runner    *app.Runner
 
 	opts     Options
 	settings *store.Settings
-	projects objc.ID // toolbar project picker (NSPopUpButton)
+	billing  atomic.Pointer[string] // readable from any goroutine
+	projects objc.ID                // toolbar project picker (NSPopUpButton)
 	all      []string
 }
 
@@ -81,6 +90,7 @@ func NewShell(opts Options) (*Shell, error) {
 	}
 
 	s := &Shell{App: appkit.SharedApplication(), opts: opts, settings: opts.Settings}
+	s.billing.Store(&opts.Settings.BillingProject)
 
 	appkit.SetMainMenu(s.App, s.menus())
 
@@ -106,7 +116,15 @@ func NewShell(opts Options) (*Shell, error) {
 	s.Inspector = newInspectorPane(s, opts.Backend)
 	s.Explorer = newExplorerPane(s, opts.Backend)
 
-	s.Results = appkit.SecondaryLabel("Run a query with ⌘↩ to see results here.")
+	s.Results = newResultsPane()
+	s.Runner = app.NewRunner(app.RunnerOptions{
+		Backend:  opts.Queries,
+		Metadata: opts.Backend,
+		Storage:  opts.Storage,
+		Post:     objc.Main,
+		OnUpdate: s.Results.Update,
+		SpillDir: opts.SpillDir,
+	})
 
 	autosave := func(name string) string {
 		if opts.Deterministic {
@@ -116,12 +134,9 @@ func NewShell(opts Options) (*Shell, error) {
 		return name
 	}
 
-	resultsView := appkit.NewView()
-	appkit.AddCentered(resultsView, s.Results)
-
 	content := appkit.SplitViewController(false, autosave("BQUIEditorResults"), []appkit.SplitItem{
 		{Controller: appkit.ViewController(s.Editor.Web.View), MinThickness: editorMin, HoldingWeight: editorHolding},
-		{Controller: appkit.ViewController(resultsView), MinThickness: resultsMin, HoldingWeight: resultsHolding},
+		{Controller: appkit.ViewController(s.Results.View), MinThickness: resultsMin, HoldingWeight: resultsHolding},
 	})
 
 	s.Split = appkit.SplitViewController(true, autosave("BQUIMainSplit"), []appkit.SplitItem{
@@ -173,8 +188,8 @@ func (s *Shell) lspOptions() *bqconfig.LSPOptions {
 	return o
 }
 
-// BillingProject returns the project jobs run in.
-func (s *Shell) BillingProject() string { return s.settings.BillingProject }
+// BillingProject returns the project jobs run in. Safe from any goroutine.
+func (s *Shell) BillingProject() string { return *s.billing.Load() }
 
 // SetBillingProject switches the billing project, pins it, retargets bqls
 // and persists the choice.
@@ -184,6 +199,8 @@ func (s *Shell) SetBillingProject(project string) {
 	}
 
 	s.settings.BillingProject = project
+	s.billing.Store(&project)
+
 	if s.settings.Pin(project) {
 		s.Explorer.Model.SetProjects(s.settings.PinnedProjects)
 	}
@@ -332,7 +349,7 @@ func (s *Shell) menus() []appkit.Menu {
 		{Title: "Query", Items: []appkit.MenuItem{
 			{Title: "Run", Key: "\r", Run: func() { s.Editor.RequestRun(false) }},
 			{Title: "Run Statement at Cursor", Key: "\r", Mods: cmd | shift, Run: func() { s.Editor.RequestRun(true) }},
-			{Title: "Stop", Key: ".", Run: func() { s.status("Nothing is running.") }},
+			{Title: "Stop", Key: ".", Run: s.Stop},
 			{},
 			{Title: "Format", Key: "f", Mods: cmd | shift, Run: func() { s.Editor.Format() }},
 		}},
@@ -365,7 +382,7 @@ func (s *Shell) toolbarItems() []*appkit.ToolbarItem {
 		{ID: "project", Kind: appkit.ToolbarCustomView, Label: "Project", View: s.projects},
 		{Kind: appkit.ToolbarFlexibleSpace},
 		{ID: "run", Kind: appkit.ToolbarButton, Label: "Run", Symbol: "play.fill", ToolTip: "Run (⌘↩)", Run: func() { s.Editor.RequestRun(false) }},
-		{ID: "stop", Kind: appkit.ToolbarButton, Label: "Stop", Symbol: "stop.fill", ToolTip: "Stop (⌘.)", Run: func() { s.status("Nothing is running.") }},
+		{ID: "stop", Kind: appkit.ToolbarButton, Label: "Stop", Symbol: "stop.fill", ToolTip: "Stop (⌘.)", Run: s.Stop},
 		{ID: "format", Kind: appkit.ToolbarButton, Label: "Format", Symbol: "text.alignleft", ToolTip: "Format SQL (⇧⌘F)", Run: func() { s.Editor.Format() }},
 		{ID: "cost", Kind: appkit.ToolbarCustomView, Label: "Estimate", View: cost},
 		{ID: "search", Kind: appkit.ToolbarSearch, Label: "Search"},
@@ -375,32 +392,49 @@ func (s *Shell) toolbarItems() []*appkit.ToolbarItem {
 }
 
 // onRun receives the SQL the editor resolved (selection, statement at the
-// cursor, or whole script). Execution and the results grid arrive in M5.
+// cursor, or whole script) and runs it in the billing project.
 func (s *Shell) onRun(req RunRequest) {
-	sql := strings.TrimSpace(req.SQL)
+	s.RunSQL(req.SQL)
+}
+
+// firstPageRows is how many rows the first jobs.query page returns inline;
+// larger results stream through the Storage Read API.
+const firstPageRows = 5000
+
+// RunSQL runs a query and shows its results.
+func (s *Shell) RunSQL(sql string) {
+	sql = strings.TrimSpace(sql)
 	if sql == "" {
 		s.status("Nothing to run.")
 
 		return
 	}
 
-	what := "script"
+	if s.settings.BillingProject == "" {
+		s.status("Choose a billing project in the toolbar first.")
 
-	switch {
-	case req.Selection != "":
-		what = "selection"
-	case req.Kind != "":
-		what = req.Kind + " statement"
+		return
 	}
 
-	first, _, _ := strings.Cut(sql, "\n")
-	s.status(fmt.Sprintf("Would run %s (%d chars): %s", what, len(sql), first))
+	s.Results.Show(s.Runner.Start(bq.QueryRequest{
+		SQL: sql, Project: s.settings.BillingProject, MaxInlineRows: firstPageRows,
+	}))
+}
+
+// Preview shows the first rows of a table (Storage Read API, no query cost).
+func (s *Shell) Preview(info app.ObjectInfo) {
+	s.Results.Show(s.Runner.Preview(info.ObjectRef()))
+}
+
+// Stop cancels the current run.
+func (s *Shell) Stop() {
+	if r := s.Results.Current(); r != nil {
+		r.Cancel()
+	}
 }
 
 // Status returns the results-pane status text. Main thread only.
-func (s *Shell) Status() string {
-	return objc.GoString(objc.Msg(s.Results, "stringValue"))
-}
+func (s *Shell) Status() string { return s.Results.StatusText() }
 
 func (s *Shell) onCost(summary string) {
 	if summary == "" {
@@ -410,9 +444,7 @@ func (s *Shell) onCost(summary string) {
 	appkit.SetString(s.Cost, summary)
 }
 
-func (s *Shell) status(msg string) {
-	appkit.SetString(s.Results, msg)
-}
+func (s *Shell) status(msg string) { s.Results.Notice(msg) }
 
 // ResolveBillingProject fills in the billing project from gcloud/env when
 // none is saved yet (runs gcloud off the main thread).

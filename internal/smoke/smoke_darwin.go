@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/editor"
 	"github.com/paulourio/bqui/internal/objc"
+	"github.com/paulourio/bqui/internal/results"
 	"github.com/paulourio/bqui/internal/ui"
 )
 
@@ -98,6 +100,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	}
 
 	ex := exploreFlow(s)
+	rs := resultsFlow(s)
 
 	queued := time.Now()
 
@@ -115,10 +118,11 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		explorerChecks(rep, ex)
 
 		if ready {
-			// Cursor is on line 3 ("SELECT "), the third statement.
-			ok := strings.Contains(runStatus, "statement") && strings.Contains(runStatus, ": SELECT")
-			rep.check("editor-run-at-cursor", ok, "status: %q", runStatus)
+			// Cursor is on line 3 ("SELECT "): only that statement runs.
+			rep.check("editor-run-at-cursor", runStatus == "SELECT", "ran statement %q", runStatus)
 		}
+
+		resultsChecks(rep, rs)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -338,28 +342,165 @@ func explorerChecks(rep *Report, r exploreResult) {
 
 // runAtCursor triggers "Run Statement at Cursor" (page → Go → bqls
 // statements → shell) and waits for the results status to change.
+// runAtCursor triggers "Run Statement at Cursor" (page → Go → bqls
+// statements → runner) and returns the title of the run it started (the
+// statement's first line) once that run finished.
 func runAtCursor(s *ui.Shell) string {
-	statusCh := make(chan string, 1)
-	read := func() string {
-		objc.Main(func() { statusCh <- s.Status() })
+	var before *app.Run
 
-		return <-statusCh
+	onMain(func() { before = s.Results.Current() })
+	onMain(func() { s.Editor.RequestRun(true) })
+
+	var run *app.Run
+
+	waitMain(runTimeout, func() bool {
+		run = s.Results.Current()
+
+		return run != nil && run != before
+	})
+
+	if run == nil || run == before {
+		return ""
 	}
 
-	before := read()
+	<-run.Done()
 
-	objc.Main(func() { s.Editor.RequestRun(true) })
+	return run.Snapshot().Title
+}
 
-	deadline := time.Now().Add(runTimeout)
-	for time.Now().Before(deadline) {
-		if st := read(); st != before {
-			return st
+// resultsResult captures what the results flow observed.
+type resultsResult struct {
+	ErrorStatus, CancelStatus, PreviewStatus, DoneStatus string
+	PreviewRows                                          int64
+	Rows, Lines                                          int64
+	TableRows                                            int
+	Gutter                                               []string
+	NestedLines                                          int
+	NullText                                             appkit.CellText
+	Separators                                           int
+	JSONRow                                              string
+	SepInside                                            bool
+	SepDetail                                            string
+}
+
+// waitRun runs start on the main thread and waits for the resulting run.
+func waitRun(s *ui.Shell, start func()) *app.Run {
+	var before, run *app.Run
+
+	onMain(func() { before = s.Results.Current() })
+	onMain(start)
+	onMain(func() { run = s.Results.Current() })
+
+	if run == nil || run == before {
+		return nil
+	}
+
+	select {
+	case <-run.Done():
+	case <-time.After(loadTimeout):
+	}
+
+	// Let the final OnUpdate land on the main thread.
+	waitMain(loadTimeout, func() bool {
+		return s.Results.StatusText() != "" && !strings.HasPrefix(s.Results.StatusText(), "Running")
+	})
+
+	return run
+}
+
+// resultsFlow runs queries through the shell and inspects the grid exactly
+// as the table renders it.
+func resultsFlow(s *ui.Shell) resultsResult {
+	var r resultsResult
+
+	waitRun(s, func() { s.RunSQL("SELEC broken") })
+	onMain(func() { r.ErrorStatus = s.Status() })
+
+	onMain(func() { s.RunSQL("SELECT order_id FROM orders LIMIT 10") })
+	time.Sleep(100 * time.Millisecond)
+	onMain(s.Stop)
+	waitMain(loadTimeout, func() bool { return strings.HasPrefix(s.Status(), "Cancelled") })
+	onMain(func() { r.CancelStatus = s.Status() })
+
+	if pr := waitRun(s, func() {
+		s.Preview(app.ObjectInfo{Kind: app.KindTable, Project: app.FakeProject, Dataset: "analytics", Name: "events"})
+	}); pr != nil {
+		if g := pr.Snapshot().Grid; g != nil {
+			r.PreviewRows, _, _ = g.Size()
 		}
-
-		time.Sleep(pollInterval)
 	}
 
-	return before
+	onMain(func() { r.PreviewStatus = s.Status() })
+
+	run := waitRun(s, func() { s.RunSQL("SELECT order_id, created_at, customer, items, total FROM orders LIMIT 5000") })
+	if run == nil {
+		return r
+	}
+
+	onMain(func() { inspectGrid(s, run, &r) })
+
+	return r
+}
+
+// inspectGrid reads the finished grid back through the table (main thread).
+func inspectGrid(s *ui.Shell, run *app.Run, r *resultsResult) {
+	r.DoneStatus = s.Status()
+	g := run.Snapshot().Grid
+
+	if g == nil {
+		return
+	}
+
+	r.Rows, r.Lines, _ = g.Size()
+	t := s.Results.Table
+	r.TableRows = t.Rows()
+
+	for line := range 8 {
+		r.Gutter = append(r.Gutter, t.VisibleText(line, "__row").Text)
+
+		if t.VisibleText(line, "__row").Text == "" {
+			r.NestedLines++
+		}
+	}
+
+	// Order 3 (row index 2) has a NULL customer.tier (column c3).
+	if first, err := g.FirstLine(2); err == nil {
+		r.NullText = t.VisibleText(int(first), "c3")
+	}
+
+	for line := range 40 {
+		if s.Results.Table.VisibleText(line, "__row").Text != "" && line > 0 {
+			r.Separators++
+		}
+	}
+
+	if row, err := g.Row(3); err == nil {
+		r.JSONRow = string(results.AppendRowJSON(nil, g.Fields(), row))
+	}
+
+	// Line 0 is order 1's only line: its separator must be visible and lie
+	// on the row view's bottom edge (inside its bounds).
+	rb, sf, vis := t.SeparatorGeometry(0)
+	inside := sf.Size.Height > 0 && sf.Origin.Y >= rb.Origin.Y && sf.Origin.Y+sf.Size.Height <= rb.Origin.Y+rb.Size.Height+0.5
+	r.SepInside = vis && inside && sf.Size.Width >= rb.Size.Width-1
+	r.SepDetail = fmt.Sprintf("row bounds %+v, separator %+v, visible %v", rb, sf, vis)
+
+	// Leave the nested items.* columns in view for screen captures.
+	t.ScrollToColumn("c" + strconv.Itoa(len(g.Columns())-1))
+}
+
+func resultsChecks(rep *Report, r resultsResult) {
+	rep.check("results-error", strings.HasPrefix(r.ErrorStatus, "✕") && strings.Contains(r.ErrorStatus, "Syntax error"), "status %q", r.ErrorStatus)
+	rep.check("results-cancel", strings.HasPrefix(r.CancelStatus, "Cancelled"), "status %q", r.CancelStatus)
+	rep.check("results-preview", r.PreviewRows == 1000 && strings.Contains(r.PreviewStatus, "Preview of"), "%d rows; status %q", r.PreviewRows, r.PreviewStatus)
+	rep.check("results-done", strings.Contains(r.DoneStatus, "✓ 5,000 rows"), "status %q", r.DoneStatus)
+	rep.check("results-grid", r.Rows == 5000 && r.Lines > r.Rows && int64(r.TableRows) == r.Lines,
+		"%d rows → %d visual lines; table shows %d", r.Rows, r.Lines, r.TableRows)
+	rep.check("results-nesting", r.NestedLines > 0 && len(r.Gutter) > 0 && r.Gutter[0] == "1",
+		"gutter %q (%d continuation lines in the first 8)", r.Gutter, r.NestedLines)
+	rep.check("results-null", r.NullText.Text == "null" && r.NullText.Italic && r.NullText.Secondary, "NULL cell %+v", r.NullText)
+	rep.check("results-separator", r.SepInside, "%s", r.SepDetail)
+	rep.check("results-json", strings.HasPrefix(r.JSONRow, `{"order_id":"4"`) && strings.Contains(r.JSONRow, `"items":[{`), "row 4 JSON %s", r.JSONRow)
 }
 
 func editorChecks(s *ui.Shell, rep *Report, ready bool, boot time.Duration, selfTest json.RawMessage, stErr error) {

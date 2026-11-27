@@ -146,12 +146,17 @@ func (p *ExplorerPane) menu(id uint64) []appkit.MenuItem {
 		return []appkit.MenuItem{refresh, {}, copyID, copySQL, console}
 	case app.KindTable, app.KindView, app.KindMaterializedView, app.KindExternalTable,
 		app.KindSnapshot, app.KindShardGroup:
-		return []appkit.MenuItem{
+		items := []appkit.MenuItem{
 			{Title: "Query", Run: func() { p.s.Editor.AppendText(selectStar(info)) }},
 			{Title: "Insert Reference", Run: func() { p.s.Editor.InsertText(info.SQLName()) }},
-			{},
-			copyID, copySQL, console,
 		}
+
+		// Storage Read API previews cover native tables, snapshots and shards.
+		if info.Kind == app.KindTable || info.Kind == app.KindSnapshot || info.Kind == app.KindShardGroup {
+			items = append(items, appkit.MenuItem{Title: "Preview", Run: func() { p.s.Preview(info) }})
+		}
+
+		return append(items, appkit.MenuItem{}, copyID, copySQL, console)
 	case app.KindRoutine:
 		return []appkit.MenuItem{
 			{Title: "Insert Reference", Run: func() { p.s.Editor.InsertText(info.SQLName()) }},

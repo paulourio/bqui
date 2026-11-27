@@ -11,6 +11,9 @@ import (
 // internal/editor/web drift from the pins above (run make update-assets).
 func TestVendoredAssetsMatchPins(t *testing.T) {
 	web := filepath.Join("..", "..", "internal", "editor", "web")
+	if _, err := os.Stat(filepath.Join(web, "index.html")); err != nil {
+		t.Skip("source tree not available (test binary run outside the repo)")
+	}
 
 	for _, a := range assets {
 		b, err := os.ReadFile(filepath.Join(web, a.dir, stampFile))
