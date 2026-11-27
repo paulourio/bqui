@@ -110,23 +110,47 @@ func SetGridFontSize(size float64) {
 	}
 }
 
+// GridFontSize returns the current grid cell font size.
+func GridFontSize() float64 { return gridFontSize }
+
 // attributed builds an attributed string from colored spans.
 func attributed(spans []Span, font objc.ID) objc.ID {
+	if font == objc.Nil {
+		font, _, _ = gridFonts()
+	}
+
 	fontKey, colorKey := attributeKeys()
 	out := objc.Msg(objc.Msg(objc.Cls("NSMutableAttributedString"), "alloc"), "init")
-	label := SystemColor("labelColor")
 
-	for _, sp := range spans {
-		color := sp.Color
-		if color == objc.Nil {
-			color = label
+	objc.WithPool(func() {
+		label := SystemColor("labelColor")
+		byColor := make(map[objc.ID]objc.ID, 8)
+
+		for _, sp := range spans {
+			s := objc.String(sp.Text)
+			if s == objc.Nil {
+				continue
+			}
+
+			color := sp.Color
+			if color == objc.Nil {
+				color = label
+			}
+
+			attrs, ok := byColor[color]
+			if !ok {
+				attrs = objc.Msg(objc.Cls("NSDictionary"), "dictionaryWithObjects:forKeys:",
+					objc.Array(font, color), objc.Array(fontKey, colorKey))
+				byColor[color] = attrs
+			}
+
+			piece := objc.Msg(objc.Msg(objc.Cls("NSAttributedString"), "alloc"), "initWithString:attributes:", s, attrs)
+			if piece != objc.Nil {
+				objc.Msg(out, "appendAttributedString:", piece)
+				objc.Release(piece)
+			}
 		}
-
-		attrs := objc.Msg(objc.Cls("NSDictionary"), "dictionaryWithObjects:forKeys:", objc.Array(font, color), objc.Array(fontKey, colorKey))
-		piece := objc.Msg(objc.Msg(objc.Cls("NSAttributedString"), "alloc"), "initWithString:attributes:", objc.String(sp.Text), attrs)
-		objc.Msg(out, "appendAttributedString:", piece)
-		objc.Release(piece)
-	}
+	})
 
 	return objc.Msg(out, "autorelease")
 }
@@ -135,8 +159,8 @@ var fontAttr, colorAttr objc.ID
 
 func attributeKeys() (font, color objc.ID) {
 	if fontAttr == objc.Nil {
-		fontAttr, _ = objc.Const(objc.AppKit, "NSFontAttributeName")
-		colorAttr, _ = objc.Const(objc.AppKit, "NSForegroundColorAttributeName")
+		fontAttr = objc.Retain(constant("NSFontAttributeName", "NSFont"))
+		colorAttr = objc.Retain(constant("NSForegroundColorAttributeName", "NSColor"))
 	}
 
 	return fontAttr, colorAttr
@@ -261,7 +285,10 @@ func NewTable(src TableSource, opts TableOptions) *Table {
 func (t *Table) SetColumns(cols []TableColumn) {
 	checkReentrancy("table set columns")
 
-	for _, c := range objc.ArrayItems(objc.Msg(objc.Msg(t.View, "tableColumns"), "copy")) {
+	colsCopy := objc.Msg(objc.Msg(t.View, "tableColumns"), "copy")
+	defer objc.Release(colsCopy)
+
+	for _, c := range objc.ArrayItems(colsCopy) {
 		objc.Msg(t.View, "removeTableColumn:", c)
 	}
 
@@ -410,6 +437,7 @@ func (t *Table) rowView(tv objc.ID, row int) objc.ID {
 		objc.Msg(rv, "addSubview:", sep)
 		objc.Release(sep)
 		rowSeparators.Put(rv, sep)
+		objc.Msg(rv, "autorelease")
 	}
 
 	if sep, ok := rowSeparators.Get(rv); ok {

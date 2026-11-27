@@ -218,6 +218,8 @@ func NewOutline(src OutlineSource, opts OutlineOptions) *Outline {
 		if i == 0 {
 			objc.Msg(o.View, "setOutlineTableColumn:", col)
 		}
+
+		objc.Release(col)
 	}
 
 	objc.Msg(o.View, "setColumnAutoresizingStyle:", columnAutoresizeLastOnly)
@@ -412,6 +414,7 @@ func newOutlineCell(id string, auto bool) objc.ID {
 	UseAutoLayout(img)
 	objc.Msg(cell, "addSubview:", img)
 	objc.Msg(cell, "setImageView:", img)
+	objc.Release(img)
 
 	tf := Label("", 0)
 	UseAutoLayout(tf)
@@ -441,7 +444,7 @@ func newOutlineCell(id string, auto bool) objc.ID {
 
 	Activate(constraints...)
 
-	return cell
+	return objc.Msg(cell, "autorelease")
 }
 
 func textCell(ov objc.ID, c CellText, auto bool) objc.ID {
@@ -513,7 +516,7 @@ func newTextCell(id string, wrap, auto bool) objc.ID {
 
 	Activate(constraints...)
 
-	return cell
+	return objc.Msg(cell, "autorelease")
 }
 
 func setSecondary(tf objc.ID, secondary bool) {
