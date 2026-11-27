@@ -607,29 +607,35 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
   - Bridge test: a definition result maps to a `TableRef`.
   - Smoke: go to definition on `bigquery-public-data.samples.shakespeare` selects the node and shows the schema.
 
-### M15 — Sessions: a folder/file workspace (replaces the Saved sidebar)
+### M15 — Workbooks: a Library › Workbook › Query tree (replaces the Saved sidebar)
 
-**Goal:** an IDE-like tree where each **session is a folder** and each **query is a `.sql` file** inside it.
+**Goal:** an IDE-like tree. A **library** holds **workbooks**, which are folders, and each workbook holds **queries**, which are `.sql` files.
+
+**Naming:** the words avoid BigQuery and GCP terms (project, session, workspace, repository, folder, notebook).
 
 - **Model:**
-  - Sessions are folders under the queries directory (default `~/Documents/bqui/sessions/`). Folders and files on disk are the source of truth, so the tree is git-friendly and editable in Finder.
-  - On first launch bqui creates a default session named `session-YYYY-MM-DD`.
-  - A **New Session** button (sidebar toolbar, ⇧⌘N) creates another session with the same naming pattern, plus `-2`, `-3`… on collisions. Sessions can be renamed (this renames the folder) and deleted (to the Trash).
-  - Files: **New Query** (⌘N) creates `Untitled-1.sql`, `Untitled-2.sql`… in the selected session. Files can be renamed, moved between sessions by drag, duplicated and deleted (to the Trash).
+  - **Libraries** are top-level namespaces at `~/Documents/bqui/libraries/<name>/`.
+    - `bqui` with no flag uses `default`, and `bqui --library work` selects another.
+    - A library holds files only. Settings stay global.
+  - **Workbooks** are folders inside the library. Folders and files on disk are the source of truth, so the tree is git-friendly and editable in Finder.
+    - On first launch bqui creates `workbook-YYYY-MM-DD`.
+    - **New Workbook** (sidebar button, ⇧⌘N) creates another, adding `-2`, `-3`… on collisions.
+    - Workbooks can be renamed (this renames the folder) and deleted (to the Trash).
+  - **Queries:** **New Query** (⌘N) creates `Untitled-1.sql`, `Untitled-2.sql`… in the selected workbook. Queries can be renamed, dragged between workbooks, duplicated and deleted (to the Trash).
 - **Display:**
   - The tree shows names without `.sql`, and lists only `.sql` files.
   - Renaming edits the bare name; bqui adds the extension and rejects `/`.
 - **Editor binding:**
   - The file selected in the tree is the file shown in the editor. Selecting another file autosaves the current one first, replacing the M10 save prompts.
-  - The window subtitle shows `session / file`.
+  - The window subtitle shows `workbook / query`.
   - Restore on launch: the last selected file, cursor and BigQuery session mode, reusing the M10 workspace tables, keyed by file path.
-- **BigQuery session mode:** stays a per-file toggle. Whether a whole sidebar session should share one BigQuery session is an open question.
+- **BigQuery session mode:** stays a per-query toggle (decided 2026-11-27).
 - **Migration:**
-  - The existing `queries/*.sql` move into a session named `imported`.
+  - The existing `~/Documents/bqui/queries/*.sql` move into the workbook `default/imported`.
   - BigQuery Studio saved queries (M11) become a read-only-ish top-level node, "BigQuery Studio", opened and saved as today.
   - The local `link_id` header keeps working.
-- **Replaces:** the Saved tab. The sidebar switcher becomes Explorer | Sessions.
-- **Tests:** session/file naming and collisions, rename and move on disk, migration from `queries/`, and restoring the selection (Linux). Smoke: create a session, create a file, rename both, switch files with autosave.
+- **Replaces:** the Saved tab. The sidebar switcher becomes Explorer | Workbooks.
+- **Tests:** workbook and query naming and collisions, rename and move on disk, migration from `queries/`, `--library`, and restoring the selection (Linux). Smoke: create a workbook, create a query, rename both, switch queries with autosave.
 - **Runs per file:** every run from a file is tracked, so a file's job history is one click away.
   - **Storage:**
     - The local `runs` table gains a `file_id` column. Each file gets a stable ID in its header comment (`id = "…"`), so the link survives renames and moves, including ones made in Finder.
@@ -638,12 +644,12 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
     - A **Runs** tab in the bottom pane lists the current file's runs, newest first. It switches with the selected file, and its count shows in the tab title, for example "Runs (12)".
     - Each row shows state, started, duration, bytes and the first line of the SQL that ran.
     - **Double-click** reopens that job's results and plan (`Runner.OpenJob`). The context menu offers Copy Job ID, Open in Console, Restore this SQL into the editor, and Compare with current text.
-  - **Tree hint:** the file's tooltip in the Sessions tree shows its last run (state and time).
+  - **Tree hint:** the query's tooltip in the Workbooks tree shows its last run (state and time).
   - **Tests:** a file ID survives rename and move, runs are attributed to the right file, and rows come back newest first (Linux). Smoke: run twice from one file and once from another; the Runs tab shows 2, then 1 after switching files.
 
 ### M16 — Job browser
 
-- **Where:** a special top-level folder, **Job History**, in the Sessions tree, listing the user's own BigQuery jobs (`jobs.list`, `allUsers=false`, newest first).
+- **Where:** a special top-level node, **Job History**, in the Workbooks tree, listing the user's own BigQuery jobs in the current billing project (decided 2026-11-27) (`jobs.list`, `allUsers=false`, newest first).
 - **Rows:** one per job, named by **job ID**, with a state icon and the creation time as secondary text.
 - **Lazy listing:**
   - It shows a recent window (for example the last 50, or the last 7 days) and loads the next page when scrolled to the end.
@@ -651,7 +657,7 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
   - A filter field searches the loaded jobs. The local run history (FTS) can back the search.
 - **Hover:** a tooltip with the first ~10 lines of the SQL, state, duration, bytes processed, statement type and project/location.
 - **Double-click:** opens the job's SQL in the editor as a **read-only job document**, a virtual file `Job History/<job id>`. Its job details and results are reachable from the bottom tabs, through the existing Job information and results reopening.
-  - Editing turns it into a normal file: **Save to Session…** copies the SQL into `Untitled-N.sql` in the chosen session.
+  - Editing turns it into a normal file: **Save to Workbook…** copies the SQL into `Untitled-N.sql` in the chosen workbook.
 - **Overlap:** the History bottom tab (M6) stays for project-wide and filtered browsing. This folder is the quick, personal path.
 - **Tests:** tooltip text formatting and pagination (Linux, fake jobs). Smoke: hover text, then double-click opens the read-only job SQL.
 
