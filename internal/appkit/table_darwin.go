@@ -47,22 +47,24 @@ type Table struct {
 }
 
 const (
-	rowViewID                 = "BQUIGridRow"
-	defaultRowHeight          = 22.0
-	tableStylePlain   int64   = 4
-	gridVerticalLines uint64  = 1
-	boxCustom         uint64  = 4
-	noTitle           uint64  = 0
-	autoresizeWidth   uint64  = 1 << 1
-	autoresizeMinY    uint64  = 1 << 3
-	autoresizeMaxY    uint64  = 1 << 5
-	columnNoAutoSize  uint64  = 0
-	textAlignRight    int64   = 2
-	italicFontMask    uint64  = 1
-	gridFontSize      float64 = 12
+	rowViewID                = "BQUIGridRow"
+	defaultRowHeight         = 22.0
+	tableStylePlain   int64  = 4
+	gridVerticalLines uint64 = 1
+	boxCustom         uint64 = 4
+	noTitle           uint64 = 0
+	autoresizeWidth   uint64 = 1 << 1
+	autoresizeMinY    uint64 = 1 << 3
+	autoresizeMaxY    uint64 = 1 << 5
+	columnNoAutoSize  uint64 = 0
+	textAlignRight    int64  = 2
+	italicFontMask    uint64 = 1
 )
 
 var (
+	gridFontSize = 12.0
+	gridMonoSize = monoFontSize
+
 	tables          objc.Registry[*Table]
 	tableByView     objc.Registry[*Table]
 	rowSeparators   objc.Registry[objc.ID] // row view → its separator (NSView.tag is read-only)
@@ -91,13 +93,63 @@ var (
 	fontRegular, fontItalic, fontMono objc.ID
 )
 
+// SetGridFontSize changes the grid and mono cell font size (tables must be
+// reloaded afterwards).
+func SetGridFontSize(size float64) {
+	if size <= 0 || size == gridFontSize {
+		return
+	}
+
+	gridFontSize, gridMonoSize = size, size-1
+
+	if fontsOnce {
+		fontsOnce = false
+
+		for _, f := range []objc.ID{fontRegular, fontItalic, fontMono} {
+			objc.Release(f)
+		}
+	}
+}
+
+// attributed builds an attributed string from colored spans.
+func attributed(spans []Span, font objc.ID) objc.ID {
+	fontKey, colorKey := attributeKeys()
+	out := objc.Msg(objc.Msg(objc.Cls("NSMutableAttributedString"), "alloc"), "init")
+	label := SystemColor("labelColor")
+
+	for _, sp := range spans {
+		color := sp.Color
+		if color == objc.Nil {
+			color = label
+		}
+
+		attrs := objc.Msg(objc.Cls("NSDictionary"), "dictionaryWithObjects:forKeys:", objc.Array(font, color), objc.Array(fontKey, colorKey))
+		piece := objc.Msg(objc.Msg(objc.Cls("NSAttributedString"), "alloc"), "initWithString:attributes:", objc.String(sp.Text), attrs)
+		objc.Msg(out, "appendAttributedString:", piece)
+		objc.Release(piece)
+	}
+
+	return objc.Msg(out, "autorelease")
+}
+
+var fontAttr, colorAttr objc.ID
+
+func attributeKeys() (font, color objc.ID) {
+	if fontAttr == objc.Nil {
+		fontAttr, _ = objc.Const(objc.AppKit, "NSFontAttributeName")
+		colorAttr, _ = objc.Const(objc.AppKit, "NSForegroundColorAttributeName")
+	}
+
+	return fontAttr, colorAttr
+}
+
 func gridFonts() (regular, italic, mono objc.ID) {
 	if !fontsOnce {
 		fontsOnce = true
 		fontRegular = objc.Retain(objc.Msg(objc.Cls("NSFont"), "monospacedDigitSystemFontOfSize:weight:", gridFontSize, 0.0))
 		fm := objc.Msg(objc.Cls("NSFontManager"), "sharedFontManager")
 		fontItalic = objc.Retain(objc.Msg(fm, "convertFont:toHaveTrait:", fontRegular, italicFontMask))
-		fontMono = objc.Retain(objc.Msg(objc.Cls("NSFont"), "monospacedSystemFontOfSize:weight:", monoFontSize, 0.0))
+		fontMono = objc.Retain(objc.Msg(objc.Cls("NSFont"), "monospacedSystemFontOfSize:weight:", gridMonoSize, 0.0))
 	}
 
 	return fontRegular, fontItalic, fontMono
@@ -409,18 +461,29 @@ func gridCell(tv objc.ID, c CellText) objc.ID {
 	}
 
 	tf := objc.Msg(cell, "textField")
-	SetString(tf, c.Text)
-	setSecondary(tf, c.Secondary)
 
 	regular, italic, mono := gridFonts()
 
+	font := regular
+
 	switch {
 	case c.Italic:
-		objc.Msg(tf, "setFont:", italic)
+		font = italic
 	case c.Mono:
-		objc.Msg(tf, "setFont:", mono)
-	default:
-		objc.Msg(tf, "setFont:", regular)
+		font = mono
+	}
+
+	objc.Msg(tf, "setFont:", font)
+	setSecondary(tf, c.Secondary)
+
+	if c.Color != objc.Nil {
+		objc.Msg(tf, "setTextColor:", c.Color)
+	}
+
+	if len(c.Spans) > 0 {
+		objc.Msg(tf, "setAttributedStringValue:", attributed(c.Spans, font))
+	} else {
+		SetString(tf, c.Text)
 	}
 
 	align := TextAlignmentLeft
@@ -431,4 +494,9 @@ func gridCell(tv objc.ID, c CellText) objc.ID {
 	objc.Msg(tf, "setAlignment:", align)
 
 	return cell
+}
+
+// SetRowHeight changes the row height (for a new grid font size).
+func (t *Table) SetRowHeight(h float64) {
+	objc.Msg(t.View, "setRowHeight:", h)
 }

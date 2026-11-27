@@ -39,6 +39,8 @@ type ResultsPane struct {
 	Inspect func(fields []results.Field, row []any, index int64, path string)
 	// ExportMenu builds the Export submenu for the context menu.
 	ExportMenu func() appkit.MenuItem
+	// NullColor and NumberColor come from the theme (nil = system colors).
+	NullColor, NumberColor objc.ID
 
 	status, empty objc.ID
 
@@ -326,9 +328,14 @@ func (s *gridSource) CellText(row int, column string) appkit.CellText {
 
 	switch cell.Kind {
 	case results.Null:
-		return appkit.CellText{Text: "null", Secondary: true, Italic: true}
+		return appkit.CellText{Text: "null", Secondary: true, Italic: true, Color: s.p.NullColor}
 	case results.Value:
-		return appkit.CellText{Text: results.FormatCell(s.p.cols[i].Type, cell.V), Right: s.p.cols[i].Numeric()}
+		c := appkit.CellText{Text: results.FormatCell(s.p.cols[i].Type, cell.V), Right: s.p.cols[i].Numeric()}
+		if c.Right {
+			c.Color = s.p.NumberColor
+		}
+
+		return c
 	case results.Blank:
 	}
 

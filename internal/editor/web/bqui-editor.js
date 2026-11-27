@@ -66,7 +66,7 @@
     },
   };
 
-  var state = { editor: null };
+  var state = { editor: null, mode: 'system' };
 
   function modelURI(model) {
     // Monaco's LSP client lowercases URIs; report them the same way.
@@ -88,6 +88,11 @@
     };
   }
 
+  function applyTheme() {
+    state.themeName = state.isDark() ? 'bqui-dark' : 'bqui-light';
+    monaco.editor.setTheme(state.themeName);
+  }
+
   function handleApp(method, p) {
     var ed = state.editor;
     if (!ed) return;
@@ -103,7 +108,16 @@
         }
         break;
       case 'setTheme':
-        monaco.editor.setTheme(p.dark ? 'bqui-dark' : 'bqui-light');
+        // p: { light, dark: IStandaloneThemeData, mode: system|light|dark,
+        //      fontSize, ligatures }
+        if (p.light) monaco.editor.defineTheme('bqui-light', p.light);
+        if (p.dark) monaco.editor.defineTheme('bqui-dark', p.dark);
+        state.mode = p.mode || 'system';
+        applyTheme();
+        if (p.fontSize) ed.updateOptions({ fontSize: p.fontSize, fontLigatures: p.ligatures !== false });
+        var active = state.isDark() ? p.dark : p.light;
+        document.body.style.background = (active && active.colors && active.colors['editor.background']) || '';
+        app('themeApplied', { theme: state.themeName });
         break;
       case 'focus':
         ed.focus();
@@ -290,9 +304,8 @@
     });
     state.editor = ed;
 
-    dark.addEventListener('change', function (e) {
-      monaco.editor.setTheme(e.matches ? 'bqui-dark' : 'bqui-light');
-    });
+    state.isDark = function () { return state.mode === 'dark' || (state.mode !== 'light' && dark.matches); };
+    dark.addEventListener('change', function () { applyTheme(); });
 
     // Monaco's own LSP client drives completion, hover, signature help,
     // diagnostics, semantic tokens, formatting, code lenses, symbols, ...

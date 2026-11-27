@@ -18,6 +18,7 @@ import (
 
 	"github.com/paulourio/bqui/internal/editor"
 	"github.com/paulourio/bqui/internal/objc"
+	"github.com/paulourio/bqui/internal/theme"
 	"github.com/paulourio/bqui/internal/webkit"
 )
 
@@ -72,6 +73,7 @@ type EditorPane struct {
 	mu            sync.Mutex
 	uri           string
 	changes       int
+	appliedTheme  string
 	consoleErrors []string
 	bootError     string
 }
@@ -137,6 +139,24 @@ func serveEditorAsset(_, path string) webkit.Response {
 // SetText replaces the editor contents (queued until the page is ready).
 func (p *EditorPane) SetText(text string) {
 	_ = p.Bridge.SendApp("setText", map[string]string{"text": text})
+}
+
+// SetTheme compiles a theme for Monaco and applies it (and its fonts).
+func (p *EditorPane) SetTheme(t *theme.Theme) {
+	lig := t.Fonts.Ligatures == nil || *t.Fonts.Ligatures
+
+	_ = p.Bridge.SendApp("setTheme", map[string]any{
+		"light": theme.Monaco(t.Light, false), "dark": theme.Monaco(t.Dark, true),
+		"mode": string(t.Appearance), "fontSize": t.Fonts.EditorSize, "ligatures": lig,
+	})
+}
+
+// AppliedTheme is the Monaco theme the page last applied (smoke checks).
+func (p *EditorPane) AppliedTheme() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.appliedTheme
 }
 
 // SetTextAt replaces the contents and places the cursor (0-based), without
@@ -262,6 +282,16 @@ func (p *EditorPane) onApp(method string, params json.RawMessage) {
 			if p.opts.OnChange != nil {
 				p.opts.OnChange(c.Text, c.Line, c.Character)
 			}
+		}
+	case "themeApplied":
+		var t struct {
+			Theme string `json:"theme"`
+		}
+
+		if json.Unmarshal(params, &t) == nil {
+			p.mu.Lock()
+			p.appliedTheme = t.Theme
+			p.mu.Unlock()
 		}
 	case "selftest":
 		select {

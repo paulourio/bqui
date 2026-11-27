@@ -28,6 +28,19 @@ type Settings struct {
 	BillingProject string `json:"billingProject,omitempty"`
 	// PinnedProjects are shown in the explorer, in order.
 	PinnedProjects []string `json:"pinnedProjects"`
+	// Theme is the chosen theme's name ("" = Default).
+	Theme string `json:"theme,omitempty"`
+}
+
+// DefaultThemesDir is ~/Library/Application Support/bqui/themes (or the OS
+// equivalent).
+func DefaultThemesDir() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("store: %w", err)
+	}
+
+	return filepath.Join(dir, appDir, "themes"), nil
 }
 
 // Pin adds project to the pinned list (no-op if present). It reports

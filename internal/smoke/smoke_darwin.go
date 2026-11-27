@@ -115,6 +115,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	xs := exportFlow(s, dir)
 	phase("workspace")
 	ws := workspaceFlow(s)
+	phase("theme")
+	ts := themeFlow(s, dir)
 	phase("checks")
 
 	queued := time.Now()
@@ -143,6 +145,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		planChecks(rep, ps)
 		exportChecks(rep, xs)
 		workspaceChecks(rep, ws)
+		themeChecks(rep, ts)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -757,6 +760,102 @@ func workspaceFlow(s *ui.Shell) workspaceResult {
 	})
 
 	return r
+}
+
+// themeResult captures switching, importing and restoring themes.
+type themeResult struct {
+	MidnightEditor, ImportEditor, DefaultEditor string
+	MidnightDark, ImportDark                    bool
+	NullColored, KeyColored                     bool
+	JSONSpans                                   int
+	Imported, ImportErr                         string
+	ImportSaved                                 bool
+	Themes                                      int
+	Shot                                        string
+}
+
+const smokeVSCodeTheme = `{
+	// Light VS Code theme with comments and trailing commas.
+	"name": "Smoke Light", "type": "light",
+	"colors": { "editor.background": "#fdf6e3", "editor.foreground": "#586e75", },
+	"tokenColors": [
+		{ "scope": "keyword", "settings": { "foreground": "#859900", "fontStyle": "bold" } },
+		{ "scope": "string", "settings": { "foreground": "#2aa198" } },
+	],
+}`
+
+func themeFlow(s *ui.Shell, dir string) themeResult {
+	var r themeResult
+
+	editorTheme := func(want string) string {
+		waitMain(loadTimeout, func() bool { return s.Editor.AppliedTheme() == want })
+
+		return s.Editor.AppliedTheme()
+	}
+
+	// Midnight is dark-only: app, editor, grid and JSON all switch.
+	onMain(func() { s.ApplyTheme("Midnight"); s.SelectTab(ui.TabJSON) })
+	r.MidnightEditor = editorTheme("bqui-dark")
+	onMain(func() {
+		r.MidnightDark = s.Dark()
+		r.NullColored = s.Results.NullColor != objc.Nil
+
+		if s.JSON.Rows() > 0 {
+			c := s.JSON.Cell(0)
+			r.JSONSpans = len(c.Spans)
+
+			for _, sp := range c.Spans {
+				if sp.Color != objc.Nil && sp.Color == s.JSON.KeyColor() {
+					r.KeyColored = true
+				}
+			}
+		}
+	})
+
+	time.Sleep(settleDelay)
+	onMain(func() {
+		r.Shot = "theme-midnight.png"
+		if err := appkit.WriteWindowPNG(s.Window, filepath.Join(dir, r.Shot)); err != nil {
+			r.Shot = "✕ " + err.Error()
+		}
+	})
+
+	path := filepath.Join(dir, "smoke-vscode-theme.json")
+	if err := os.WriteFile(path, []byte(smokeVSCodeTheme), 0o600); err != nil {
+		r.ImportErr = err.Error()
+
+		return r
+	}
+
+	onMain(func() {
+		t, err := s.ImportVSCodeTheme(path)
+		if err != nil {
+			r.ImportErr = err.Error()
+
+			return
+		}
+
+		r.Imported = s.Theme.Name
+		_, statErr := os.Stat(t.Path)
+		r.ImportSaved = statErr == nil
+		r.Themes = len(s.Themes)
+	})
+	r.ImportEditor = editorTheme("bqui-light")
+	onMain(func() { r.ImportDark = s.Dark() })
+
+	onMain(func() { s.ApplyTheme("Default"); s.SelectTab(ui.TabResults) })
+	r.DefaultEditor = s.Editor.AppliedTheme()
+
+	return r
+}
+
+func themeChecks(rep *Report, r themeResult) {
+	rep.check("theme-switch", r.MidnightEditor == "bqui-dark" && r.MidnightDark && r.NullColored,
+		"editor %q, app dark %v, grid null colored %v", r.MidnightEditor, r.MidnightDark, r.NullColored)
+	rep.check("theme-json", r.JSONSpans > 1 && r.KeyColored, "%d spans, keys colored %v", r.JSONSpans, r.KeyColored)
+	rep.check("theme-screenshot", !strings.HasPrefix(r.Shot, "✕"), "%s", r.Shot)
+	rep.check("theme-import", r.Imported == "Smoke Light" && r.ImportSaved && r.ImportEditor == "bqui-light" && !r.ImportDark && r.ImportErr == "",
+		"imported %q saved %v, editor %q, dark %v, %d themes %s", r.Imported, r.ImportSaved, r.ImportEditor, r.ImportDark, r.Themes, r.ImportErr)
 }
 
 func workspaceChecks(rep *Report, r workspaceResult) {

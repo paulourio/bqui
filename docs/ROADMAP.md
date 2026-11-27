@@ -487,6 +487,27 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M12 — Themes
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **`internal/theme`:**
+  - TOML themes with light and dark palettes. A palette covers editor colors, one style per bqls token type (and modifiers such as `property.partitioned`), grid null and number colors, JSON key, string, number and literal colors, and the plan heat color. Font sizes and ligatures are included.
+  - Partial themes inherit from Default, and colors are validated.
+  - Built-ins: Default, Paper, Midnight (dark only), High Contrast.
+- **Monaco compile:** semantic rules, plus Monarch `sql` aliases so colors are correct before semantic tokens arrive, plus workbench colors.
+- **VS Code import:**
+  - Reads JSONC and maps `colors`, `tokenColors` and `semanticTokenColors`.
+  - `tokenColors` match TextMate prefixes, preferring the most specific scope.
+  - `*.modifier` applies to every token type that carries the modifier.
+  - The imported appearance is filled in; the other appearance keeps Default.
+- **UI (View ▸ Theme):**
+  - Pick a theme (shown with a check), Import VS Code Theme, Duplicate Current Theme, Reload Themes, Show Themes Folder.
+  - Changes apply live to app appearance, the editor (colors and font size), the grid (font size, null and number colors), JSON syntax colors, and the execution graph heat color.
+  - Colors re-resolve when macOS switches between light and dark.
+  - The chosen theme persists in settings.
+- **Not done:**
+  - A preferences window with live preview and in-app color editing; you edit the TOML and use Reload Themes instead.
+  - Vibrancy and accent options.
+  - The UI font size.
+
 **Theme model**
 - App appearance: system, light or dark; accent; vibrancy on or off.
 - Editor: background, foreground, selection, caret, gutter, and a color for each semantic token type plus modifier. The theme compiles to a Monaco theme (`monaco.editor.defineTheme`, applied through `bqui/setTheme`), so editor colors switch live together with the native UI.

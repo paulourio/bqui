@@ -27,6 +27,8 @@ type JSONPane struct {
 	grid *results.Grid
 	rows int64
 	note objc.ID
+	// colors by JSON token kind (theme); nil disables syntax coloring.
+	colors map[results.JSONKind]objc.ID
 }
 
 func newJSONPane(s *Shell) *JSONPane {
@@ -78,6 +80,12 @@ func (p *JSONPane) Rows() int64 { return p.rows }
 
 // Line returns the JSON text of a row as displayed (smoke checks).
 func (p *JSONPane) Line(i int) string { return jsonSource{p}.CellText(i, "json").Text }
+
+// Cell returns a rendered JSON line with its colored spans (smoke checks).
+func (p *JSONPane) Cell(i int) appkit.CellText { return jsonSource{p}.CellText(i, "json") }
+
+// KeyColor is the theme color for object keys (smoke checks).
+func (p *JSONPane) KeyColor() objc.ID { return p.colors[results.JSONKey] }
 
 func (p *JSONPane) rowJSON(i int64) []byte {
 	row, err := p.grid.Row(i)
@@ -168,5 +176,13 @@ func (s jsonSource) CellText(i int, column string) appkit.CellText {
 		text = string([]rune(text)[:jsonLineRunes]) + " …"
 	}
 
-	return appkit.CellText{Text: text, Mono: true}
+	c := appkit.CellText{Text: text, Mono: true}
+
+	if colors := s.p.colors; colors != nil {
+		for _, sp := range results.JSONSpans(text) {
+			c.Spans = append(c.Spans, appkit.Span{Text: text[sp.Start:sp.End], Color: colors[sp.Kind]})
+		}
+	}
+
+	return c
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/paulourio/bqui/internal/plan"
 	"github.com/paulourio/bqui/internal/results"
 	"github.com/paulourio/bqui/internal/store"
+	"github.com/paulourio/bqui/internal/theme"
 )
 
 // AppName is the user-visible application name.
@@ -69,6 +70,8 @@ type Options struct {
 	// Workspace persists the editor text, saved queries and run history
 	// (nil: an in-memory workspace).
 	Workspace *app.Workspace
+	// ThemesDir holds user themes (TOML).
+	ThemesDir string
 }
 
 // Shell is the main window and its panes.
@@ -94,6 +97,11 @@ type Shell struct {
 	sideTabs  *appkit.Segmented
 	sideViews []objc.ID
 	recorded  map[*app.Run]bool
+
+	Themes      []*theme.Theme
+	Theme       *theme.Theme
+	themeErrs   []error
+	themeColors []objc.ID
 
 	exportCancel func()
 	lastExport   app.ExportProgress
@@ -123,6 +131,7 @@ func NewShell(opts Options) (*Shell, error) {
 		s.Workspace = w
 	}
 
+	s.loadThemes()
 	appkit.SetMainMenu(s.App, s.menus())
 
 	ed, err := NewEditorPane(EditorOptions{
@@ -191,6 +200,9 @@ func NewShell(opts Options) (*Shell, error) {
 	objc.Msg(s.Window, "center")
 	appkit.SetToolbar(s.Window, "BQUIMainToolbar", s.toolbarItems())
 	s.restoreWorkspace()
+	s.ApplyTheme(s.settings.Theme)
+	s.rebuildMenus() // theme check marks
+	s.watchAppearance()
 
 	// Give the editor ~55% of the content height on first launch; autosave
 	// restores the user's divider afterwards.
@@ -391,6 +403,8 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Toggle Inspector", Action: "toggleInspector:", Key: "i", Mods: cmd | ctrl},
 			{},
 			{Title: "Run History", Key: "y", Run: s.RunHistory},
+			{},
+			s.themeMenu(),
 			{},
 			{Title: "Enter Full Screen", Action: "toggleFullScreen:", Key: "f", Mods: cmd | ctrl},
 		}},

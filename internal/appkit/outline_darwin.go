@@ -39,6 +39,16 @@ type CellText struct {
 	Italic    bool // grid cells (NULL)
 	Right     bool // right-aligned (numbers)
 	ToolTip   string
+	// Color overrides the text color (grid cells; nil = system colors).
+	Color objc.ID
+	// Spans, if set, replace Text with colored runs (grid cells).
+	Spans []Span
+}
+
+// Span is a run of colored text (nil Color = label color).
+type Span struct {
+	Text  string
+	Color objc.ID
 }
 
 // Column describes one outline column. The first column is the outline

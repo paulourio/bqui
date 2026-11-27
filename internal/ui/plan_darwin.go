@@ -214,6 +214,8 @@ func msShort(v int64) string {
 type GraphPane struct {
 	View   objc.ID
 	Canvas objc.ID
+	// Hot is the heat color for the busiest stage (theme; nil = default).
+	Hot objc.ID
 
 	s        *Shell
 	plan     *plan.Plan
@@ -274,6 +276,9 @@ func (g *GraphPane) Draw(appkit.Rect) {
 
 	base := appkit.SystemColor("controlBackgroundColor")
 	hot := appkit.RGB(0.95, 0.45, 0.15, 1)
+	if g.Hot != objc.Nil {
+		hot = g.Hot
+	}
 	border := appkit.SystemColor("separatorColor")
 	accent := appkit.SystemColor("controlAccentColor")
 	label := appkit.SystemColor("labelColor")

@@ -76,6 +76,7 @@ func main() {
 			SettingsPath:  settingsPath,
 			SpillDir:      spillDir(),
 			Workspace:     workspace,
+			ThemesDir:     themesDir(*smokeDir),
 		})
 		if err != nil {
 			fatal(err)
@@ -241,4 +242,19 @@ func openWorkspace(fake bool, smokeDir string) (*app.Workspace, func()) {
 			}
 		})
 	}
+}
+
+// themesDir is the user themes folder (a fresh one for smoke runs, which
+// openWorkspace has already cleared).
+func themesDir(smokeDir string) string {
+	if smokeDir != "" {
+		return filepath.Join(smokeDir, "state", "themes")
+	}
+
+	dir, err := store.DefaultThemesDir()
+	if err != nil {
+		return ""
+	}
+
+	return dir
 }
