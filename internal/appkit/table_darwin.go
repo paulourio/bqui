@@ -611,3 +611,10 @@ func newGridCell(id string) objc.ID {
 func (t *Table) SetRowHeight(h float64) {
 	objc.Msg(t.View, "setRowHeight:", h)
 }
+
+// ScrollToEnd scrolls the last row into view.
+func (t *Table) ScrollToEnd() {
+	if n := t.Rows(); n > 0 {
+		objc.Msg(t.View, "scrollRowToVisible:", n-1)
+	}
+}

@@ -656,6 +656,27 @@ func (p *ResultsPane) AutoFit() {
 	}
 }
 
+// LoadedRows returns loaded rows and whether more can be fetched (smoke).
+func (p *ResultsPane) LoadedRows() (rows int64, more bool) {
+	if p.grid == nil {
+		return 0, false
+	}
+
+	rows, _, _ = p.grid.Size()
+
+	return rows, p.snap.More
+}
+
+// ColumnWidth returns a result column's width (smoke checks).
+func (p *ResultsPane) ColumnWidth(i int) float64 {
+	col := objc.Msg(p.Table.View, "tableColumnWithIdentifier:", objc.String(colPrefix+strconv.Itoa(i)))
+	if col == objc.Nil {
+		return 0
+	}
+
+	return objc.Send[float64](col, "width")
+}
+
 // rowsText describes the loaded rows (and whether more can be fetched).
 func (p *ResultsPane) rowsText() []string {
 	s := p.snap

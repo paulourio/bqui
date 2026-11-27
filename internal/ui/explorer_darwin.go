@@ -335,3 +335,13 @@ func kindSymbol(k app.NodeKind) string {
 
 	return ""
 }
+
+// Activate acts like a double-click on a node (smoke checks).
+func (p *ExplorerPane) Activate(id uint64) { p.onDoubleClick(id) }
+
+// EditorFocused reports whether keyboard focus is in the editor.
+func (s *Shell) EditorFocused() bool {
+	fr := objc.Msg(s.Window, "firstResponder")
+
+	return fr != objc.Nil && objc.Send[bool](fr, "isDescendantOf:", s.Editor.Web.View)
+}

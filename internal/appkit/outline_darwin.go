@@ -694,3 +694,8 @@ func stringOrNil(s string) objc.ID {
 
 	return objc.String(s)
 }
+
+// Focus makes the outline the window's first responder.
+func (o *Outline) Focus() {
+	objc.Msg(objc.Msg(o.View, "window"), "makeFirstResponder:", o.View)
+}
