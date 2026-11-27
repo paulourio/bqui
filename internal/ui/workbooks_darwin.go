@@ -326,16 +326,8 @@ func (p *WorkbooksPane) menu(id uint64) []appkit.MenuItem {
 	newWorkbook := appkit.MenuItem{Title: "New Workbook", Run: p.s.NewWorkbook}
 	refresh := appkit.MenuItem{Title: "Refresh", Run: p.Reload}
 
-	if q, ok := p.remote(id); ok {
-		return []appkit.MenuItem{
-			{Title: "Open", Run: func() { p.s.OpenStudioQuery(q) }},
-			{},
-			{Title: "Rename…", Run: func() { p.s.RenameStudioQuery(q) }},
-			{Title: "Delete…", Run: func() { p.s.DeleteStudioQuery(q) }},
-			{},
-			{Title: "Copy Resource Name", Run: func() { appkit.CopyToPasteboard(q.Name) }},
-			refresh,
-		}
+	if items, ok := p.remoteMenu(id, refresh); ok {
+		return items
 	}
 
 	n, ok := p.nodes[id]
@@ -355,42 +347,7 @@ func (p *WorkbooksPane) menu(id uint64) []appkit.MenuItem {
 			newWorkbook, refresh,
 		}
 	case ok && n.query != nil:
-		q := *n.query
-
-		var moves []appkit.MenuItem
-
-		if wbs, err := lib.Workbooks(); err == nil {
-			for _, w := range wbs {
-				if w.Name != q.Workbook {
-					to := w.Name
-					moves = append(moves, appkit.MenuItem{Title: to, Run: func() { p.s.MoveQuery(q, to, q.Name) }})
-				}
-			}
-		}
-
-		items := []appkit.MenuItem{
-			{Title: "Open", Run: func() { p.s.OpenLibraryQuery(q.Path) }},
-			{Title: "Run", Run: func() {
-				if _, body, err := store.ReadQuery(q.Path); err == nil {
-					p.s.RunSQL(body)
-				}
-			}},
-			{},
-			{Title: "Rename…", Run: func() { p.s.RenameQuery(q) }},
-			{Title: "Duplicate", Run: func() { p.s.DuplicateQuery(q) }},
-		}
-
-		if len(moves) > 0 {
-			items = append(items, appkit.MenuItem{Title: "Move to", Submenu: &appkit.Menu{Title: "Move to", Items: moves}})
-		}
-
-		return append(items,
-			appkit.MenuItem{},
-			appkit.MenuItem{Title: "Show in Finder", Run: func() { appkit.RevealInFinder(q.Path) }},
-			appkit.MenuItem{Title: "Copy Path", Run: func() { appkit.CopyToPasteboard(q.Path) }},
-			appkit.MenuItem{},
-			appkit.MenuItem{Title: "Move to Trash", Run: func() { p.s.TrashQuery(q) }},
-		)
+		return p.queryMenu(*n.query)
 	}
 
 	return []appkit.MenuItem{
@@ -725,4 +682,62 @@ func renameError(err error) string {
 	}
 
 	return err.Error()
+}
+
+// remoteMenu is the context menu of a BigQuery Studio saved query.
+func (p *WorkbooksPane) remoteMenu(id uint64, refresh appkit.MenuItem) ([]appkit.MenuItem, bool) {
+	q, ok := p.remote(id)
+	if !ok {
+		return nil, false
+	}
+
+	return []appkit.MenuItem{
+		{Title: "Open", Run: func() { p.s.OpenStudioQuery(q) }},
+		{},
+		{Title: "Rename…", Run: func() { p.s.RenameStudioQuery(q) }},
+		{Title: "Delete…", Run: func() { p.s.DeleteStudioQuery(q) }},
+		{},
+		{Title: "Copy Resource Name", Run: func() { appkit.CopyToPasteboard(q.Name) }},
+		refresh,
+	}, true
+}
+
+// queryMenu is the context menu of a library query.
+func (p *WorkbooksPane) queryMenu(q store.Query) []appkit.MenuItem {
+	lib := p.s.Workspace.Library()
+
+	var moves []appkit.MenuItem
+
+	if wbs, err := lib.Workbooks(); err == nil {
+		for _, w := range wbs {
+			if w.Name != q.Workbook {
+				to := w.Name
+				moves = append(moves, appkit.MenuItem{Title: to, Run: func() { p.s.MoveQuery(q, to, q.Name) }})
+			}
+		}
+	}
+
+	items := []appkit.MenuItem{
+		{Title: "Open", Run: func() { p.s.OpenLibraryQuery(q.Path) }},
+		{Title: "Run", Run: func() {
+			if _, body, err := store.ReadQuery(q.Path); err == nil {
+				p.s.RunSQL(body)
+			}
+		}},
+		{},
+		{Title: "Rename…", Run: func() { p.s.RenameQuery(q) }},
+		{Title: "Duplicate", Run: func() { p.s.DuplicateQuery(q) }},
+	}
+
+	if len(moves) > 0 {
+		items = append(items, appkit.MenuItem{Title: "Move to", Submenu: &appkit.Menu{Title: "Move to", Items: moves}})
+	}
+
+	return append(items,
+		appkit.MenuItem{},
+		appkit.MenuItem{Title: "Show in Finder", Run: func() { appkit.RevealInFinder(q.Path) }},
+		appkit.MenuItem{Title: "Copy Path", Run: func() { appkit.CopyToPasteboard(q.Path) }},
+		appkit.MenuItem{},
+		appkit.MenuItem{Title: "Move to Trash", Run: func() { p.s.TrashQuery(q) }},
+	)
 }
