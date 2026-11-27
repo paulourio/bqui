@@ -183,9 +183,11 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 	)
 
 	// The tab bar sits under the action row when it is shown, else under
-	// the subtitle; setActions switches between the two.
-	p.segBelowSubtitle = appkit.Equal(appkit.Anchor(p.seg.View, "topAnchor"), appkit.Anchor(p.subtitle, "bottomAnchor"), segGap)
-	p.segBelowActions = appkit.Equal(appkit.Anchor(p.seg.View, "topAnchor"), appkit.Anchor(p.actions, "bottomAnchor"), actionsGap)
+	// the subtitle; setActions switches between the two. Both constraints
+	// are retained: an inactive constraint is owned by nothing else, and
+	// the pane lives as long as the window.
+	p.segBelowSubtitle = objc.Retain(appkit.Equal(appkit.Anchor(p.seg.View, "topAnchor"), appkit.Anchor(p.subtitle, "bottomAnchor"), segGap))
+	p.segBelowActions = objc.Retain(appkit.Equal(appkit.Anchor(p.seg.View, "topAnchor"), appkit.Anchor(p.actions, "bottomAnchor"), actionsGap))
 	p.setActions(app.ObjectInfo{}, "")
 
 	p.setState(stateEmpty)
