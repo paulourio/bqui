@@ -42,7 +42,7 @@ bqui/
     bqstorage/         Storage Read API sessions + Arrow decoding (arrow-go, pure Go)
     results/           result store (Arrow IPC spill), schema flattener, sub-row layout engine, value formatter, JSON renderer
     plan/              query plan model, DAG layout (Sugiyama), timeline model
-    export/            CSV / NDJSON / Parquet / Arrow IPC writers, parallel streams, progress
+    export/            CSV / NDJSON / Parquet writers, parallel streams, progress
     webkit/            WKWebView, URL scheme handler, script message handler, JS evaluation (darwin)
     editor/            Monaco host: embedded assets (web/), JS↔Go bridge, LSP relay to in-process bqls (UI-agnostic core)
     store/             SQLite schema/migrations (history, sessions, tabs, links), saved-query folder, settings
@@ -404,13 +404,14 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 - **`internal/export`:**
   - CSV, flattened into console-style lines by default, or with JSON cells as an option. NULLs and blank continuation cells are empty.
   - NDJSON in the console's JSON encoding.
-  - Parquet (zstd, nested types preserved) and Arrow IPC (zstd), written straight from Storage Read API Arrow records.
+  - Parquet (zstd, nested types preserved), written straight from Storage Read API Arrow records.
+  - Arrow IPC export shipped at first and was removed on 2026-11-27 at the user's request.
 - **`Runner.Export`:**
   - Tables and query results (the destination table) stream through the Storage Read API; in-memory results (the fake backend, or no destination) export CSV/NDJSON from the grid.
   - It writes to `<file>.partial` and renames on success; failures and cancellations leave nothing behind.
   - It checks free disk space against the scan estimate and shows a Storage Read API cost hint.
   - Progress shows rows, bytes, elapsed time and estimated rows, and Stop cancels.
-- **Live test** (`-tags live`): `bigquery-public-data.samples.shakespeare` (164,656 rows) exports to Parquet (1.0 MB), Arrow (1.9 MB) and CSV (4.6 MB).
+- **Live test** (`-tags live`): `bigquery-public-data.samples.shakespeare` (164,656 rows) exports to Parquet (1.0 MB) and CSV (4.6 MB).
 - **UI:** Export Results submenus in the Query menu and the results context menu, and Export Table in the explorer, each with a save panel.
 - **Not done:**
   - XLSX.
@@ -426,7 +427,7 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 - CSV (with RFC 4180 options and a flattening choice: console-style sub-lines or JSON-in-cell, allowed **only in CSV export**)
 - NDJSON (BigQuery JSON encoding)
 - Parquet (nested types preserved)
-- Arrow IPC/Feather
+- ~~Arrow IPC/Feather~~ (removed)
 - *(Optional)* XLSX via `excelize` (pure Go) with a row cap
 
 **Engine**

@@ -128,7 +128,7 @@ func TestLiveExportParquetAndArrow(t *testing.T) {
 	ref := &bq.TableRef{Project: "bigquery-public-data", Dataset: "samples", Table: "shakespeare"}
 	dir := t.TempDir()
 
-	for _, f := range []export.Format{export.Parquet, export.Arrow, export.CSV} {
+	for _, f := range []export.Format{export.Parquet, export.CSV} {
 		path := filepath.Join(dir, "shakespeare."+f.Ext())
 
 		p := runExport(t, rn, ExportSource{Table: ref}, path, f)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
-	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
@@ -130,14 +129,14 @@ func record(t *testing.T, mem memory.Allocator) arrow.RecordBatch {
 	return b.NewRecordBatch()
 }
 
-func TestParquetAndArrowRoundTrip(t *testing.T) {
+func TestParquetRoundTrip(t *testing.T) {
 	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
 	defer mem.AssertSize(t, 0)
 
 	rec := record(t, mem)
 	defer rec.Release()
 
-	for _, f := range []Format{Parquet, Arrow} {
+	for _, f := range []Format{Parquet} {
 		var buf bytes.Buffer
 
 		w, err := NewRecordWriter(&buf, f, rec.Schema())
@@ -176,20 +175,6 @@ func TestParquetAndArrowRoundTrip(t *testing.T) {
 			n = tbl.NumRows()
 			sku = tbl.Column(1).Data().Chunk(0).(*array.List).ListValues().(*array.Struct).Field(0).(*array.String).Value(0)
 			tbl.Release()
-		case Arrow:
-			fr, err := ipc.NewFileReader(bytes.NewReader(buf.Bytes()))
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			r, err := fr.RecordBatch(0)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			n = r.NumRows()
-			sku = r.Column(1).(*array.List).ListValues().(*array.Struct).Field(0).(*array.String).Value(0)
-			fr.Close()
 		case CSV, NDJSON:
 		}
 

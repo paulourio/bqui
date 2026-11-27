@@ -1,7 +1,7 @@
 // Package export writes BigQuery results to files: CSV (flattened
-// console-style lines or JSON cells), newline-delimited JSON, Parquet and
-// Arrow IPC. Row formats take decoded rows; columnar formats take Arrow
-// records straight from the Storage Read API, preserving nesting.
+// console-style lines or JSON cells), newline-delimited JSON and Parquet.
+// Row formats take decoded rows; Parquet takes Arrow records straight from
+// the Storage Read API, preserving nesting.
 package export
 
 import (
@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
@@ -29,7 +28,6 @@ const (
 	CSV Format = iota
 	NDJSON
 	Parquet
-	Arrow
 )
 
 var formatInfo = [...]struct {
@@ -39,7 +37,6 @@ var formatInfo = [...]struct {
 	CSV:     {"CSV", "csv", false},
 	NDJSON:  {"Newline-delimited JSON", "jsonl", false},
 	Parquet: {"Parquet", "parquet", true},
-	Arrow:   {"Arrow IPC", "arrow", true},
 }
 
 func (f Format) String() string { return formatInfo[f].name }
@@ -51,7 +48,7 @@ func (f Format) Ext() string { return formatInfo[f].ext }
 func (f Format) Columnar() bool { return formatInfo[f].columnar }
 
 // Formats lists every format.
-func Formats() []Format { return []Format{CSV, NDJSON, Parquet, Arrow} }
+func Formats() []Format { return []Format{CSV, NDJSON, Parquet} }
 
 // CSVNesting chooses how CSV represents nested and repeated data.
 type CSVNesting int
@@ -73,7 +70,7 @@ type Options struct {
 }
 
 // ErrColumnar is returned when a columnar format is given rows.
-var ErrColumnar = errors.New("export: Parquet and Arrow need a Storage Read API source")
+var ErrColumnar = errors.New("export: Parquet needs a Storage Read API source")
 
 // RowWriter writes decoded rows.
 type RowWriter interface {
@@ -88,7 +85,7 @@ func NewRowWriter(w io.Writer, f Format, fields []results.Field, opts Options) (
 		return newCSV(w, fields, opts)
 	case NDJSON:
 		return &ndjsonWriter{w: w, fields: fields}, nil
-	case Parquet, Arrow:
+	case Parquet:
 	}
 
 	return nil, ErrColumnar
@@ -231,7 +228,7 @@ type RecordWriter interface {
 	Close() error
 }
 
-// NewRecordWriter creates a Parquet (zstd) or Arrow IPC file writer.
+// NewRecordWriter creates a Parquet (zstd) file writer.
 func NewRecordWriter(w io.Writer, f Format, schema *arrow.Schema) (RecordWriter, error) {
 	switch f {
 	case Parquet:
@@ -240,13 +237,6 @@ func NewRecordWriter(w io.Writer, f Format, schema *arrow.Schema) (RecordWriter,
 		fw, err := pqarrow.NewFileWriter(schema, w, props, pqarrow.NewArrowWriterProperties(pqarrow.WithStoreSchema()))
 		if err != nil {
 			return nil, fmt.Errorf("export: parquet: %w", err)
-		}
-
-		return fw, nil
-	case Arrow:
-		fw, err := ipc.NewFileWriter(w, ipc.WithSchema(schema), ipc.WithZstd())
-		if err != nil {
-			return nil, fmt.Errorf("export: arrow: %w", err)
 		}
 
 		return fw, nil

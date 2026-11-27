@@ -16,7 +16,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
@@ -262,7 +261,7 @@ func TestTier1F1NestedFieldsOffline(t *testing.T) {
 		}
 	})
 
-	t.Run("export_Parquet_and_Arrow_IPC_columnar", func(t *testing.T) {
+	t.Run("export_Parquet_columnar", func(t *testing.T) {
 		t.Parallel()
 
 		ds := buildGithubNestedSubsetDataset(t)
@@ -271,30 +270,6 @@ func TestTier1F1NestedFieldsOffline(t *testing.T) {
 			t.Fatalf("decodeArrowBatch: %v", err)
 		}
 		defer rec.Release()
-
-		var arrowBuf bytes.Buffer
-		aw, err := export.NewRecordWriter(&arrowBuf, export.Arrow, rec.Schema())
-		if err != nil {
-			t.Fatalf("NewRecordWriter Arrow: %v", err)
-		}
-
-		if werr := aw.Write(rec); werr != nil {
-			t.Fatalf("Arrow write: %v", werr)
-		}
-
-		if cerr := aw.Close(); cerr != nil {
-			t.Fatalf("Arrow close: %v", cerr)
-		}
-
-		fr, err := ipc.NewFileReader(bytes.NewReader(arrowBuf.Bytes()))
-		if err != nil {
-			t.Fatalf("ipc.NewFileReader: %v", err)
-		}
-		defer fr.Close()
-
-		if fr.NumRecords() != 1 {
-			t.Fatalf("Arrow NumRecords = %d, want 1", fr.NumRecords())
-		}
 
 		var pqBuf bytes.Buffer
 		pw, err := export.NewRecordWriter(&pqBuf, export.Parquet, rec.Schema())

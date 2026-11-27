@@ -18,7 +18,6 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
-	"github.com/apache/arrow-go/v18/arrow/ipc"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/pqarrow"
@@ -228,7 +227,7 @@ func TestTier3PairwiseCombinations(t *testing.T) {
 		}
 	})
 
-	t.Run("P05_Runner_ArrowStorage_Parquet_ArrowIPC_RoundTrip", func(t *testing.T) {
+	t.Run("P05_Runner_ArrowStorage_Parquet_RoundTrip", func(t *testing.T) {
 		t.Parallel()
 
 		ds := buildGithubNestedSubsetDataset(t)
@@ -246,7 +245,7 @@ func TestTier3PairwiseCombinations(t *testing.T) {
 		dir := t.TempDir()
 		ref := &bq.TableRef{Project: "p", Dataset: "d", Table: "t"}
 
-		for _, fmtKind := range []export.Format{export.Arrow, export.Parquet} {
+		for _, fmtKind := range []export.Format{export.Parquet} {
 			outPath := filepath.Join(dir, "out."+fmtKind.Ext())
 			ch := make(chan app.ExportProgress, 1)
 			rn.Export(app.ExportSource{Table: ref}, outPath, fmtKind, export.Options{}, func(p app.ExportProgress) {
@@ -260,44 +259,24 @@ func TestTier3PairwiseCombinations(t *testing.T) {
 				t.Fatalf("%s export failed: %+v", fmtKind, p)
 			}
 
-			if fmtKind == export.Arrow {
-				f, err := os.Open(outPath)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				fr, err := ipc.NewFileReader(f)
-				if err != nil {
-					_ = f.Close()
-					t.Fatalf("ipc.NewFileReader: %v", err)
-				}
-
-				if fr.NumRecords() != 1 {
-					t.Fatalf("Arrow NumRecords = %d, want 1", fr.NumRecords())
-				}
-
-				_ = fr.Close()
-				_ = f.Close()
-			} else {
-				pr, err := file.OpenParquetFile(outPath, false)
-				if err != nil {
-					t.Fatalf("OpenParquetFile: %v", err)
-				}
-
-				rr, err := pqarrow.NewFileReader(pr, pqarrow.ArrowReadProperties{}, memory.NewGoAllocator())
-				if err != nil {
-					_ = pr.Close()
-					t.Fatal(err)
-				}
-
-				tblOut, err := rr.ReadTable(t.Context())
-				if err != nil || tblOut.NumRows() != 2 {
-					t.Fatalf("Parquet ReadTable rows=%d err=%v", tblOut.NumRows(), err)
-				}
-
-				tblOut.Release()
-				_ = pr.Close()
+			pr, err := file.OpenParquetFile(outPath, false)
+			if err != nil {
+				t.Fatalf("OpenParquetFile: %v", err)
 			}
+
+			rr, err := pqarrow.NewFileReader(pr, pqarrow.ArrowReadProperties{}, memory.NewGoAllocator())
+			if err != nil {
+				_ = pr.Close()
+				t.Fatal(err)
+			}
+
+			tblOut, err := rr.ReadTable(t.Context())
+			if err != nil || tblOut.NumRows() != 2 {
+				t.Fatalf("Parquet ReadTable rows=%d err=%v", tblOut.NumRows(), err)
+			}
+
+			tblOut.Release()
+			_ = pr.Close()
 		}
 	})
 

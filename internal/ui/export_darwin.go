@@ -24,7 +24,6 @@ var exportChoices = []exportChoice{
 	{"CSV with JSON Cells…", export.CSV, export.Options{CSVNesting: export.CSVJSONCells}},
 	{"JSON Lines…", export.NDJSON, export.Options{}},
 	{"Parquet…", export.Parquet, export.Options{}},
-	{"Arrow IPC…", export.Arrow, export.Options{}},
 }
 
 // exportMenu builds an Export submenu for a source; columnar formats are
