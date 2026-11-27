@@ -50,15 +50,22 @@ const (
 	ToolbarInspectorSeparator
 )
 
+// Toolbar item visibility priorities.
+const (
+	ToolbarVisibilityLow  int64 = -1000
+	ToolbarVisibilityHigh int64 = 1000
+)
+
 // ToolbarItem describes one toolbar item.
 type ToolbarItem struct {
-	ID      string // required for Button/CustomView/Search
-	Kind    ToolbarItemKind
-	Label   string
-	Symbol  string // SF Symbol name for buttons
-	ToolTip string
-	View    objc.ID // for ToolbarCustomView
-	Run     func()
+	ID                 string // required for Button/CustomView/Search
+	Kind               ToolbarItemKind
+	Label              string
+	Symbol             string // SF Symbol name for buttons
+	ToolTip            string
+	View               objc.ID // for ToolbarCustomView
+	VisibilityPriority int64
+	Run                func()
 
 	item objc.ID
 }
@@ -169,6 +176,10 @@ func buildToolbarItem(it *ToolbarItem, ident objc.ID) objc.ID {
 
 	if it.ToolTip != "" {
 		objc.Msg(item, "setToolTip:", objc.String(it.ToolTip))
+	}
+
+	if it.VisibilityPriority != 0 {
+		objc.Msg(item, "setVisibilityPriority:", it.VisibilityPriority)
 	}
 
 	if it.Run != nil {

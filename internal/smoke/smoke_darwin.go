@@ -129,6 +129,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	is := inspectFlow(s, dir)
 	phase("definition")
 	gd := definitionFlow(s)
+	phase("layout")
+	ly := layoutFlow(s, dir)
 	phase("checks")
 
 	queued := time.Now()
@@ -162,6 +164,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		studioChecks(rep, st)
 		inspectChecks(rep, is)
 		definitionChecks(rep, gd)
+		layoutChecks(rep, ly)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -379,7 +382,6 @@ func explorerChecks(rep *Report, r exploreResult) {
 		"%d tables; main-thread reload %v (max over run %v)", r.ScaleRows, r.ScaleReload.Round(time.Millisecond), r.MaxReload.Round(time.Millisecond))
 	rep.check("explorer-filter", r.FilterRows >= 3 && r.FilterRows <= 6, "%d rows visible for filter \"shakes\"", r.FilterRows)
 	rep.check("inspector-dataset", r.DatasetDetails > 3 && r.DatasetSegment == 1, "%d detail rows, segment %d", r.DatasetDetails, r.DatasetSegment)
-	rep.skip("inspector-segments", "%s", r.SegGeometry)
 	rep.check("inspector-schema", r.SchemaFields > 20 && r.SchemaRows > 5 && r.SchemaSegment == 0,
 		"%d fields (%d top-level rows), segment %d", r.SchemaFields, r.SchemaRows, r.SchemaSegment)
 }
@@ -600,7 +602,7 @@ func jobsFlow(s *ui.Shell) jobsResult {
 
 	onMain(func() { ref = s.History.Model.Rows()[0].Ref })
 
-	if run := waitRun(s, func() { s.Results.Show(s.Runner.OpenJob(ref)) }); run != nil {
+	if run := waitRun(s, func() { s.ShowRun(s.Runner.OpenJob(ref)) }); run != nil {
 		if g := run.Snapshot().Grid; g != nil {
 			r.ReopenedRows, _, _ = g.Size()
 		}
@@ -982,6 +984,7 @@ func prefsFlow(s *ui.Shell, dir string) prefsResult {
 // studioResult captures the BigQuery Studio saved-query flow.
 type studioResult struct {
 	Listed                       []string
+	GroupExpanded                bool
 	Opened, Saved, Overwritten   bool
 	ConflictErr, RemoteAfterConf string
 	Published                    bool
@@ -1006,6 +1009,8 @@ func studioFlow(s *ui.Shell, dir string) studioResult {
 	var target dataform.SavedQuery
 
 	onMain(func() {
+		r.GroupExpanded = s.Workbooks.StudioExpanded()
+
 		for _, q := range s.Workbooks.StudioQueries() {
 			r.Listed = append(r.Listed, q.Title)
 
@@ -1264,7 +1269,8 @@ func inspectChecks(rep *Report, r inspectResult) {
 }
 
 func studioChecks(rep *Report, r studioResult) {
-	rep.check("studio-list-open", r.Err == "" && len(r.Listed) >= 2 && r.Opened, "listed %q, opened %v %s", r.Listed, r.Opened, r.Err)
+	rep.check("studio-list-open", r.Err == "" && len(r.Listed) >= 2 && r.Opened && r.GroupExpanded,
+		"listed %q, opened %v, groupExpanded %v %s", r.Listed, r.Opened, r.GroupExpanded, r.Err)
 	rep.check("studio-save", r.Saved, "edit committed to BigQuery Studio: %v", r.Saved)
 	rep.check("studio-conflict", strings.Contains(r.ConflictErr, "changed in BigQuery") && r.RemoteAfterConf == "SELECT 'edited in the console'" && r.Overwritten,
 		"conflict %q, console version kept %q, explicit overwrite %v", r.ConflictErr, r.RemoteAfterConf, r.Overwritten)
@@ -1407,10 +1413,12 @@ func accessibilityChecks(ax *appkit.AXNode, rep *Report) {
 func screenshots(s *ui.Shell, dir string, rep *Report, next func(error)) {
 	// The frame view (content view's superview) includes titlebar and toolbar.
 	frameView := objc.Msg(objc.Msg(s.Window, "contentView"), "superview")
+	origFrame := objc.Send[appkit.Rect](s.Window, "frame")
 
 	if err := appkit.WritePNG(s.Inspector.SegmentView(), filepath.Join(dir, "segmented.png")); err == nil {
 		rep.Screenshots = append(rep.Screenshots, "segmented.png")
 	}
+
 	looks := []struct{ name, appearance string }{
 		{"light", "NSAppearanceNameAqua"},
 		{"dark", "NSAppearanceNameDarkAqua"},
@@ -1420,8 +1428,32 @@ func screenshots(s *ui.Shell, dir string, rep *Report, next func(error)) {
 
 	step = func(i int) {
 		if i == len(looks) {
-			objc.Msg(s.Window, "setAppearance:", objc.Nil)
-			next(nil)
+			objc.Msg(s.Window, "setAppearance:", objc.Msg(objc.Cls("NSAppearance"), "appearanceNamed:", objc.String("NSAppearanceNameAqua")))
+			appkit.WindowResize(s.Window, layoutNarrowWidth, layoutNarrowHeight)
+			layoutWindow(s.Window)
+
+			afterMain(settleDelay, func() {
+				narrowName := "window-narrow.png"
+				narrowPath := filepath.Join(dir, narrowName)
+
+				err := appkit.WriteWindowPNG(s.Window, narrowPath)
+				if errors.Is(err, appkit.ErrCaptureBlank) {
+					err = appkit.WritePNG(frameView, narrowPath)
+				}
+
+				rep.check("capture-narrow", err == nil, "narrow capture: %v", errText(err))
+
+				if err == nil {
+					rep.Screenshots = append(rep.Screenshots, narrowName)
+				}
+
+				objc.Msg(s.Window, "setFrame:display:", origFrame, true)
+				setInspectorWidth(s, layoutInspectorWide)
+				objc.Msg(s.Window, "setAppearance:", objc.Nil)
+				s.SelectTab(ui.TabResults)
+				layoutWindow(s.Window)
+				next(nil)
+			})
 
 			return
 		}

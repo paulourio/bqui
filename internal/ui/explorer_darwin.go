@@ -21,6 +21,7 @@ type ExplorerPane struct {
 
 	s      *Shell
 	filter bool
+	search objc.ID
 	star   objc.ID // starred-only toggle button
 
 	// LastReload / MaxReload measure main-thread time spent reloading the
@@ -43,6 +44,7 @@ func newExplorerPane(s *Shell, be app.Backend) *ExplorerPane {
 	})
 
 	search := appkit.NewSearchField("Filter", p.SetFilter)
+	p.search = search
 
 	p.star = objc.Msg(objc.Cls("NSButton"), "buttonWithImage:target:action:",
 		appkit.SymbolImage("star", "Starred only"), objc.NewTarget(func(objc.ID) { p.SetStarredOnly(!p.Model.StarredOnly()) }),
@@ -73,6 +75,9 @@ func newExplorerPane(s *Shell, be app.Backend) *ExplorerPane {
 
 	return p
 }
+
+// HeaderViews returns the filter field and starred-only button (smoke checks).
+func (p *ExplorerPane) HeaderViews() (search, star objc.ID) { return p.search, p.star }
 
 // ToggleStar stars or unstars a dataset and saves the choice.
 func (p *ExplorerPane) ToggleStar(info app.ObjectInfo) {

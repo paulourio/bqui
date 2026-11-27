@@ -4,6 +4,7 @@ package appkit
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/paulourio/bqui/internal/objc"
 )
@@ -65,6 +66,112 @@ func (s *Segmented) Select(i int) {
 // SetEnabled enables or disables one segment.
 func (s *Segmented) SetEnabled(i int, enabled bool) {
 	objc.Msg(s.View, "setEnabled:forSegment:", enabled, int64(i))
+}
+
+// SegmentCount returns the number of segments.
+func (s *Segmented) SegmentCount() int {
+	if s == nil || s.View == objc.Nil {
+		return 0
+	}
+
+	n := int(objc.Send[int64](s.View, "segmentCount"))
+	if n < 0 {
+		return 0
+	}
+
+	return n
+}
+
+// SegmentLabel returns the label of segment i ("" if out of range).
+func (s *Segmented) SegmentLabel(i int) string {
+	if i < 0 || i >= s.SegmentCount() {
+		return ""
+	}
+
+	return objc.GoString(objc.Msg(s.View, "labelForSegment:", int64(i)))
+}
+
+// SegmentWidth returns the configured width of segment i (0 if auto-sized or out of range).
+func (s *Segmented) SegmentWidth(i int) float64 {
+	if i < 0 || i >= s.SegmentCount() {
+		return 0
+	}
+
+	return objc.Send[float64](s.View, "widthForSegment:", int64(i))
+}
+
+// SetSegmentLabel sets the label of segment i.
+func (s *Segmented) SetSegmentLabel(i int, label string) {
+	if i < 0 || i >= s.SegmentCount() {
+		return
+	}
+
+	objc.Msg(s.View, "setLabel:forSegment:", objc.String(label), int64(i))
+}
+
+// SetSegmentWidth sets the explicit width of segment i.
+func (s *Segmented) SetSegmentWidth(i int, width float64) {
+	if i < 0 || i >= s.SegmentCount() {
+		return
+	}
+
+	objc.Msg(s.View, "setWidth:forSegment:", width, int64(i))
+}
+
+// SetFont sets the segmented control font to the system font at pointSize.
+func (s *Segmented) SetFont(pointSize float64) {
+	if s == nil || s.View == objc.Nil || pointSize <= 0 {
+		return
+	}
+
+	objc.Msg(s.View, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", pointSize))
+}
+
+// SizeToFit resizes the segmented control to fit its segments and invalidates
+// its intrinsic content size.
+func (s *Segmented) SizeToFit() {
+	if s == nil || s.View == objc.Nil {
+		return
+	}
+
+	objc.Msg(s.View, "sizeToFit")
+	objc.Msg(s.View, "invalidateIntrinsicContentSize")
+}
+
+// MeasureWidths measures each label with the control's font and returns
+// per-segment widths max(minWidth, ceil(textWidth)+padding).
+func (s *Segmented) MeasureWidths(labels []string, padding, minWidth float64) []float64 {
+	if s == nil || s.View == objc.Nil {
+		return nil
+	}
+
+	font := objc.Msg(s.View, "font")
+	widths := make([]float64, len(labels))
+
+	for i, lbl := range labels {
+		textW := measureStringWithFont(lbl, font).Width
+		widths[i] = max(minWidth, math.Ceil(textW)+padding)
+	}
+
+	return widths
+}
+
+// FitWidths measures each segment label with the control's font, sets each
+// segment width to max(minWidth, ceil(textWidth)+padding), and calls SizeToFit.
+func (s *Segmented) FitWidths(padding, minWidth float64) {
+	n := s.SegmentCount()
+	if n <= 0 {
+		return
+	}
+
+	font := objc.Msg(s.View, "font")
+	for i := range n {
+		textW := measureStringWithFont(s.SegmentLabel(i), font).Width
+		w := max(minWidth, math.Ceil(textW)+padding)
+		objc.Msg(s.View, "setWidth:forSegment:", w, int64(i))
+	}
+
+	s.SizeToFit()
 }
 
 // NewSearchField creates an NSSearchField that calls onChange as the user types.

@@ -21,6 +21,7 @@ type TableColumn struct {
 	ToolTip  string
 	Width    float64
 	MinWidth float64
+	MaxWidth float64
 }
 
 // TableOptions configures a Table.
@@ -47,17 +48,19 @@ type Table struct {
 }
 
 const (
-	rowViewID                = "BQUIGridRow"
-	defaultRowHeight         = 22.0
-	tableStylePlain   int64  = 4
-	gridVerticalLines uint64 = 1
-	boxCustom         uint64 = 4
-	noTitle           uint64 = 0
-	autoresizeWidth   uint64 = 1 << 1
-	autoresizeMinY    uint64 = 1 << 3
-	autoresizeMaxY    uint64 = 1 << 5
-	columnNoAutoSize  uint64 = 0
-	italicFontMask    uint64 = 1
+	rowViewID          = "BQUIGridRow"
+	gridCellID         = "BQUIGridCell"
+	defaultRowHeight   = 22.0
+	defaultMaxColWidth = 100_000.0
+	tableStylePlain    = int64(4)
+	gridVerticalLines  = uint64(1)
+	boxCustom          = uint64(4)
+	noTitle            = uint64(0)
+	autoresizeWidth    = uint64(1 << 1)
+	autoresizeMinY     = uint64(1 << 3)
+	autoresizeMaxY     = uint64(1 << 5)
+	columnNoAutoSize   = uint64(0)
+	italicFontMask     = uint64(1)
 )
 
 var (
@@ -164,6 +167,41 @@ func attributeKeys() (font, color objc.ID) {
 	}
 
 	return fontAttr, colorAttr
+}
+
+// MeasureGridTextWidth returns the rendered single-line width of text using
+// the grid's regular or mono font.
+func MeasureGridTextWidth(text string, mono bool) float64 {
+	if text == "" {
+		return 0
+	}
+
+	var w float64
+
+	objc.WithPool(func() {
+		regular, _, monoFont := gridFonts()
+
+		font := regular
+		if mono {
+			font = monoFont
+		}
+
+		if font == objc.Nil {
+			return
+		}
+
+		s := objc.String(text)
+		if s == objc.Nil {
+			return
+		}
+
+		fontKey, _ := attributeKeys()
+		attrs := objc.Msg(objc.Cls("NSDictionary"), "dictionaryWithObjects:forKeys:",
+			objc.Array(font), objc.Array(fontKey))
+		w = objc.Send[Size](s, "sizeWithAttributes:", attrs).Width
+	})
+
+	return w
 }
 
 func gridFonts() (regular, italic, mono objc.ID) {
@@ -300,16 +338,42 @@ func (t *Table) SetColumns(cols []TableColumn) {
 			objc.Msg(col, "setHeaderToolTip:", objc.String(c.ToolTip))
 		}
 
-		if c.Width > 0 {
-			objc.Msg(col, "setWidth:", c.Width)
-		}
-
 		if c.MinWidth > 0 {
 			objc.Msg(col, "setMinWidth:", c.MinWidth)
 		}
 
+		switch {
+		case c.MaxWidth > 0:
+			objc.Msg(col, "setMaxWidth:", c.MaxWidth)
+		case c.Width > 0:
+			objc.Msg(col, "setMaxWidth:", max(c.Width, defaultMaxColWidth))
+		}
+
+		if c.Width > 0 {
+			objc.Msg(col, "setWidth:", c.Width)
+		}
+
 		objc.Msg(t.View, "addTableColumn:", col)
 		objc.Release(col)
+	}
+}
+
+// SetColumnWidth resizes an existing column by identifier, expanding its
+// maxWidth if needed so AppKit does not clamp wide columns.
+func (t *Table) SetColumnWidth(id string, width float64) {
+	checkReentrancy("table set column width")
+
+	if t == nil || t.View == objc.Nil || width <= 0 {
+		return
+	}
+
+	if i := objc.Send[int64](t.View, "columnWithIdentifier:", objc.String(id)); i >= 0 {
+		col := objc.Msg(objc.Msg(t.View, "tableColumns"), "objectAtIndex:", uint64(i))
+		if maxW := objc.Send[float64](col, "maxWidth"); width > maxW {
+			objc.Msg(col, "setMaxWidth:", width)
+		}
+
+		objc.Msg(col, "setWidth:", width)
 	}
 }
 
@@ -481,10 +545,9 @@ func (t *Table) rebuildMenu(menu objc.ID) {
 }
 
 func gridCell(tv objc.ID, c CellText) objc.ID {
-	cell := objc.Msg(tv, "makeViewWithIdentifier:owner:", objc.String(textCellID+"Grid"), objc.Nil)
+	cell := objc.Msg(tv, "makeViewWithIdentifier:owner:", objc.String(gridCellID), objc.Nil)
 	if cell == objc.Nil {
-		cell = newTextCell(textCellID+"Grid", false, false)
-		objc.Msg(objc.Msg(cell, "textField"), "setSelectable:", false)
+		cell = newGridCell(gridCellID)
 	}
 
 	tf := objc.Msg(cell, "textField")
@@ -521,6 +584,27 @@ func gridCell(tv objc.ID, c CellText) objc.ID {
 	objc.Msg(tf, "setAlignment:", align)
 
 	return cell
+}
+
+func newGridCell(id string) objc.ID {
+	cell := objc.New("NSTableCellView")
+	SetIdentifier(cell, id)
+
+	tf := Label("", 0)
+	objc.Msg(tf, "setSelectable:", false)
+	objc.Msg(tf, "setUsesSingleLineMode:", true)
+	objc.Msg(tf, "setMaximumNumberOfLines:", int64(1))
+	UseAutoLayout(tf)
+	objc.Msg(cell, "addSubview:", tf)
+	objc.Msg(cell, "setTextField:", tf)
+
+	Activate(
+		Equal(Anchor(tf, "leadingAnchor"), Anchor(cell, "leadingAnchor"), 2),
+		Equal(Anchor(tf, "trailingAnchor"), Anchor(cell, "trailingAnchor"), -2),
+		Equal(Anchor(tf, "centerYAnchor"), Anchor(cell, "centerYAnchor"), 0),
+	)
+
+	return objc.Msg(cell, "autorelease")
 }
 
 // SetRowHeight changes the row height (for a new grid font size).

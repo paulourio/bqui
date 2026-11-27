@@ -55,7 +55,7 @@ func newRunsPane(s *Shell) *RunsPane {
 	p.note = appkit.SecondaryLabel("Runs of this query appear here.")
 	p.View = appkit.NewView()
 	appkit.AddFilling(p.View, p.Table.Scroll, 0)
-	appkit.AddCentered(p.View, p.note)
+	appkit.AddCenteredWrapping(p.View, p.note, 16)
 
 	return p
 }
@@ -90,6 +90,9 @@ func (p *RunsPane) Reload() {
 
 // Runs returns the listed runs (smoke checks).
 func (p *RunsPane) Runs() []store.Run { return p.runs }
+
+// NoteView returns the placeholder note label (smoke checks).
+func (p *RunsPane) NoteView() objc.ID { return p.note }
 
 func (p *RunsPane) run(i int) (store.Run, bool) {
 	if i < 0 || i >= len(p.runs) {
@@ -178,13 +181,8 @@ func (s runsSource) CellText(i int, column string) appkit.CellText {
 
 // setRunsCount shows the count in the bottom tab title ("Runs (12)").
 func (s *Shell) setRunsCount(n int) {
-	title := "Runs"
-	if n > 0 {
-		title += " (" + app.CountInt(int64(n)) + ")"
-	}
-
-	objc.Msg(s.tabs.View, "setLabel:forSegment:", objc.String(title), int64(TabRuns))
-	objc.Msg(s.tabs.View, "setWidth:forSegment:", float64(len([]rune(title)))*7.5+24, int64(TabRuns))
+	s.runsCount = n
+	s.fitBottomTabs(true)
 }
 
 // rememberLastRun keeps a file's latest run for its tree tooltip.

@@ -55,7 +55,24 @@ func textAlignmentForArch(amd64Val, arm64Val int64) int64 {
 	return arm64Val
 }
 
-const lineBreakByTruncatingTail uint64 = 4
+// NSLayoutConstraintOrientation values.
+const (
+	OrientHorizontal int64 = 0
+	OrientVertical   int64 = 1
+)
+
+// NSLayoutPriority values (32-bit float in AppKit).
+const (
+	PriorityDefaultLow  float32 = 250
+	PriorityDefaultHigh float32 = 750
+	PriorityRequired    float32 = 1000
+)
+
+const (
+	lineBreakByWordWrapping   uint64 = 0
+	lineBreakByCharWrapping   uint64 = 1
+	lineBreakByTruncatingTail uint64 = 4
+)
 
 // Label creates a non-editable NSTextField label using the system font.
 func Label(text string, pointSize float64) objc.ID {
@@ -65,6 +82,23 @@ func Label(text string, pointSize float64) objc.ID {
 	}
 
 	objc.Msg(l, "setLineBreakMode:", lineBreakByTruncatingTail)
+
+	return l
+}
+
+// WrappingLabel creates a non-editable, multi-line wrapping NSTextField label.
+func WrappingLabel(text string, pointSize float64) objc.ID {
+	l := objc.Msg(objc.Cls("NSTextField"), "wrappingLabelWithString:", objc.String(text))
+	if pointSize > 0 {
+		objc.Msg(l, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", pointSize))
+	}
+
+	objc.Msg(l, "setSelectable:", false)
+	objc.Msg(l, "setLineBreakMode:", lineBreakByWordWrapping)
+	objc.Msg(l, "setMaximumNumberOfLines:", int64(0))
+	objc.Msg(l, "setUsesSingleLineMode:", false)
+	SetCompressionResistance(l, OrientHorizontal, PriorityDefaultLow)
+	SetCompressionResistance(l, OrientVertical, PriorityDefaultHigh)
 
 	return l
 }
@@ -108,6 +142,38 @@ func EqualConst(dim objc.ID, constant float64) objc.ID {
 	return objc.Msg(dim, "constraintEqualToConstant:", constant)
 }
 
+// GreaterOrEqual returns an inactive constraint a >= b + constant.
+func GreaterOrEqual(a, b objc.ID, constant float64) objc.ID {
+	return objc.Msg(a, "constraintGreaterThanOrEqualToAnchor:constant:", b, constant)
+}
+
+// LessOrEqual returns an inactive constraint a <= b + constant.
+func LessOrEqual(a, b objc.ID, constant float64) objc.ID {
+	return objc.Msg(a, "constraintLessThanOrEqualToAnchor:constant:", b, constant)
+}
+
+// GreaterOrEqualConst returns an inactive constraint dimension >= constant.
+func GreaterOrEqualConst(dim objc.ID, constant float64) objc.ID {
+	return objc.Msg(dim, "constraintGreaterThanOrEqualToConstant:", constant)
+}
+
+// LessOrEqualConst returns an inactive constraint dimension <= constant.
+func LessOrEqualConst(dim objc.ID, constant float64) objc.ID {
+	return objc.Msg(dim, "constraintLessThanOrEqualToConstant:", constant)
+}
+
+// SetCompressionResistance sets the content compression resistance priority
+// (32-bit NSLayoutPriority) of v along orientation.
+func SetCompressionResistance(v objc.ID, orientation int64, priority float32) {
+	objc.Msg(v, "setContentCompressionResistancePriority:forOrientation:", priority, orientation)
+}
+
+// SetHuggingPriority sets the content hugging priority (32-bit
+// NSLayoutPriority) of v along orientation.
+func SetHuggingPriority(v objc.ID, orientation int64, priority float32) {
+	objc.Msg(v, "setContentHuggingPriority:forOrientation:", priority, orientation)
+}
+
 // Activate activates constraints.
 func Activate(constraints ...objc.ID) {
 	objc.Msg(objc.Cls("NSLayoutConstraint"), "activateConstraints:", objc.Array(constraints...))
@@ -133,6 +199,80 @@ func AddCentered(parent, child objc.ID) {
 		Equal(Anchor(child, "centerXAnchor"), Anchor(parent, "centerXAnchor"), 0),
 		Equal(Anchor(child, "centerYAnchor"), Anchor(parent, "centerYAnchor"), 0),
 	)
+}
+
+// AddCenteredWrapping adds child to parent centered in both axes, with
+// wrapping configured and leading/trailing bounded by inset.
+func AddCenteredWrapping(parent, child objc.ID, inset float64) {
+	if parent == objc.Nil || child == objc.Nil {
+		return
+	}
+
+	UseAutoLayout(child)
+	objc.Msg(parent, "addSubview:", child)
+
+	if objc.RespondsTo(child, "cell") {
+		if cell := objc.Msg(child, "cell"); cell != objc.Nil && objc.RespondsTo(cell, "setWraps:") {
+			objc.Msg(cell, "setWraps:", true)
+		}
+	}
+
+	if objc.RespondsTo(child, "setPreferredMaxLayoutWidth:") {
+		objc.Msg(child, "setPreferredMaxLayoutWidth:", float64(0))
+	}
+
+	if objc.RespondsTo(child, "setUsesSingleLineMode:") {
+		objc.Msg(child, "setUsesSingleLineMode:", false)
+	}
+
+	if objc.RespondsTo(child, "setMaximumNumberOfLines:") {
+		objc.Msg(child, "setMaximumNumberOfLines:", int64(0))
+	}
+
+	if objc.RespondsTo(child, "setLineBreakMode:") {
+		objc.Msg(child, "setLineBreakMode:", lineBreakByWordWrapping)
+	}
+
+	if objc.RespondsTo(child, "setAlignment:") {
+		objc.Msg(child, "setAlignment:", TextAlignmentCenter)
+	}
+
+	SetCompressionResistance(child, OrientHorizontal, PriorityDefaultLow)
+	SetCompressionResistance(child, OrientVertical, PriorityDefaultHigh)
+
+	// Auto Layout anchors constrain the alignment rectangle rather than the raw
+	// frame, so add horizontal alignment-rect padding (e.g. 2pt per side on
+	// borderless NSTextField) to keep child's frame inside [inset, width-inset].
+	leftInset, rightInset := inset, inset
+
+	if objc.RespondsTo(child, "alignmentRectForFrame:") {
+		const probeSize = 100.0
+
+		ar := objc.Send[Rect](child, "alignmentRectForFrame:", MakeRect(0, 0, probeSize, probeSize))
+		if ar.Origin.X > 0 {
+			leftInset += ar.Origin.X
+		}
+
+		if rightPad := probeSize - (ar.Origin.X + ar.Size.Width); rightPad > 0 {
+			rightInset += rightPad
+		}
+	}
+
+	Activate(
+		Equal(Anchor(child, "centerXAnchor"), Anchor(parent, "centerXAnchor"), 0),
+		Equal(Anchor(child, "centerYAnchor"), Anchor(parent, "centerYAnchor"), 0),
+		GreaterOrEqual(Anchor(child, "leadingAnchor"), Anchor(parent, "leadingAnchor"), leftInset),
+		LessOrEqual(Anchor(child, "trailingAnchor"), Anchor(parent, "trailingAnchor"), -rightInset),
+	)
+}
+
+// SetContentMinSize sets window's minimum content size.
+func SetContentMinSize(window objc.ID, w, h float64) {
+	if window == objc.Nil {
+		return
+	}
+
+	objc.Msg(window, "setContentMinSize:", Size{Width: w, Height: h})
 }
 
 // SetIdentifier sets the NSUserInterfaceItemIdentifier of a view or item.

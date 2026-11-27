@@ -19,7 +19,7 @@ import (
 // (so selection and expansion survive reloads); fixed IDs mark the
 // BigQuery Studio section.
 const (
-	studioGroupID = uint64(1) << 62
+	studioGroupID = uint64(1) << 54
 	studioEmptyID = studioGroupID + 1
 	studioBase    = uint64(1) << 40
 )
@@ -291,6 +291,9 @@ func (p *WorkbooksPane) StudioQueries() []dataform.SavedQuery { return p.studioS
 
 // StudioLoading reports a Studio fetch in flight (smoke checks).
 func (p *WorkbooksPane) StudioLoading() bool { return p.studioLoading }
+
+// StudioExpanded reports whether the BigQuery Studio group is expanded (smoke checks).
+func (p *WorkbooksPane) StudioExpanded() bool { return p.Outline.IsExpanded(studioGroupID) }
 
 func (p *WorkbooksPane) remote(id uint64) (dataform.SavedQuery, bool) {
 	if id <= studioBase || id >= studioGroupID || id-studioBase > uint64(len(p.studioShown)) {

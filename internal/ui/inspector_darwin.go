@@ -5,10 +5,12 @@ package ui
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	bigquery "google.golang.org/api/bigquery/v2"
 
@@ -20,12 +22,17 @@ import (
 )
 
 const (
-	inspectorInset   = 12.0
-	metadataTimeout  = 30 * time.Second
-	metadataCacheTTL = 5 * time.Minute
-	segSchema        = 0
-	segDetails       = 1
-	segPreview       = 2
+	inspectorInset                  = 12.0
+	inspectorCenteredInset          = 16.0
+	charWrapTokenRunes              = 18
+	lineBreakWordWrap        uint64 = 0
+	lineBreakCharWrap        uint64 = 1
+	tableAutoresizingUniform uint64 = 1
+	metadataTimeout                 = 30 * time.Second
+	metadataCacheTTL                = 5 * time.Minute
+	segSchema                       = 0
+	segDetails                      = 1
+	segPreview                      = 2
 )
 
 // InspectorPane shows the selected object's schema and details.
@@ -55,6 +62,10 @@ type InspectorPane struct {
 	previewFor    string // FullID whose preview is loaded or offered
 	wantSeg       int    // tab the user last picked (kept across objects)
 
+	schemaResizeObs objc.ID
+	fittingSchema   bool
+	lastSchemaW     float64
+
 	cacheMu sync.Mutex
 	cache   map[string]cached
 }
@@ -71,27 +82,38 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 
 	p.schema = appkit.NewOutline(p.schemaSrc, appkit.OutlineOptions{
 		Columns: []appkit.Column{
-			{ID: "name", Title: "Field name", Width: 170, MinWidth: 80},
-			{ID: "type", Title: "Type", Width: 90, MinWidth: 50},
-			{ID: "mode", Title: "Mode", Width: 82, MinWidth: 50},
-			{ID: "key", Title: "Key", Width: 90, MinWidth: 30},
-			{ID: "description", Title: "Description", Width: 160, MinWidth: 60},
+			{ID: "name", Title: "Field name", Width: 118, MinWidth: 80},
+			{ID: "type", Title: "Type", Width: 62, MinWidth: 48},
+			{ID: "mode", Title: "Mode", Width: 66, MinWidth: 62},
+			{ID: "key", Title: "Key", Width: 56, MinWidth: 42},
+			{ID: "description", Title: "Description", Width: 126, MinWidth: 48},
 		},
-		Alternating: true,
-		Menu:        p.schemaMenu,
+		Alternating:         true,
+		AutomaticRowHeights: true,
+		NoHorizontalScroll:  true,
+		Menu:                p.schemaMenu,
 	})
+	objc.Msg(p.schema.View, "setColumnAutoresizingStyle:", tableAutoresizingUniform)
+	objc.Msg(p.schema.Scroll, "setPostsFrameChangedNotifications:", true)
+	p.schemaResizeObs = objc.NewTarget(func(objc.ID) { p.fitSchemaColumnsIfResized() })
+	objc.Msg(objc.Msg(objc.Cls("NSNotificationCenter"), "defaultCenter"),
+		"addObserver:selector:name:object:",
+		p.schemaResizeObs, objc.Sel(objc.ActionSelector), objc.String("NSViewFrameDidChangeNotification"), p.schema.Scroll)
 
 	p.details = appkit.NewOutline(p.detailsSrc, appkit.OutlineOptions{
 		Columns: []appkit.Column{
-			{ID: "key", Title: "Property", Width: 170, MinWidth: 80},
-			{ID: "value", Title: "Value", Width: 320, MinWidth: 100},
+			{ID: "key", Title: "Property", Width: 130, MinWidth: 70},
+			{ID: "value", Title: "Value", Width: 160, MinWidth: 100},
 		},
 		Menu:                p.detailsMenu,
 		AutomaticRowHeights: true,
+		NoHorizontalScroll:  true,
 	})
 
-	p.title = appkit.BoldLabel("No selection", 14)
-	p.subtitle = appkit.SecondaryLabel("Select a table, view, routine or model in the explorer.")
+	p.title = appkit.WrappingLabel("No selection", 0)
+	objc.Msg(p.title, "setFont:", objc.Msg(objc.Cls("NSFont"), "boldSystemFontOfSize:", 14.0))
+	p.subtitle = appkit.WrappingLabel("Select a table, view, routine or model in the explorer.", 0)
+	objc.Msg(p.subtitle, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
 	p.status = appkit.SecondaryLabel("")
 	p.seg = appkit.NewTabBar([]string{"Schema", "Details", "Preview"}, func(i int) {
 		p.wantSeg = i
@@ -112,16 +134,17 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 	p.valueSrc = &valueSource{}
 	p.values = appkit.NewOutline(p.valueSrc, appkit.OutlineOptions{
 		Columns: []appkit.Column{
-			{ID: "name", Title: "Name", Width: 150, MinWidth: 60},
-			{ID: "value", Title: "Value", Width: 240, MinWidth: 80},
-			{ID: "type", Title: "Type", Width: 110, MinWidth: 40},
+			{ID: "name", Title: "Name", Width: 100, MinWidth: 60},
+			{ID: "type", Title: "Type", Width: 86, MinWidth: 50},
+			{ID: "value", Title: "Value", Width: 104, MinWidth: 80},
 		},
 		AutomaticRowHeights: true,
+		NoHorizontalScroll:  true,
 		Menu:                p.valueMenu,
 	})
 	appkit.AddFilling(content, p.values.Scroll, 0)
 	appkit.AddFilling(content, p.newPreview(), 0)
-	appkit.AddCentered(content, p.status)
+	appkit.AddCenteredWrapping(content, p.status, inspectorCenteredInset)
 
 	safeTop := objc.Msg(objc.Msg(p.View, "safeAreaLayoutGuide"), "topAnchor")
 	lead, trail := appkit.Anchor(p.View, "leadingAnchor"), appkit.Anchor(p.View, "trailingAnchor")
@@ -172,8 +195,8 @@ func (p *InspectorPane) ShowSections(title, subtitle string, sections []app.Sect
 	p.gen++
 	p.current = app.ObjectInfo{Kind: app.KindPlaceholder, Name: title}
 
-	appkit.SetString(p.title, title)
-	appkit.SetString(p.subtitle, subtitle)
+	p.setTitle(title)
+	p.setSubtitle(subtitle)
 	p.schemaSrc.set(nil)
 	p.detailsSrc.set(sections)
 	p.schema.Reload(0)
@@ -194,18 +217,15 @@ func (p *InspectorPane) ShowRow(fields []results.Field, row []any, index int64, 
 	p.gen++
 	p.current = app.ObjectInfo{Kind: app.KindPlaceholder, Name: "Row " + app.Count(uint64(index+1))} //nolint:gosec // non-negative
 
-	appkit.SetString(p.title, p.current.Name)
-	appkit.SetString(p.subtitle, "result row · "+strconv.Itoa(len(fields))+" fields")
+	p.setTitle(p.current.Name)
+	p.setSubtitle("result row · " + strconv.Itoa(len(fields)) + " fields")
 
 	p.valueSrc.set(results.Tree(fields, row))
 	p.values.Reload(0)
 	p.setState(stateValue)
 
 	if id, ok := p.valueSrc.byPath[focus]; ok {
-		for _, anc := range p.valueSrc.ancestors(id) {
-			p.values.Expand(anc, false)
-		}
-
+		p.values.ExpandAll(p.valueSrc.ancestors(id))
 		p.values.Select(id)
 	}
 }
@@ -277,17 +297,32 @@ func (s *valueSource) Children(parent uint64) []uint64 { return s.children[paren
 func (s *valueSource) Expandable(item uint64) bool     { return len(s.children[item]) > 0 }
 
 func (s *valueSource) Cell(item uint64) appkit.OutlineCell {
-	return appkit.OutlineCell{Title: s.nodes[item].Name}
+	n, ok := s.nodes[item]
+	if !ok || n == nil {
+		return appkit.OutlineCell{}
+	}
+
+	return appkit.OutlineCell{Title: n.Name, Wrap: true, CharWrap: needsCharWrap(n.Name)}
 }
 
 func (s *valueSource) CellText(item uint64, column string) appkit.CellText {
-	n := s.nodes[item]
+	n, ok := s.nodes[item]
+	if !ok || n == nil {
+		return appkit.CellText{}
+	}
 
 	switch column {
 	case "value":
-		return appkit.CellText{Text: n.Display, Secondary: n.Null || len(n.Children) > 0, Italic: n.Null, Wrap: true, Mono: !n.Null && len(n.Children) == 0}
+		return appkit.CellText{
+			Text:      n.Display,
+			Secondary: n.Null || len(n.Children) > 0,
+			Italic:    n.Null,
+			Wrap:      true,
+			CharWrap:  needsCharWrap(n.Display),
+			Mono:      !n.Null && len(n.Children) == 0,
+		}
 	case "type":
-		return appkit.CellText{Text: n.Type, Secondary: true}
+		return appkit.CellText{Text: n.Type, Secondary: true, Wrap: true, CharWrap: needsCharWrap(n.Type)}
 	}
 
 	return appkit.CellText{}
@@ -298,8 +333,108 @@ func (p *InspectorPane) showSegment(i int) {
 	appkit.SetHidden(p.details.Scroll, i != segDetails)
 	appkit.SetHidden(p.previewHolder, i != segPreview)
 
-	if i == segPreview {
+	switch i {
+	case segSchema:
+		p.fitSchemaColumns(true)
+	case segPreview:
 		p.preparePreview()
+	}
+}
+
+func (p *InspectorPane) fitSchemaColumnsIfResized() {
+	clip := objc.Msg(p.schema.Scroll, "contentView")
+	avail := appkit.ViewBounds(clip).Size.Width
+	if avail <= 0 {
+		avail = appkit.ViewBounds(p.schema.Scroll).Size.Width
+	}
+
+	if avail <= 0 || math.Abs(avail-p.lastSchemaW) <= 0.5 {
+		return
+	}
+
+	p.fitSchemaColumns(false)
+	objc.Main(func() { p.schema.InvalidateRowHeights() })
+}
+
+func (p *InspectorPane) fitSchemaColumns(invalidate bool) {
+	if p.fittingSchema {
+		return
+	}
+
+	clip := objc.Msg(p.schema.Scroll, "contentView")
+	avail := appkit.ViewBounds(clip).Size.Width
+	if avail <= 0 {
+		avail = appkit.ViewBounds(p.schema.Scroll).Size.Width
+	}
+
+	if avail <= 0 {
+		return
+	}
+
+	p.fittingSchema = true
+	defer func() { p.fittingSchema = false }()
+
+	p.lastSchemaW = avail
+
+	keyCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("key"))
+	showKey := keyCol != objc.Nil && !objc.Send[bool](keyCol, "isHidden")
+
+	visibleCols := 4
+	if showKey {
+		visibleCols = 5
+	}
+
+	spacing := objc.Send[appkit.Size](p.schema.View, "intercellSpacing").Width
+	budget := max(0.0, avail-float64(visibleCols)*spacing)
+
+	type colSpec struct {
+		id        string
+		min, wide float64
+	}
+
+	specs := []colSpec{
+		{id: "name", min: 80, wide: 118},
+		{id: "type", min: 48, wide: 62},
+		{id: "mode", min: 62, wide: 66},
+	}
+	if showKey {
+		specs = append(specs, colSpec{id: "key", min: 42, wide: 56})
+	}
+
+	const descMin, descWide = 48.0, 126.0
+
+	var minFixed, wideFixed float64
+	for _, sp := range specs {
+		minFixed += sp.min
+		wideFixed += sp.wide
+	}
+
+	minTotal := minFixed + descMin
+	wideTotal := wideFixed + descWide
+
+	var ratio float64
+	if wideTotal > minTotal {
+		ratio = min(1.0, max(0.0, (budget-minTotal)/(wideTotal-minTotal)))
+	}
+
+	var usedFixed float64
+	for _, sp := range specs {
+		w := math.Floor(sp.min + ratio*(sp.wide-sp.min))
+		usedFixed += w
+
+		if col := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String(sp.id)); col != objc.Nil {
+			objc.Msg(col, "setWidth:", w)
+		}
+	}
+
+	descW := max(descMin, budget-usedFixed)
+	if col := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("description")); col != objc.Nil {
+		objc.Msg(col, "setWidth:", descW)
+	}
+
+	objc.Msg(p.schema.View, "sizeLastColumnToFit")
+	if invalidate {
+		p.schema.InvalidateRowHeights()
 	}
 }
 
@@ -335,6 +470,46 @@ func (p *InspectorPane) SegmentGeometry() string {
 // SegmentView returns the segmented control (smoke diagnostics).
 func (p *InspectorPane) SegmentView() objc.ID { return p.seg.View }
 
+// TitleView returns the title label (smoke checks).
+func (p *InspectorPane) TitleView() objc.ID { return p.title }
+
+// SubtitleView returns the subtitle label (smoke checks).
+func (p *InspectorPane) SubtitleView() objc.ID { return p.subtitle }
+
+// StatusView returns the loading/error status label (smoke checks).
+func (p *InspectorPane) StatusView() objc.ID { return p.status }
+
+// TabBar returns the inspector tab bar (smoke checks).
+func (p *InspectorPane) TabBar() *appkit.TabBar { return p.seg }
+
+// SchemaOutline returns the schema outline view (smoke checks).
+func (p *InspectorPane) SchemaOutline() *appkit.Outline { return p.schema }
+
+// DetailsOutline returns the details outline view (smoke checks).
+func (p *InspectorPane) DetailsOutline() *appkit.Outline { return p.details }
+
+// ValuesOutline returns the value-tree outline view (smoke checks).
+func (p *InspectorPane) ValuesOutline() *appkit.Outline { return p.values }
+
+// ViewPromptViews returns the preview container, prompt stack, and prompt label (smoke checks).
+func (p *InspectorPane) ViewPromptViews() (holder, prompt, text objc.ID) {
+	return p.previewHolder, p.viewPrompt, p.promptText
+}
+
+// ShowTable loads table metadata directly on the main thread (smoke checks).
+func (p *InspectorPane) ShowTable(info app.ObjectInfo, tbl *bigquery.Table) {
+	p.gen++
+	if info.FullID() != p.current.FullID() {
+		p.table = nil
+		p.resetPreview()
+	}
+
+	p.current = info
+	p.setTitle(displayName(info))
+	p.setSubtitle(info.Kind.String() + " · " + info.FullID())
+	p.apply(p.gen, info, tbl, nil)
+}
+
 // ShowJob displays a job's details (from the job history).
 func (p *InspectorPane) ShowJob(ref bq.JobRef) {
 	if p.jobs == nil {
@@ -346,8 +521,8 @@ func (p *InspectorPane) ShowJob(ref bq.JobRef) {
 	info := app.ObjectInfo{Kind: app.KindPlaceholder, Project: ref.Project, Name: ref.JobID}
 	p.current = info
 
-	appkit.SetString(p.title, ref.JobID)
-	appkit.SetString(p.subtitle, "job · "+ref.Project+" · "+ref.Location)
+	p.setTitle(ref.JobID)
+	p.setSubtitle("job · " + ref.Project + " · " + ref.Location)
 	appkit.SetString(p.status, "Loading…")
 	p.setState(stateLoading)
 
@@ -374,8 +549,8 @@ func (p *InspectorPane) Show(info app.ObjectInfo) {
 
 	p.current = info
 
-	appkit.SetString(p.title, displayName(info))
-	appkit.SetString(p.subtitle, info.Kind.String()+" · "+info.FullID())
+	p.setTitle(displayName(info))
+	p.setSubtitle(info.Kind.String() + " · " + info.FullID())
 
 	if info.Kind == app.KindProject || info.Kind == app.KindPlaceholder {
 		p.apply(gen, info, nil, nil)
@@ -472,7 +647,7 @@ func (p *InspectorPane) apply(gen uint64, info app.ObjectInfo, v any, err error)
 		fields = app.SchemaTree(x)
 		sections = p.fmt.TableSections(x)
 
-		if info.Kind == app.KindShardGroup {
+		if info.Kind == app.KindShardGroup && len(info.Shards) > 0 {
 			sections = append([]app.Section{{Title: "Sharded table", Rows: []app.Detail{
 				{Key: "Shards", Value: app.Count(uint64(len(info.Shards)))},
 				{Key: "Newest", Value: info.Shards[0], Mono: true},
@@ -495,9 +670,11 @@ func (p *InspectorPane) apply(gen uint64, info app.ObjectInfo, v any, err error)
 	p.detailsSrc.set(sections)
 
 	// The Key column only earns its space when some field has a badge.
+	// Reload before unhiding so NSOutlineView does not query stale handles.
+	p.schema.Reload(0)
 	keyCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("key"))
 	objc.Msg(keyCol, "setHidden:", !anyBadges(fields))
-	p.schema.Reload(0)
+	p.fitSchemaColumns(true)
 	p.details.Reload(0)
 	p.details.Expand(0, true)
 
@@ -610,23 +787,29 @@ func (s *schemaSource) Children(parent uint64) []uint64 { return s.children[pare
 func (s *schemaSource) Expandable(item uint64) bool     { return len(s.children[item]) > 0 }
 
 func (s *schemaSource) Cell(item uint64) appkit.OutlineCell {
-	f := s.fields[item]
+	f, ok := s.fields[item]
+	if !ok || f == nil {
+		return appkit.OutlineCell{}
+	}
 
-	return appkit.OutlineCell{Title: f.Name, ToolTip: f.Description}
+	return appkit.OutlineCell{Title: f.Name, ToolTip: f.Description, Wrap: true, CharWrap: needsCharWrap(f.Name)}
 }
 
 func (s *schemaSource) CellText(item uint64, column string) appkit.CellText {
-	f := s.fields[item]
+	f, ok := s.fields[item]
+	if !ok || f == nil {
+		return appkit.CellText{}
+	}
 
 	switch column {
 	case "type":
-		return appkit.CellText{Text: f.Type, Mono: true}
+		return appkit.CellText{Text: f.Type, Mono: true, Wrap: true, CharWrap: needsCharWrap(f.Type)}
 	case "mode":
 		return appkit.CellText{Text: f.Mode, Secondary: f.Mode == "NULLABLE"}
 	case "key":
 		return appkit.CellText{Text: strings.Join(f.Badges(), ", "), Secondary: true}
 	case "description":
-		return appkit.CellText{Text: f.Description, Secondary: true, ToolTip: f.Description}
+		return appkit.CellText{Text: f.Description, Secondary: true, Wrap: true, CharWrap: needsCharWrap(f.Description), ToolTip: f.Description}
 	}
 
 	return appkit.CellText{}
@@ -668,7 +851,9 @@ func (s *detailsSource) Cell(item uint64) appkit.OutlineCell {
 		return appkit.OutlineCell{Title: t, Group: true}
 	}
 
-	return appkit.OutlineCell{Title: s.rows[item].Key}
+	key := s.rows[item].Key
+
+	return appkit.OutlineCell{Title: key, Wrap: true, CharWrap: needsCharWrap(key)}
 }
 
 func (s *detailsSource) CellText(item uint64, column string) appkit.CellText {
@@ -677,7 +862,42 @@ func (s *detailsSource) CellText(item uint64, column string) appkit.CellText {
 		return appkit.CellText{}
 	}
 
-	return appkit.CellText{Text: r.Value, Mono: r.Mono, Wrap: strings.Contains(r.Value, "\n"), ToolTip: r.Value}
+	return appkit.CellText{Text: r.Value, Mono: r.Mono, Wrap: true, CharWrap: needsCharWrap(r.Value), ToolTip: r.Value}
+}
+
+// needsCharWrap reports whether s contains any whitespace-delimited token
+// longer than charWrapTokenRunes (such as KMS keys, gs:// URIs, table/job IDs,
+// URLs, emails, or UUID labels) that would overflow narrow columns under word wrap.
+func needsCharWrap(s string) bool {
+	for tok := range strings.FieldsSeq(s) {
+		if utf8.RuneCountInString(tok) > charWrapTokenRunes {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (p *InspectorPane) setTitle(text string) {
+	appkit.SetString(p.title, text)
+
+	mode := lineBreakWordWrap
+	if needsCharWrap(text) {
+		mode = lineBreakCharWrap
+	}
+
+	objc.Msg(p.title, "setLineBreakMode:", mode)
+}
+
+func (p *InspectorPane) setSubtitle(text string) {
+	appkit.SetString(p.subtitle, text)
+
+	mode := lineBreakWordWrap
+	if needsCharWrap(text) {
+		mode = lineBreakCharWrap
+	}
+
+	objc.Msg(p.subtitle, "setLineBreakMode:", mode)
 }
 
 // newPreview builds the Preview tab: a results grid, and a prompt with a
@@ -686,10 +906,9 @@ func (p *InspectorPane) newPreview() objc.ID {
 	p.preview = newResultsPane()
 	p.preview.SetEmptyText("Select a table to preview its rows.")
 
-	p.promptText = appkit.SecondaryLabel("")
+	p.promptText = appkit.WrappingLabel("", 0)
+	objc.Msg(p.promptText, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
 	objc.Msg(p.promptText, "setAlignment:", appkit.TextAlignmentCenter)
-	objc.Msg(p.promptText, "setMaximumNumberOfLines:", int64(0))
-	objc.Msg(p.promptText, "setPreferredMaxLayoutWidth:", previewPromptWidth)
 
 	button := appkit.Button("Load Preview", func() { p.LoadViewPreview() })
 	p.viewPrompt = objc.Msg(objc.Cls("NSStackView"), "stackViewWithViews:", objc.Array(p.promptText, button))
@@ -706,7 +925,9 @@ func (p *InspectorPane) newPreview() objc.ID {
 	appkit.Activate(
 		appkit.Equal(appkit.Anchor(p.viewPrompt, "centerXAnchor"), appkit.Anchor(p.previewHolder, "centerXAnchor"), 0),
 		appkit.Equal(appkit.Anchor(p.viewPrompt, "centerYAnchor"), appkit.Anchor(p.previewHolder, "centerYAnchor"), 0),
-		appkit.EqualConst(appkit.Anchor(p.viewPrompt, "widthAnchor"), previewPromptWidth),
+		appkit.LessOrEqualConst(appkit.Anchor(p.viewPrompt, "widthAnchor"), previewPromptWidth),
+		appkit.GreaterOrEqual(appkit.Anchor(p.viewPrompt, "leadingAnchor"), appkit.Anchor(p.previewHolder, "leadingAnchor"), inspectorCenteredInset),
+		appkit.LessOrEqual(appkit.Anchor(p.viewPrompt, "trailingAnchor"), appkit.Anchor(p.previewHolder, "trailingAnchor"), -inspectorCenteredInset),
 	)
 	appkit.SetHidden(p.viewPrompt, true)
 	appkit.SetHidden(p.previewHolder, true)

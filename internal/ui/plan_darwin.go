@@ -56,7 +56,7 @@ func newPlanPane(s *Shell) *PlanPane {
 
 	p.View = appkit.NewView()
 	appkit.AddFilling(p.View, p.Outline.Scroll, 0)
-	appkit.AddCentered(p.View, p.note)
+	appkit.AddCenteredWrapping(p.View, p.note, 16)
 	appkit.SetHidden(p.Outline.Scroll, true)
 
 	return p
@@ -72,6 +72,9 @@ func (p *PlanPane) SetPlan(pl *plan.Plan) {
 
 // Rows reports visible rows (smoke checks).
 func (p *PlanPane) Rows() int64 { return p.Outline.Rows() }
+
+// NoteView returns the placeholder note label (smoke checks).
+func (p *PlanPane) NoteView() objc.ID { return p.note }
 
 type planSource struct{ p *PlanPane }
 
@@ -232,7 +235,7 @@ func newGraphPane(s *Shell) *GraphPane {
 
 	g.View = appkit.NewView()
 	appkit.AddFilling(g.View, scroll, 0)
-	appkit.AddCentered(g.View, g.note)
+	appkit.AddCenteredWrapping(g.View, g.note, 16)
 
 	return g
 }
@@ -255,6 +258,12 @@ func (g *GraphPane) SetPlan(pl *plan.Plan) {
 
 // Nodes reports how many nodes are laid out (smoke checks).
 func (g *GraphPane) Nodes() int { return len(g.layout.Nodes) }
+
+// Layout returns the laid-out stage graph (smoke checks).
+func (g *GraphPane) Layout() plan.Layout { return g.layout }
+
+// NoteView returns the placeholder note label (smoke checks).
+func (g *GraphPane) NoteView() objc.ID { return g.note }
 
 // SelectStage selects a node as if clicked (smoke checks).
 func (g *GraphPane) SelectStage(id int64) {

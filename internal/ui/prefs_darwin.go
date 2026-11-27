@@ -11,7 +11,7 @@ import (
 
 const (
 	prefsWidth   = 520.0
-	prefsHeight  = 340.0
+	prefsHeight  = 380.0
 	prefsField   = 260.0
 	prefsPadding = 20.0
 )
@@ -32,6 +32,15 @@ func (s *Shell) PreferencesWindow() objc.ID {
 	return s.prefs.window
 }
 
+// PreferencesMessageView returns the Settings validation message label (smoke checks).
+func (s *Shell) PreferencesMessageView() objc.ID {
+	if s.prefs == nil {
+		return objc.Nil
+	}
+
+	return s.prefs.message
+}
+
 // ShowPreferences opens the Settings window (created once).
 func (s *Shell) ShowPreferences() {
 	if s.prefs == nil {
@@ -44,6 +53,7 @@ func (s *Shell) ShowPreferences() {
 	}
 
 	appkit.SetString(s.prefs.message, "")
+	objc.Msg(s.prefs.message, "setLineBreakMode:", lineBreakWordWrap)
 	objc.Msg(s.prefs.window, "center")
 	objc.Msg(s.prefs.window, "makeKeyAndOrderFront:", objc.Nil)
 }
@@ -66,7 +76,10 @@ func (s *Shell) newPrefsWindow() *prefsWindow {
 		rows = append(rows, []objc.ID{appkit.Label(l, 0), f})
 	}
 
-	p.message = appkit.SecondaryLabel("")
+	p.message = appkit.WrappingLabel("", 0)
+	objc.Msg(p.message, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
+	appkit.UseAutoLayout(p.message)
+	appkit.Activate(appkit.EqualConst(appkit.Anchor(p.message, "widthAnchor"), prefsField))
 
 	apply := appkit.Button("Apply", func() { s.applyPrefsWindow() })
 	appkit.SetDefaultButton(apply)
@@ -86,6 +99,7 @@ func (s *Shell) newPrefsWindow() *prefsWindow {
 	appkit.Activate(
 		appkit.Equal(appkit.Anchor(grid, "topAnchor"), appkit.Anchor(content, "topAnchor"), prefsPadding),
 		appkit.Equal(appkit.Anchor(grid, "centerXAnchor"), appkit.Anchor(content, "centerXAnchor"), 0),
+		appkit.LessOrEqual(appkit.Anchor(grid, "bottomAnchor"), appkit.Anchor(content, "bottomAnchor"), -prefsPadding),
 	)
 
 	return p
@@ -100,12 +114,32 @@ func (s *Shell) applyPrefsWindow() {
 	}
 
 	if err := s.ApplyPreferences(text); err != nil {
-		appkit.SetString(s.prefs.message, "✕ "+err.Error())
+		s.prefs.setMessage("✕ " + err.Error())
 
 		return
 	}
 
-	appkit.SetString(s.prefs.message, "✓ Saved. Applies to the next run.")
+	s.prefs.setMessage("✓ Saved. Applies to the next run.")
+}
+
+// SetPreferencesMessage updates the Settings validation message (smoke checks).
+func (s *Shell) SetPreferencesMessage(text string) {
+	if s.prefs == nil {
+		return
+	}
+
+	s.prefs.setMessage(text)
+}
+
+func (p *prefsWindow) setMessage(text string) {
+	appkit.SetString(p.message, text)
+
+	mode := lineBreakWordWrap
+	if needsCharWrap(text) {
+		mode = lineBreakCharWrap
+	}
+
+	objc.Msg(p.message, "setLineBreakMode:", mode)
 }
 
 // ApplyPreferences validates, saves and applies preferences (runs, bqls,

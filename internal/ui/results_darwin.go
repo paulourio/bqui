@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
@@ -17,18 +18,19 @@ import (
 )
 
 const (
-	gutterID       = "__row"
-	gutterWidth    = 56.0
-	colMinWidth    = 48.0
-	colMaxWidth    = 360.0
-	charWidth      = 7.2
-	colPadding     = 18.0
-	sampleLines    = 200
-	statusInset    = 10.0
-	tickInterval   = 200 * time.Millisecond
-	maxCopyLines   = 100_000
-	colPrefix      = "c"
-	statusFontSize = 12.0
+	gutterID            = "__row"
+	gutterWidth         = 56.0
+	colMinWidth         = 48.0
+	colMaxWidth         = 360.0
+	charWidth           = 7.2
+	colPadding          = 18.0
+	sampleLines         = 200
+	statusInset         = 10.0
+	tickInterval        = 200 * time.Millisecond
+	maxCopyLines        = 100_000
+	colPrefix           = "c"
+	statusFontSize      = 11.0
+	defaultGridFontSize = 12.0
 )
 
 // ResultsPane shows the current run: a status line over the result grid.
@@ -48,22 +50,23 @@ type ResultsPane struct {
 
 	status, empty objc.ID
 
-	run   *app.Run
-	snap  app.RunSnapshot
-	grid  *results.Grid
-	cols  []results.Column
-	lines int64
+	run      *app.Run
+	snap     app.RunSnapshot
+	grid     *results.Grid
+	cols     []results.Column
+	lines    int64
+	fontSize float64
 
 	ticking bool
 }
 
 func newResultsPane() *ResultsPane {
-	p := &ResultsPane{}
+	p := &ResultsPane{fontSize: appkit.GridFontSize()}
 	src := &gridSource{p: p}
 
 	p.Table = appkit.NewTable(src, appkit.TableOptions{Copy: p.copyLines, Menu: p.menu, OnDoubleClick: p.inspectLine})
-	p.status = appkit.SecondaryLabel("")
-	objc.Msg(p.status, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", statusFontSize))
+	p.status = appkit.WrappingLabel("", statusFontSize)
+	objc.Msg(p.status, "setTextColor:", objc.Msg(objc.Cls("NSColor"), "secondaryLabelColor"))
 	p.empty = appkit.SecondaryLabel("Run a query with ⌘↩ to see results here.")
 
 	p.Banner = appkit.NewBanner()
@@ -78,7 +81,7 @@ func newResultsPane() *ResultsPane {
 		objc.Msg(p.View, "addSubview:", v)
 	}
 
-	appkit.AddCentered(p.View, p.empty)
+	appkit.AddCenteredWrapping(p.View, p.empty, 16)
 
 	lead, trail := appkit.Anchor(p.View, "leadingAnchor"), appkit.Anchor(p.View, "trailingAnchor")
 	appkit.Activate(
@@ -103,7 +106,7 @@ func (p *ResultsPane) Show(r *app.Run) {
 		go old.Close()
 	}
 
-	p.run, p.grid, p.cols, p.lines = r, nil, nil, 0
+	p.run, p.grid, p.cols, p.lines, p.fontSize = r, nil, nil, 0, appkit.GridFontSize()
 	p.Table.SetColumns(nil)
 	p.Table.Reload()
 	appkit.SetHidden(p.Table.Scroll, true)
@@ -161,6 +164,12 @@ func (p *ResultsPane) Current() *app.Run { return p.run }
 // StatusText returns the status line (smoke checks).
 func (p *ResultsPane) StatusText() string { return objc.GoString(objc.Msg(p.status, "stringValue")) }
 
+// StatusView returns the status label (smoke checks).
+func (p *ResultsPane) StatusView() objc.ID { return p.status }
+
+// EmptyView returns the empty placeholder label (smoke checks).
+func (p *ResultsPane) EmptyView() objc.ID { return p.empty }
+
 // Update refreshes the pane for r (main thread; stale runs are ignored).
 func (p *ResultsPane) Update(r *app.Run) {
 	if r != p.run {
@@ -169,16 +178,27 @@ func (p *ResultsPane) Update(r *app.Run) {
 
 	p.snap = r.Snapshot()
 
-	if p.snap.Grid != nil && p.grid == nil {
+	gridAdded := p.snap.Grid != nil && p.grid == nil
+	if gridAdded {
 		p.grid = p.snap.Grid
 		p.cols = p.grid.Columns()
-		p.Table.SetColumns(p.columns())
+		p.fontSize = appkit.GridFontSize()
 		appkit.SetHidden(p.Table.Scroll, false)
 	}
 
 	if p.grid != nil {
+		if !gridAdded {
+			p.checkFontSize(true)
+		}
+
 		_, lines, _ := p.grid.Size()
-		if lines != p.lines {
+		switch {
+		case gridAdded:
+			p.lines = lines
+			p.Table.SetColumns(p.columns())
+			p.Table.Reload()
+			p.Table.ScrollToTop()
+		case lines != p.lines:
 			first := p.lines == 0
 			p.lines = lines
 
@@ -284,11 +304,11 @@ func (p *ResultsPane) doneText() string {
 
 	if res := s.Result; res != nil {
 		if res.BytesProc > 0 {
-			parts = append(parts, app.Bytes(res.BytesProc)+" processed")
+			parts = append(parts, noBreak(app.Bytes(res.BytesProc))+"\u00a0read")
 		}
 
 		if res.BytesBilled > 0 {
-			parts = append(parts, app.Bytes(res.BytesBilled)+" billed")
+			parts = append(parts, noBreak(app.Bytes(res.BytesBilled))+"\u00a0billed")
 		}
 
 		if res.CacheHit {
@@ -297,7 +317,7 @@ func (p *ResultsPane) doneText() string {
 	}
 
 	if s.SlotMs > 0 {
-		parts = append(parts, "slot "+seconds(time.Duration(s.SlotMs)*time.Millisecond))
+		parts = append(parts, "slot\u00a0"+seconds(time.Duration(s.SlotMs)*time.Millisecond))
 	}
 
 	parts = append(parts, seconds(s.Elapsed))
@@ -309,37 +329,81 @@ func (p *ResultsPane) doneText() string {
 	return strings.Join(parts, " · ")
 }
 
+func noBreak(s string) string { return strings.ReplaceAll(s, " ", "\u00a0") }
+
 func seconds(d time.Duration) string {
 	if d < time.Second {
-		return strconv.FormatInt(d.Milliseconds(), 10) + " ms"
+		return strconv.FormatInt(d.Milliseconds(), 10) + "\u00a0ms"
 	}
 
-	return strconv.FormatFloat(d.Seconds(), 'f', 1, 64) + " s"
+	return strconv.FormatFloat(d.Seconds(), 'f', 1, 64) + "\u00a0s"
 }
 
 // columns builds table columns: a row-number gutter, then one per leaf with
 // a width sampled from the first lines.
 func (p *ResultsPane) columns() []appkit.TableColumn {
-	out := []appkit.TableColumn{{ID: gutterID, Title: "Row", Width: gutterWidth, MinWidth: 32}}
+	fs := p.fontSize
+	if fs <= 0 {
+		fs = appkit.GridFontSize()
+		p.fontSize = fs
+	}
+
+	scale := fs / defaultGridFontSize
+	cw := charWidth * scale
+	maxW := max(colMaxWidth, colMaxWidth*scale)
+	gutterW := max(gutterWidth, gutterWidth*scale)
+
+	out := []appkit.TableColumn{{ID: gutterID, Title: "Row", Width: gutterW, MinWidth: 32}}
 
 	sample := min(p.lines, sampleLines)
 
 	for i, c := range p.cols {
-		w := float64(len(c.Name))*charWidth + colPadding
+		w := float64(utf8.RuneCountInString(c.Name))*cw + colPadding
 
 		for line := range sample {
 			if cell, _, err := p.grid.Cell(line, i); err == nil && cell.Kind == results.Value {
-				w = max(w, float64(len([]rune(results.FormatCell(c.Type, cell.V))))*charWidth+colPadding)
+				w = max(w, float64(utf8.RuneCountInString(results.FormatCell(c.Type, cell.V)))*cw+colPadding)
 			}
 		}
 
 		out = append(out, appkit.TableColumn{
 			ID: colPrefix + strconv.Itoa(i), Title: c.Name, ToolTip: c.Name + " · " + c.Type,
-			Width: min(max(w, colMinWidth), colMaxWidth), MinWidth: colMinWidth,
+			Width: min(max(w, colMinWidth), maxW), MinWidth: colMinWidth,
 		})
 	}
 
 	return out
+}
+
+func (p *ResultsPane) checkFontSize(sync bool) {
+	fs := appkit.GridFontSize()
+	if fs <= 0 || fs == p.fontSize {
+		return
+	}
+
+	p.fontSize = fs
+	if p.grid == nil {
+		return
+	}
+
+	if sync {
+		p.applyColumnWidths()
+
+		return
+	}
+
+	grid := p.grid
+	objc.Main(func() {
+		if p.grid == grid && p.fontSize == fs {
+			p.applyColumnWidths()
+		}
+	})
+}
+
+func (p *ResultsPane) applyColumnWidths() {
+	for _, col := range p.columns() {
+		p.Table.SetColumnWidth(col.ID, col.Width)
+	}
 }
 
 func columnIndex(id string) (int, bool) {
@@ -355,7 +419,11 @@ func columnIndex(id string) (int, bool) {
 // gridSource adapts the current grid to appkit.TableSource.
 type gridSource struct{ p *ResultsPane }
 
-func (s *gridSource) NumberOfRows() int { return int(s.p.lines) }
+func (s *gridSource) NumberOfRows() int {
+	s.p.checkFontSize(false)
+
+	return int(s.p.lines)
+}
 
 func (s *gridSource) CellText(row int, column string) appkit.CellText {
 	g := s.p.grid

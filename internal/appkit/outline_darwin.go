@@ -28,6 +28,8 @@ type OutlineCell struct {
 	ToolTip   string
 	Group     bool // source-list section header
 	Secondary bool // dimmed text (placeholders)
+	Wrap      bool // multi-line wrapping (needs OutlineOptions.AutomaticRowHeights)
+	CharWrap  bool // character-wrap unbroken tokens when Wrap is true
 }
 
 // CellText is the content of a plain text column.
@@ -36,6 +38,7 @@ type CellText struct {
 	Secondary bool
 	Mono      bool
 	Wrap      bool // multi-line (needs OutlineOptions.AutomaticRowHeights)
+	CharWrap  bool // character-wrap unbroken tokens when Wrap is true
 	Italic    bool // grid cells (NULL)
 	Right     bool // right-aligned (numbers)
 	ToolTip   string
@@ -73,6 +76,8 @@ type OutlineOptions struct {
 	// (multi-line values). Row heights cannot come from a Go delegate:
 	// purego callbacks cannot return floating-point values.
 	AutomaticRowHeights bool
+	// NoHorizontalScroll disables the horizontal scrollbar even with multiple columns.
+	NoHorizontalScroll bool
 }
 
 // Outline is a Go-backed NSOutlineView inside an NSScrollView.
@@ -80,20 +85,22 @@ type Outline struct {
 	Scroll objc.ID
 	View   objc.ID
 
-	src     OutlineSource
-	opts    OutlineOptions
-	targets []objc.ID // context-menu targets of the last built menu
+	src           OutlineSource
+	opts          OutlineOptions
+	targets       []objc.ID // context-menu targets of the last built menu
+	resizePending bool
+	expanding     bool
 }
 
 const (
-	outlineCellID = "BQUIOutlineCell"
-	textCellID    = "BQUITextCell"
+	outlineCellIconID  = "BQUIOutlineCellIcon"
+	outlineCellPlainID = "BQUIOutlineCellPlain"
+	textCellID         = "BQUITextCell"
 
 	columnAutoresizeLastOnly    uint64 = 4
 	columnResizeUserAndAuto     uint64 = 3
 	defaultColumnWidth                 = 200.0
 	monoFontSize                       = 11.0
-	lineBreakByWordWrapping     uint64 = 0
 	notificationObjectKeyString        = "NSObject"
 	cellPad                            = 3.0
 )
@@ -145,7 +152,7 @@ func outlineMethods() []objc.Method {
 
 			o, ok := get(self)
 
-			return ok && o.src.Cell(objc.Uint64(item)).Group
+			return ok && !o.expanding && o.src.Cell(objc.Uint64(item)).Group
 		}},
 		{Sel: "outlineView:viewForTableColumn:item:", Fn: func(self objc.ID, _ objc.SEL, ov, col, item objc.ID) objc.ID {
 			defer enterDelegate()()
@@ -168,14 +175,16 @@ func outlineMethods() []objc.Method {
 		{Sel: "outlineViewItemWillExpand:", Fn: func(self objc.ID, _ objc.SEL, notif objc.ID) {
 			defer enterDelegate()()
 
-			o, ok := get(self)
-			if !ok || o.opts.OnExpand == nil {
-				return
+			if o, ok := get(self); ok {
+				o.onItemWillExpand(notif)
 			}
+		}},
+		{Sel: "outlineViewColumnDidResize:", Fn: func(self objc.ID, _ objc.SEL, _ objc.ID) {
+			defer enterDelegate()()
 
-			info := objc.Msg(notif, "userInfo")
-			item := objc.Msg(info, "objectForKey:", objc.String(notificationObjectKeyString))
-			o.opts.OnExpand(objc.Uint64(item))
+			if o, ok := get(self); ok {
+				o.onColumnDidResize()
+			}
 		}},
 		{Sel: "menuNeedsUpdate:", Fn: func(self objc.ID, _ objc.SEL, menu objc.ID) {
 			defer enterDelegate()()
@@ -223,6 +232,10 @@ func NewOutline(src OutlineSource, opts OutlineOptions) *Outline {
 	}
 
 	objc.Msg(o.View, "setColumnAutoresizingStyle:", columnAutoresizeLastOnly)
+	if len(opts.Columns) > 1 {
+		objc.Msg(o.View, "setStyle:", tableStylePlain)
+		objc.Msg(o.View, "setIntercellSpacing:", Size{Width: 3, Height: 2})
+	}
 	objc.Msg(o.View, "setFloatsGroupRows:", false)
 	objc.Msg(o.View, "setUsesAlternatingRowBackgroundColors:", opts.Alternating)
 	objc.Msg(o.View, "setAutoresizesOutlineColumn:", false)
@@ -253,11 +266,52 @@ func NewOutline(src OutlineSource, opts OutlineOptions) *Outline {
 	o.Scroll = objc.New("NSScrollView")
 	objc.Msg(o.Scroll, "setDocumentView:", o.View)
 	objc.Msg(o.Scroll, "setHasVerticalScroller:", true)
-	objc.Msg(o.Scroll, "setHasHorizontalScroller:", len(cols) > 1)
+	objc.Msg(o.Scroll, "setHasHorizontalScroller:", len(cols) > 1 && !opts.NoHorizontalScroll)
 	objc.Msg(o.Scroll, "setAutohidesScrollers:", true)
 	objc.Msg(o.Scroll, "setDrawsBackground:", false)
 
 	return o
+}
+
+// InvalidateRowHeights notifies the outline view that automatic row heights
+// need recalculation and forces a layout pass.
+func (o *Outline) InvalidateRowHeights() {
+	if o == nil || o.View == objc.Nil {
+		return
+	}
+
+	checkReentrancy("outline note heights")
+
+	n := o.Rows()
+	if n <= 0 {
+		return
+	}
+
+	set := objc.Msg(objc.Cls("NSIndexSet"), "indexSetWithIndexesInRange:", nsRange{Location: 0, Length: uint64(n)})
+	objc.Msg(o.View, "noteHeightOfRowsWithIndexesChanged:", set)
+	objc.Msg(o.View, "layoutSubtreeIfNeeded")
+}
+
+func (o *Outline) onColumnDidResize() {
+	if !o.opts.AutomaticRowHeights || o.resizePending {
+		return
+	}
+
+	o.resizePending = true
+	objc.Main(func() {
+		o.resizePending = false
+		o.InvalidateRowHeights()
+	})
+}
+
+func (o *Outline) onItemWillExpand(notif objc.ID) {
+	if o.opts.OnExpand == nil {
+		return
+	}
+
+	info := objc.Msg(notif, "userInfo")
+	item := objc.Msg(info, "objectForKey:", objc.String(notificationObjectKeyString))
+	o.opts.OnExpand(objc.Uint64(item))
 }
 
 // Reload reloads item and its children (0 reloads everything). Expanded
@@ -277,6 +331,10 @@ func (o *Outline) Reload(item uint64) {
 // Expand expands item; recursive also expands its descendants. Item 0 is the
 // root, so Expand(0, true) expands the whole tree.
 func (o *Outline) Expand(item uint64, recursive bool) {
+	if o == nil || o.View == objc.Nil {
+		return
+	}
+
 	checkReentrancy("outline expand")
 
 	target := objc.Nil
@@ -284,7 +342,48 @@ func (o *Outline) Expand(item uint64, recursive bool) {
 		target = objc.Number(item)
 	}
 
+	if o.opts.AutomaticRowHeights {
+		objc.Msg(o.View, "setUsesAutomaticRowHeights:", false)
+	}
+
+	o.expanding = true
 	objc.Msg(o.View, "expandItem:expandChildren:", target, recursive)
+	o.expanding = false
+
+	if o.opts.AutomaticRowHeights {
+		objc.Msg(o.View, "setUsesAutomaticRowHeights:", true)
+		o.InvalidateRowHeights()
+	}
+}
+
+// ExpandAll expands each item in order, toggling automatic row heights and
+// invalidating row heights once after all expansions complete.
+func (o *Outline) ExpandAll(items []uint64) {
+	if o == nil || o.View == objc.Nil || len(items) == 0 {
+		return
+	}
+
+	checkReentrancy("outline expand")
+
+	if o.opts.AutomaticRowHeights {
+		objc.Msg(o.View, "setUsesAutomaticRowHeights:", false)
+	}
+
+	o.expanding = true
+	for _, item := range items {
+		target := objc.Nil
+		if item != 0 {
+			target = objc.Number(item)
+		}
+
+		objc.Msg(o.View, "expandItem:expandChildren:", target, false)
+	}
+	o.expanding = false
+
+	if o.opts.AutomaticRowHeights {
+		objc.Msg(o.View, "setUsesAutomaticRowHeights:", true)
+		o.InvalidateRowHeights()
+	}
 }
 
 // IsExpanded reports whether item is expanded.
@@ -373,28 +472,38 @@ func (o *Outline) viewFor(ov, col objc.ID, item uint64) objc.ID {
 
 func (o *Outline) outlineCell(ov objc.ID, c OutlineCell) objc.ID {
 	auto := o.opts.AutomaticRowHeights
+	hasIcon := c.Symbol != "" && !c.Group
 
-	id := outlineCellID
+	id := outlineCellPlainID
+	if hasIcon {
+		id = outlineCellIconID
+	}
+
+	if c.Wrap {
+		id += "Wrap"
+		if c.CharWrap {
+			id += "Char"
+		}
+	}
+
 	if auto {
 		id += "Auto"
 	}
 
 	cell := objc.Msg(ov, "makeViewWithIdentifier:owner:", objc.String(id), objc.Nil)
 	if cell == objc.Nil {
-		cell = newOutlineCell(id, auto)
+		cell = newOutlineCellWithBreak(id, hasIcon, c.Wrap, c.CharWrap, auto)
 	}
 
 	tf := objc.Msg(cell, "textField")
 	SetString(tf, c.Title)
 	setSecondary(tf, c.Secondary)
 
-	img := objc.Msg(cell, "imageView")
-	if c.Symbol != "" && !c.Group {
-		objc.Msg(img, "setImage:", SymbolImage(c.Symbol, c.Title))
-		objc.Msg(img, "setHidden:", false)
-	} else {
-		objc.Msg(img, "setImage:", objc.Nil)
-		objc.Msg(img, "setHidden:", true)
+	if hasIcon {
+		if img := objc.Msg(cell, "imageView"); img != objc.Nil {
+			objc.Msg(img, "setImage:", SymbolImage(c.Symbol, c.Title))
+			objc.Msg(img, "setHidden:", false)
+		}
 	}
 
 	objc.Msg(cell, "setToolTip:", stringOrNil(c.ToolTip))
@@ -402,44 +511,69 @@ func (o *Outline) outlineCell(ov objc.ID, c OutlineCell) objc.ID {
 	return cell
 }
 
-// newOutlineCell builds an icon+text cell. With auto heights the text is
-// pinned top and bottom so the cell has a defined fitting height.
-func newOutlineCell(id string, auto bool) objc.ID {
+// newOutlineCell builds an outline cell, omitting the leading icon view and its
+// gutter when hasIcon is false.
+func newOutlineCell(id string, hasIcon, wrap, auto bool) objc.ID {
+	return newOutlineCellWithBreak(id, hasIcon, wrap, false, auto)
+}
+
+func newOutlineCellWithBreak(id string, hasIcon, wrap, charWrap, auto bool) objc.ID {
 	const iconSize, gap = 16.0, 6.0
 
 	cell := objc.New("NSTableCellView")
 	SetIdentifier(cell, id)
 
-	img := objc.New("NSImageView")
-	UseAutoLayout(img)
-	objc.Msg(cell, "addSubview:", img)
-	objc.Msg(cell, "setImageView:", img)
-	objc.Release(img)
+	var tf objc.ID
+	if wrap {
+		mode := lineBreakByWordWrapping
+		if charWrap {
+			mode = lineBreakByCharWrapping
+		}
 
-	tf := Label("", 0)
+		tf = newWrappingCellField(false, mode)
+	} else {
+		tf = Label("", 0)
+	}
+
 	UseAutoLayout(tf)
+	SetHuggingPriority(tf, OrientVertical, PriorityDefaultLow)
 	objc.Msg(cell, "addSubview:", tf)
 	objc.Msg(cell, "setTextField:", tf)
 
 	constraints := []objc.ID{
-		Equal(Anchor(img, "leadingAnchor"), Anchor(cell, "leadingAnchor"), 2),
-		EqualConst(Anchor(img, "widthAnchor"), iconSize),
-		EqualConst(Anchor(img, "heightAnchor"), iconSize),
-		Equal(Anchor(tf, "leadingAnchor"), Anchor(img, "trailingAnchor"), gap),
 		Equal(Anchor(tf, "trailingAnchor"), Anchor(cell, "trailingAnchor"), -2),
+	}
+
+	if hasIcon {
+		img := objc.New("NSImageView")
+		UseAutoLayout(img)
+		objc.Msg(cell, "addSubview:", img)
+		objc.Msg(cell, "setImageView:", img)
+		objc.Release(img)
+
+		constraints = append(constraints,
+			Equal(Anchor(img, "leadingAnchor"), Anchor(cell, "leadingAnchor"), 2),
+			EqualConst(Anchor(img, "widthAnchor"), iconSize),
+			EqualConst(Anchor(img, "heightAnchor"), iconSize),
+			Equal(Anchor(tf, "leadingAnchor"), Anchor(img, "trailingAnchor"), gap),
+		)
+
+		if auto {
+			constraints = append(constraints, Equal(Anchor(img, "topAnchor"), Anchor(cell, "topAnchor"), cellPad))
+		} else {
+			constraints = append(constraints, Equal(Anchor(img, "centerYAnchor"), Anchor(cell, "centerYAnchor"), 0))
+		}
+	} else {
+		constraints = append(constraints, Equal(Anchor(tf, "leadingAnchor"), Anchor(cell, "leadingAnchor"), 2))
 	}
 
 	if auto {
 		constraints = append(constraints,
-			Equal(Anchor(img, "topAnchor"), Anchor(cell, "topAnchor"), cellPad),
 			Equal(Anchor(tf, "topAnchor"), Anchor(cell, "topAnchor"), cellPad),
 			Equal(Anchor(tf, "bottomAnchor"), Anchor(cell, "bottomAnchor"), -cellPad),
 		)
 	} else {
-		constraints = append(constraints,
-			Equal(Anchor(img, "centerYAnchor"), Anchor(cell, "centerYAnchor"), 0),
-			Equal(Anchor(tf, "centerYAnchor"), Anchor(cell, "centerYAnchor"), 0),
-		)
+		constraints = append(constraints, Equal(Anchor(tf, "centerYAnchor"), Anchor(cell, "centerYAnchor"), 0))
 	}
 
 	Activate(constraints...)
@@ -451,6 +585,9 @@ func textCell(ov objc.ID, c CellText, auto bool) objc.ID {
 	id := textCellID
 	if c.Wrap {
 		id += "Wrap"
+		if c.CharWrap {
+			id += "Char"
+		}
 	}
 
 	if auto {
@@ -459,7 +596,7 @@ func textCell(ov objc.ID, c CellText, auto bool) objc.ID {
 
 	cell := objc.Msg(ov, "makeViewWithIdentifier:owner:", objc.String(id), objc.Nil)
 	if cell == objc.Nil {
-		cell = newTextCell(id, c.Wrap, auto)
+		cell = newTextCellWithBreak(id, c.Wrap, c.CharWrap, auto)
 	}
 
 	tf := objc.Msg(cell, "textField")
@@ -485,24 +622,34 @@ func textCell(ov objc.ID, c CellText, auto bool) objc.ID {
 }
 
 func newTextCell(id string, wrap, auto bool) objc.ID {
+	return newTextCellWithBreak(id, wrap, false, auto)
+}
+
+func newTextCellWithBreak(id string, wrap, charWrap, auto bool) objc.ID {
 	cell := objc.New("NSTableCellView")
 	SetIdentifier(cell, id)
 
-	tf := Label("", 0)
+	var tf objc.ID
+	if wrap {
+		mode := lineBreakByWordWrapping
+		if charWrap {
+			mode = lineBreakByCharWrapping
+		}
+
+		tf = newWrappingCellField(true, mode)
+	} else {
+		tf = Label("", 0)
+		objc.Msg(tf, "setSelectable:", true)
+	}
+
 	UseAutoLayout(tf)
-	objc.Msg(tf, "setSelectable:", true)
+	SetHuggingPriority(tf, OrientVertical, PriorityDefaultLow)
 	objc.Msg(cell, "addSubview:", tf)
 	objc.Msg(cell, "setTextField:", tf)
 
 	constraints := []objc.ID{
 		Equal(Anchor(tf, "leadingAnchor"), Anchor(cell, "leadingAnchor"), 2),
 		Equal(Anchor(tf, "trailingAnchor"), Anchor(cell, "trailingAnchor"), -2),
-	}
-
-	if wrap {
-		objc.Msg(tf, "setLineBreakMode:", lineBreakByWordWrapping)
-		objc.Msg(tf, "setMaximumNumberOfLines:", int64(0))
-		objc.Msg(tf, "setUsesSingleLineMode:", false)
 	}
 
 	if auto {
@@ -517,6 +664,18 @@ func newTextCell(id string, wrap, auto bool) objc.ID {
 	Activate(constraints...)
 
 	return objc.Msg(cell, "autorelease")
+}
+
+func newWrappingCellField(selectable bool, lineBreak uint64) objc.ID {
+	tf := objc.Msg(objc.Cls("NSTextField"), "wrappingLabelWithString:", objc.String(""))
+	objc.Msg(tf, "setSelectable:", selectable)
+	objc.Msg(tf, "setLineBreakMode:", lineBreak)
+	objc.Msg(tf, "setMaximumNumberOfLines:", int64(0))
+	objc.Msg(tf, "setUsesSingleLineMode:", false)
+	SetCompressionResistance(tf, OrientHorizontal, PriorityDefaultLow)
+	SetCompressionResistance(tf, OrientVertical, PriorityDefaultHigh)
+
+	return tf
 }
 
 func setSecondary(tf objc.ID, secondary bool) {

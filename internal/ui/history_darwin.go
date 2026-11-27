@@ -14,14 +14,19 @@ import (
 )
 
 const (
-	historyScopeMine  = 0
-	historyScopeLocal = 2
-	historyLoadAhead  = 10 // rows from the end that trigger the next page
-	historyInset      = 8.0
-	historySearchW    = 220.0
-
-	localRefreshDelay  = 150 * time.Millisecond
-	localSearchTimeout = 5 * time.Second
+	historyScopeMine      = 0
+	historyScopeLocal     = 2
+	historyLoadAhead      = 10 // rows from the end that trigger the next page
+	historyInset          = 8.0
+	historySearchW        = 220.0
+	historySearchMinW     = 52.0
+	historyCountMinW      = 40.0
+	historyTabFontSize    = 11.0
+	historyTabPadding     = 18.0
+	historyTabMinW        = 44.0
+	historySearchPrefPrio = float32(200)
+	localRefreshDelay     = 150 * time.Millisecond
+	localSearchTimeout    = 5 * time.Second
 )
 
 // HistoryPane lists the project's jobs (personal or project-wide).
@@ -30,11 +35,13 @@ type HistoryPane struct {
 	Table *appkit.Table
 	Model *app.History
 
-	s      *Shell
-	scope  *appkit.Segmented
-	count  objc.ID
-	shown  bool
-	asking bool
+	s       *Shell
+	scope   *appkit.Segmented
+	refresh objc.ID
+	count   objc.ID
+	search  objc.ID
+	shown   bool
+	asking  bool
 
 	filter   string
 	filtered []app.JobRow // BigQuery rows matching filter
@@ -136,32 +143,43 @@ func newHistoryPane(s *Shell, be app.JobsBackend) *HistoryPane {
 	})
 
 	p.scope = appkit.NewSegmented([]string{"My jobs", "Project jobs", "This Mac"}, func(int) { p.Reload() })
+	objc.Msg(p.scope.View, "setControlSize:", controlSizeSmall)
+	p.scope.SetFont(historyTabFontSize)
+	p.scope.FitWidths(historyTabPadding, historyTabMinW)
 	p.count = appkit.SecondaryLabel("")
-	search := appkit.NewSearchField("Search SQL or job ID", p.SetFilter)
+	appkit.SetCompressionResistance(p.count, appkit.OrientHorizontal, appkit.PriorityDefaultLow)
+	p.search = appkit.NewSearchField("Search SQL or job ID", p.SetFilter)
 
-	refresh := objc.Msg(objc.Cls("NSButton"), "buttonWithImage:target:action:",
+	p.refresh = objc.Msg(objc.Cls("NSButton"), "buttonWithImage:target:action:",
 		appkit.SymbolImage("arrow.clockwise", "Refresh"), objc.NewTarget(func(objc.ID) { p.Reload() }), objc.Sel(objc.ActionSelector))
-	objc.Msg(refresh, "setBordered:", false)
-	objc.Msg(refresh, "setToolTip:", objc.String("Refresh job history"))
+	objc.Msg(p.refresh, "setBordered:", false)
+	objc.Msg(p.refresh, "setToolTip:", objc.String("Refresh job history"))
 
 	p.View = appkit.NewView()
 
-	for _, v := range []objc.ID{p.scope.View, refresh, p.count, search, p.Table.Scroll} {
+	for _, v := range []objc.ID{p.scope.View, p.refresh, p.count, p.search, p.Table.Scroll} {
 		appkit.UseAutoLayout(v)
 		objc.Msg(p.View, "addSubview:", v)
 	}
+
+	searchPrefW := appkit.EqualConst(appkit.Anchor(p.search, "widthAnchor"), historySearchW)
+	objc.Msg(searchPrefW, "setPriority:", historySearchPrefPrio)
 
 	top, lead, trail := appkit.Anchor(p.View, "topAnchor"), appkit.Anchor(p.View, "leadingAnchor"), appkit.Anchor(p.View, "trailingAnchor")
 	appkit.Activate(
 		appkit.Equal(appkit.Anchor(p.scope.View, "topAnchor"), top, historyInset/2),
 		appkit.Equal(appkit.Anchor(p.scope.View, "leadingAnchor"), lead, historyInset),
-		appkit.Equal(appkit.Anchor(refresh, "centerYAnchor"), appkit.Anchor(p.scope.View, "centerYAnchor"), 0),
-		appkit.Equal(appkit.Anchor(refresh, "leadingAnchor"), appkit.Anchor(p.scope.View, "trailingAnchor"), historyInset),
+		appkit.Equal(appkit.Anchor(p.refresh, "centerYAnchor"), appkit.Anchor(p.scope.View, "centerYAnchor"), 0),
+		appkit.Equal(appkit.Anchor(p.refresh, "leadingAnchor"), appkit.Anchor(p.scope.View, "trailingAnchor"), historyInset),
 		appkit.Equal(appkit.Anchor(p.count, "centerYAnchor"), appkit.Anchor(p.scope.View, "centerYAnchor"), 0),
-		appkit.Equal(appkit.Anchor(p.count, "leadingAnchor"), appkit.Anchor(refresh, "trailingAnchor"), historyInset),
-		appkit.Equal(appkit.Anchor(search, "centerYAnchor"), appkit.Anchor(p.scope.View, "centerYAnchor"), 0),
-		appkit.Equal(appkit.Anchor(search, "trailingAnchor"), trail, -historyInset),
-		appkit.EqualConst(appkit.Anchor(search, "widthAnchor"), historySearchW),
+		appkit.Equal(appkit.Anchor(p.count, "leadingAnchor"), appkit.Anchor(p.refresh, "trailingAnchor"), historyInset),
+		appkit.LessOrEqual(appkit.Anchor(p.count, "trailingAnchor"), appkit.Anchor(p.search, "leadingAnchor"), -historyInset),
+		appkit.GreaterOrEqualConst(appkit.Anchor(p.count, "widthAnchor"), historyCountMinW),
+		appkit.Equal(appkit.Anchor(p.search, "centerYAnchor"), appkit.Anchor(p.scope.View, "centerYAnchor"), 0),
+		appkit.Equal(appkit.Anchor(p.search, "trailingAnchor"), trail, -historyInset),
+		appkit.GreaterOrEqualConst(appkit.Anchor(p.search, "widthAnchor"), historySearchMinW),
+		appkit.LessOrEqualConst(appkit.Anchor(p.search, "widthAnchor"), historySearchW),
+		searchPrefW,
 		appkit.Equal(appkit.Anchor(p.Table.Scroll, "topAnchor"), appkit.Anchor(p.scope.View, "bottomAnchor"), historyInset/2),
 		appkit.Equal(appkit.Anchor(p.Table.Scroll, "leadingAnchor"), lead, 0),
 		appkit.Equal(appkit.Anchor(p.Table.Scroll, "trailingAnchor"), trail, 0),
@@ -169,6 +187,11 @@ func newHistoryPane(s *Shell, be app.JobsBackend) *HistoryPane {
 	)
 
 	return p
+}
+
+// HeaderViews returns the header controls for layout inspection (smoke checks).
+func (p *HistoryPane) HeaderViews() (scope *appkit.Segmented, refresh, count, search objc.ID) {
+	return p.scope, p.refresh, p.count, p.search
 }
 
 // SetScope selects My jobs (0), Project jobs (1) or This Mac (2) and reloads.

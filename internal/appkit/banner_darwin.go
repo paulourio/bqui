@@ -44,9 +44,10 @@ func NewBanner() *Banner {
 	UseAutoLayout(icon)
 	b.icon = icon
 
-	b.title = Label("", 0)
+	b.title = WrappingLabel("", 0)
 	objc.Msg(b.title, "setFont:", objc.Msg(objc.Cls("NSFont"), "boldSystemFontOfSize:", 13.0))
 	objc.Msg(b.title, "setTextColor:", red)
+	UseAutoLayout(b.title)
 
 	b.detail = wrappingLabel("labelColor")
 	b.hint = wrappingLabel("secondaryLabelColor")
@@ -71,6 +72,7 @@ func NewBanner() *Banner {
 		Equal(Anchor(text, "topAnchor"), Anchor(content, "topAnchor"), bannerPadding),
 		Equal(Anchor(content, "bottomAnchor"), Anchor(text, "bottomAnchor"), bannerPadding),
 		// Wrapping labels fill the text column so they wrap at its width.
+		Equal(Anchor(b.title, "widthAnchor"), Anchor(text, "widthAnchor"), 0),
 		Equal(Anchor(b.detail, "widthAnchor"), Anchor(text, "widthAnchor"), 0),
 		Equal(Anchor(b.hint, "widthAnchor"), Anchor(text, "widthAnchor"), 0),
 	)

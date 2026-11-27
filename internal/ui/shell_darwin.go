@@ -30,21 +30,32 @@ import (
 const AppName = "bqui"
 
 const (
-	defaultWidth     = 1280
-	defaultHeight    = 800
-	sidebarMin       = 220
-	sidebarMax       = 480
-	inspectorMin     = 300
-	inspectorMax     = 720
-	inspectorWidth   = 440
-	editorMin        = 120
-	resultsMin       = 120
-	resultsHolding   = 240 // results pane gives space before the editor
-	editorHolding    = 260
-	windowAutosaveID = "BQUIMainWindow"
-	editorShare      = 0.55
-	projectsTimeout  = 30 * time.Second
-	projectPickerW   = 220
+	defaultWidth                   = 1280
+	defaultHeight                  = 800
+	windowMinWidth                 = 900
+	windowMinHeight                = 520
+	sidebarMin                     = 172
+	sidebarMax                     = 480
+	contentMin                     = 420
+	inspectorMin                   = 300
+	inspectorMax                   = 720
+	inspectorWidth                 = 440
+	editorMin                      = 120
+	resultsMin                     = 120
+	resultsHolding                 = 240 // results pane gives space before the editor
+	editorHolding                  = 260
+	windowAutosaveID               = "BQUIMainWindow"
+	editorShare                    = 0.55
+	projectsTimeout                = 30 * time.Second
+	projectPickerW                 = 80
+	projectPickerMinW              = 64
+	bottomTabFontSize              = 11.0
+	bottomTabPadding               = 12.0
+	bottomTabMinWidth              = 36.0
+	bottomTabCompactPad            = 18.0
+	bottomTabCompactMinW           = 32.0
+	controlSizeSmall        uint64 = 1
+	lineBreakTruncatingTail uint64 = 4
 )
 
 // Options configures the shell.
@@ -81,30 +92,35 @@ type Options struct {
 
 // Shell is the main window and its panes.
 type Shell struct {
-	App       objc.ID
-	Window    objc.ID
-	Split     objc.ID // outer NSSplitViewController (sidebar | content | inspector)
-	Explorer  *ExplorerPane
-	Inspector *InspectorPane
-	Editor    *EditorPane
-	Cost      objc.ID // toolbar cost estimate label
-	Results   *ResultsPane
-	JSON      *JSONPane
-	Plan      *PlanPane
-	Graph     *GraphPane
-	Job       *JobPane
-	History   *HistoryPane
-	Workbooks *WorkbooksPane
-	Runs      *RunsPane
-	Runner    *app.Runner
-	Workspace *app.Workspace
-	tabs      *appkit.Segmented
-	tabViews  []objc.ID
-	sideTabs  *appkit.Segmented
-	sideViews []objc.ID
-	recorded  map[*app.Run]bool
-	runFiles  map[*app.Run]string  // file ID a run started from
-	lastRuns  map[string]store.Run // query path → latest run (tooltips)
+	App          objc.ID
+	Window       objc.ID
+	Split        objc.ID // outer NSSplitViewController (sidebar | content | inspector)
+	Explorer     *ExplorerPane
+	Inspector    *InspectorPane
+	Editor       *EditorPane
+	Cost         objc.ID // toolbar cost estimate label
+	Results      *ResultsPane
+	JSON         *JSONPane
+	Plan         *PlanPane
+	Graph        *GraphPane
+	Job          *JobPane
+	History      *HistoryPane
+	Workbooks    *WorkbooksPane
+	Runs         *RunsPane
+	Runner       *app.Runner
+	Workspace    *app.Workspace
+	tabs         *appkit.Segmented
+	tabScroll    objc.ID
+	tabResizeObs objc.ID
+	tabViews     []objc.ID
+	runsCount    int
+	tabsCompact  bool
+	fittingTabs  bool
+	sideTabs     *appkit.Segmented
+	sideViews    []objc.ID
+	recorded     map[*app.Run]bool
+	runFiles     map[*app.Run]string  // file ID a run started from
+	lastRuns     map[string]store.Run // query path → latest run (tooltips)
 
 	Themes      []*theme.Theme
 	Theme       *theme.Theme
@@ -215,13 +231,14 @@ func NewShell(opts Options) (*Shell, error) {
 
 	s.Split = appkit.SplitViewController(true, autosave("BQUIMainSplit"), []appkit.SplitItem{
 		{Kind: appkit.SplitSidebar, Controller: appkit.ViewController(s.sidebar()), MinThickness: sidebarMin, MaxThickness: sidebarMax},
-		{Kind: appkit.SplitContent, Controller: content},
+		{Kind: appkit.SplitContent, Controller: content, MinThickness: contentMin},
 		{Kind: appkit.SplitInspector, Controller: appkit.ViewController(s.Inspector.View), MinThickness: inspectorMin, MaxThickness: inspectorMax},
 	})
 
 	s.Window = appkit.NewWindow(AppName, appkit.MakeRect(0, 0, defaultWidth, defaultHeight))
 	objc.Msg(s.Window, "setContentViewController:", s.Split)
 	objc.Msg(s.Window, "setContentSize:", appkit.Size{Width: defaultWidth, Height: defaultHeight})
+	appkit.SetContentMinSize(s.Window, windowMinWidth, windowMinHeight)
 	objc.Msg(s.Window, "center")
 	appkit.SetToolbar(s.Window, "BQUIMainToolbar", s.toolbarItems())
 	s.restoreWorkspace()
@@ -546,25 +563,37 @@ func (s *Shell) menus() []appkit.Menu {
 
 func (s *Shell) toolbarItems() []*appkit.ToolbarItem {
 	s.projects = objc.Msg(objc.Msg(objc.Cls("NSPopUpButton"), "alloc"), "initWithFrame:pullsDown:", appkit.MakeRect(0, 0, projectPickerW, 24), false)
+	appkit.UseAutoLayout(s.projects)
+	appkit.SetCompressionResistance(s.projects, appkit.OrientHorizontal, appkit.PriorityDefaultLow)
+	appkit.SetHuggingPriority(s.projects, appkit.OrientHorizontal, appkit.PriorityDefaultLow)
+	appkit.Activate(
+		appkit.GreaterOrEqualConst(appkit.Anchor(s.projects, "widthAnchor"), projectPickerMinW),
+		appkit.LessOrEqualConst(appkit.Anchor(s.projects, "widthAnchor"), projectPickerW),
+	)
+
+	if cell := objc.Msg(s.projects, "cell"); cell != objc.Nil {
+		objc.Msg(cell, "setLineBreakMode:", lineBreakTruncatingTail)
+	}
+
 	objc.Msg(s.projects, "setToolTip:", objc.String("Billing project for queries (also bqls' default project)"))
 	objc.Msg(s.projects, "setAutoenablesItems:", false)
 	objc.Msg(s.projects, "setTarget:", objc.NewTarget(func(objc.ID) { s.onProjectPicked() }))
 	objc.Msg(s.projects, "setAction:", objc.Sel(objc.ActionSelector))
 
 	cost := appkit.SecondaryLabel("—")
+	appkit.SetCompressionResistance(cost, appkit.OrientHorizontal, appkit.PriorityDefaultLow)
 	objc.Msg(cost, "setToolTip:", objc.String("Estimated bytes processed (bqls dry run)"))
 	s.Cost = cost
 
 	return []*appkit.ToolbarItem{
 		{Kind: appkit.ToolbarToggleSidebar},
 		{Kind: appkit.ToolbarSidebarSeparator},
-		{ID: "project", Kind: appkit.ToolbarCustomView, Label: "Project", View: s.projects},
+		{ID: "project", Kind: appkit.ToolbarCustomView, Label: "Project", View: s.projects, VisibilityPriority: appkit.ToolbarVisibilityHigh},
 		{Kind: appkit.ToolbarFlexibleSpace},
-		{ID: "run", Kind: appkit.ToolbarButton, Label: "Run", Symbol: "play.fill", ToolTip: "Run (⌘↩)", Run: func() { s.Editor.RequestRun(false) }},
-		{ID: "stop", Kind: appkit.ToolbarButton, Label: "Stop", Symbol: "stop.fill", ToolTip: "Stop (⌘.)", Run: s.Stop},
-		{ID: "format", Kind: appkit.ToolbarButton, Label: "Format", Symbol: "text.alignleft", ToolTip: "Format SQL (⇧⌘F)", Run: func() { s.Editor.Format() }},
-		{ID: "cost", Kind: appkit.ToolbarCustomView, Label: "Estimate", View: cost},
-		{ID: "search", Kind: appkit.ToolbarSearch, Label: "Search"},
+		{ID: "run", Kind: appkit.ToolbarButton, Label: "Run", Symbol: "play.fill", ToolTip: "Run (⌘↩)", VisibilityPriority: appkit.ToolbarVisibilityHigh, Run: func() { s.Editor.RequestRun(false) }},
+		{ID: "stop", Kind: appkit.ToolbarButton, Label: "Stop", Symbol: "stop.fill", ToolTip: "Stop (⌘.)", VisibilityPriority: appkit.ToolbarVisibilityHigh, Run: s.Stop},
+		{ID: "format", Kind: appkit.ToolbarButton, Label: "Format", Symbol: "text.alignleft", ToolTip: "Format SQL (⇧⌘F)", VisibilityPriority: appkit.ToolbarVisibilityHigh, Run: func() { s.Editor.Format() }},
+		{ID: "cost", Kind: appkit.ToolbarCustomView, Label: "Estimate", View: cost, VisibilityPriority: appkit.ToolbarVisibilityLow},
 		{Kind: appkit.ToolbarInspectorSeparator},
 		{Kind: appkit.ToolbarToggleInspector},
 	}
@@ -633,6 +662,12 @@ func (s *Shell) showRun(r *app.Run) {
 // ShowRun displays r in both the Results and JSON panes (smoke checks).
 func (s *Shell) ShowRun(r *app.Run) { s.showRun(r) }
 
+// Tabs returns the bottom tab segmented control (smoke checks).
+func (s *Shell) Tabs() *appkit.Segmented { return s.tabs }
+
+// SideTabs returns the sidebar segmented control (smoke checks).
+func (s *Shell) SideTabs() *appkit.Segmented { return s.sideTabs }
+
 // Bottom-pane tabs.
 const (
 	TabResults = iota
@@ -648,11 +683,34 @@ const (
 // segmented switcher.
 func (s *Shell) bottomPane() objc.ID {
 	s.tabs = appkit.NewSegmented([]string{"Results", "Runs", "JSON", "Execution details", "Execution graph", "Job information", "History"}, s.SelectTab)
+	objc.Msg(s.tabs.View, "setControlSize:", controlSizeSmall)
+	s.tabs.SetFont(bottomTabFontSize)
+	s.tabs.FitWidths(bottomTabPadding, bottomTabMinWidth)
+	objc.Msg(s.tabs.View, "setAutoresizingMask:", uint64(0))
 	s.tabViews = []objc.ID{s.Results.View, s.Runs.View, s.JSON.View, s.Plan.View, s.Graph.View, s.Job.View, s.History.View}
 
+	tabScroll := objc.New("NSScrollView")
+	objc.Msg(tabScroll, "setBorderType:", uint64(0))
+	objc.Msg(tabScroll, "setDrawsBackground:", false)
+	objc.Msg(tabScroll, "setHasVerticalScroller:", false)
+	objc.Msg(tabScroll, "setHasHorizontalScroller:", false)
+	objc.Msg(tabScroll, "setDocumentView:", s.tabs.View)
+	s.tabScroll = tabScroll
+
+	objc.Msg(tabScroll, "setPostsFrameChangedNotifications:", true)
+	s.tabResizeObs = objc.NewTarget(func(objc.ID) { s.fitBottomTabs(false) })
+	objc.Msg(objc.Msg(objc.Cls("NSNotificationCenter"), "defaultCenter"),
+		"addObserver:selector:name:object:",
+		s.tabResizeObs, objc.Sel(objc.ActionSelector), objc.String("NSViewFrameDidChangeNotification"), tabScroll)
+
+	tabHeight := appkit.ViewBounds(s.tabs.View).Size.Height
+	if tabHeight <= 0 {
+		tabHeight = objc.Send[appkit.Size](s.tabs.View, "fittingSize").Height
+	}
+
 	v := appkit.NewView()
-	appkit.UseAutoLayout(s.tabs.View)
-	objc.Msg(v, "addSubview:", s.tabs.View)
+	appkit.UseAutoLayout(tabScroll)
+	objc.Msg(v, "addSubview:", tabScroll)
 
 	content := appkit.NewView()
 	appkit.UseAutoLayout(content)
@@ -663,9 +721,11 @@ func (s *Shell) bottomPane() objc.ID {
 	}
 
 	appkit.Activate(
-		appkit.Equal(appkit.Anchor(s.tabs.View, "topAnchor"), appkit.Anchor(v, "topAnchor"), 6),
-		appkit.Equal(appkit.Anchor(s.tabs.View, "leadingAnchor"), appkit.Anchor(v, "leadingAnchor"), 10),
-		appkit.Equal(appkit.Anchor(content, "topAnchor"), appkit.Anchor(s.tabs.View, "bottomAnchor"), 2),
+		appkit.Equal(appkit.Anchor(tabScroll, "topAnchor"), appkit.Anchor(v, "topAnchor"), 6),
+		appkit.Equal(appkit.Anchor(tabScroll, "leadingAnchor"), appkit.Anchor(v, "leadingAnchor"), 10),
+		appkit.Equal(appkit.Anchor(tabScroll, "trailingAnchor"), appkit.Anchor(v, "trailingAnchor"), -10),
+		appkit.EqualConst(appkit.Anchor(tabScroll, "heightAnchor"), tabHeight),
+		appkit.Equal(appkit.Anchor(content, "topAnchor"), appkit.Anchor(tabScroll, "bottomAnchor"), 2),
 		appkit.Equal(appkit.Anchor(content, "leadingAnchor"), appkit.Anchor(v, "leadingAnchor"), 0),
 		appkit.Equal(appkit.Anchor(content, "trailingAnchor"), appkit.Anchor(v, "trailingAnchor"), 0),
 		appkit.Equal(appkit.Anchor(content, "bottomAnchor"), appkit.Anchor(v, "bottomAnchor"), 0),
@@ -676,9 +736,51 @@ func (s *Shell) bottomPane() objc.ID {
 	return v
 }
 
+func (s *Shell) fitBottomTabs(force bool) {
+	if s.tabs == nil || s.tabs.View == objc.Nil || s.fittingTabs {
+		return
+	}
+
+	s.fittingTabs = true
+	defer func() { s.fittingTabs = false }()
+
+	runsTitle := "Runs"
+	if s.runsCount > 0 {
+		runsTitle += " (" + app.CountInt(int64(s.runsCount)) + ")"
+	}
+
+	full := []string{"Results", runsTitle, "JSON", "Execution details", "Execution graph", "Job information", "History"}
+	compactLabels := []string{"Results", runsTitle, "JSON", "Plan", "Graph", "Job", "History"}
+
+	var fullSum float64
+	for _, w := range s.tabs.MeasureWidths(full, bottomTabPadding, bottomTabMinWidth) {
+		fullSum += w
+	}
+
+	clipW := appkit.ViewBounds(objc.Msg(s.tabs.View, "superview")).Size.Width
+	compact := clipW > 0 && fullSum > clipW+0.5
+
+	if !force && compact == s.tabsCompact {
+		return
+	}
+
+	s.tabsCompact = compact
+	labels, pad, minW := full, bottomTabPadding, bottomTabMinWidth
+	if compact {
+		labels, pad, minW = compactLabels, bottomTabCompactPad, bottomTabCompactMinW
+	}
+
+	for i, lbl := range labels {
+		s.tabs.SetSegmentLabel(i, lbl)
+	}
+
+	s.tabs.FitWidths(pad, minW)
+}
+
 // SelectTab switches the bottom pane.
 func (s *Shell) SelectTab(i int) {
 	s.tabs.Select(i)
+	s.scrollTabToVisible(i)
 
 	for j, tv := range s.tabViews {
 		appkit.SetHidden(tv, j != i)
@@ -687,6 +789,38 @@ func (s *Shell) SelectTab(i int) {
 	if i == TabHistory {
 		s.History.Shown()
 	}
+}
+
+func (s *Shell) scrollTabToVisible(i int) {
+	if s.tabs == nil || s.tabs.View == objc.Nil {
+		return
+	}
+
+	n := s.tabs.SegmentCount()
+	if i < 0 || i >= n {
+		return
+	}
+
+	b := appkit.ViewBounds(s.tabs.View)
+	if b.Size.Width <= 0 || b.Size.Height <= 0 {
+		return
+	}
+
+	var x float64
+	for j := range i {
+		x += s.tabs.SegmentWidth(j)
+	}
+
+	w := s.tabs.SegmentWidth(i)
+	if w <= 0 {
+		return
+	}
+
+	if i == n-1 && b.Size.Width-x > w {
+		w = b.Size.Width - x
+	}
+
+	objc.Send[bool](s.tabs.View, "scrollRectToVisible:", appkit.MakeRect(b.Origin.X+x, b.Origin.Y, w, b.Size.Height))
 }
 
 // onRunUpdate routes runner updates to the panes.
@@ -773,6 +907,8 @@ func (s *Shell) onCost(summary string) {
 	}
 
 	appkit.SetString(s.Cost, summary)
+	objc.Msg(s.Cost, "sizeToFit")
+	objc.Msg(s.Cost, "invalidateIntrinsicContentSize")
 }
 
 func (s *Shell) status(msg string) { s.Results.Notice(msg) }

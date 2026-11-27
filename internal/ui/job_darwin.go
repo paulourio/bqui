@@ -29,10 +29,11 @@ func newJobPane(be app.JobsBackend) *JobPane {
 	p := &JobPane{be: be, src: &detailsSource{}}
 	p.Outline = appkit.NewOutline(p.src, appkit.OutlineOptions{
 		Columns: []appkit.Column{
-			{ID: "key", Title: "Property", Width: 170, MinWidth: 80},
-			{ID: "value", Title: "Value", Width: 520, MinWidth: 100},
+			{ID: "key", Title: "Property", Width: 140, MinWidth: 70},
+			{ID: "value", Title: "Value", Width: 280, MinWidth: 100},
 		},
 		AutomaticRowHeights: true,
+		NoHorizontalScroll:  true,
 		Menu: func(item uint64) []appkit.MenuItem {
 			r, ok := p.src.rows[item]
 			if !ok {
@@ -46,7 +47,7 @@ func newJobPane(be app.JobsBackend) *JobPane {
 
 	p.View = appkit.NewView()
 	appkit.AddFilling(p.View, p.Outline.Scroll, 0)
-	appkit.AddCentered(p.View, p.note)
+	appkit.AddCenteredWrapping(p.View, p.note, 16)
 	appkit.SetHidden(p.Outline.Scroll, true)
 
 	return p
@@ -81,6 +82,9 @@ func (p *JobPane) Clear(msg string) {
 
 // Rows reports visible rows (smoke checks).
 func (p *JobPane) Rows() int64 { return p.Outline.Rows() }
+
+// NoteView returns the placeholder note label (smoke checks).
+func (p *JobPane) NoteView() objc.ID { return p.note }
 
 func (p *JobPane) apply(gen int, job *bigquery.Job, err error) {
 	if gen != p.gen {
