@@ -137,6 +137,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	se := sqlErrorsFlow(s, dir)
 	phase("active query")
 	ac := activeFlow(s, dir)
+	phase("rename")
+	rn := renameFlow(s)
 	phase("checks")
 
 	queued := time.Now()
@@ -174,6 +176,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		menuChecks(rep, mn)
 		sqlErrorsChecks(rep, se)
 		activeChecks(rep, ac)
+		renameChecks(rep, rn)
 		pagingChecks(rep, pg)
 
 		if err := run(s, dir, rep, done); err != nil {

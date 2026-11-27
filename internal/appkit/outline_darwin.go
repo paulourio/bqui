@@ -791,3 +791,15 @@ func stringOrNil(s string) objc.ID {
 func (o *Outline) Focus() {
 	objc.Msg(objc.Msg(o.View, "window"), "makeFirstResponder:", o.View)
 }
+
+// SendKey delivers a synthetic key-down event to window's first responder
+// (smoke checks): code is the key code, chars its characters.
+func SendKey(window objc.ID, code uint16, chars string) {
+	const keyDown = uint64(10) // NSEventTypeKeyDown
+
+	event := objc.Msg(objc.Cls("NSEvent"),
+		"keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:",
+		keyDown, Point{}, uint64(0), 0.0, objc.Send[int64](window, "windowNumber"), objc.Nil,
+		objc.String(chars), objc.String(chars), false, code)
+	objc.Msg(window, "sendEvent:", event)
+}
