@@ -18,6 +18,7 @@ import (
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
+	"github.com/paulourio/bqui/internal/dataform"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/plan"
 	"github.com/paulourio/bqui/internal/results"
@@ -72,6 +73,10 @@ type Options struct {
 	Workspace *app.Workspace
 	// ThemesDir holds user themes (TOML).
 	ThemesDir string
+	// Studio reads and writes BigQuery Studio saved queries (nil hides
+	// them); StudioAuthor names commits (called once, off the main thread).
+	Studio       app.StudioBackend
+	StudioAuthor func() dataform.Author
 }
 
 // Shell is the main window and its panes.
@@ -103,6 +108,7 @@ type Shell struct {
 	themeErrs   []error
 	themeColors []objc.ID
 	prefs       *prefsWindow
+	studio      studioState
 
 	exportCancel func()
 	lastExport   app.ExportProgress
@@ -267,6 +273,10 @@ func (s *Shell) SetBillingProject(project string) {
 
 	s.Editor.ConfigureLSP(s.lspOptions())
 	s.rebuildProjectPicker()
+
+	if s.Saved != nil && s.sideTabs.Selected() == SidebarSaved {
+		s.Saved.ReloadStudio()
+	}
 	s.saveSettings()
 }
 
@@ -384,6 +394,8 @@ func (s *Shell) menus() []appkit.Menu {
 			{},
 			{Title: "Save", Key: "s", Run: func() { s.SaveQuery() }},
 			{Title: "Save As…", Key: "s", Mods: cmd | shift, Run: func() { s.SaveQueryAs() }},
+			{Title: "Save to BigQuery Studio…", Key: "s", Mods: cmd | opt, Run: s.PublishStudio},
+			{Title: "Reload from BigQuery Studio", Run: s.ReloadStudio},
 			{Title: "Show Saved Queries", Key: "1", Mods: cmd | opt, Run: func() { s.SelectSidebar(SidebarSaved) }},
 			{},
 			{Title: "Close Window", Action: "performClose:", Key: "w"},

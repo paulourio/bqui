@@ -20,16 +20,31 @@ type Preferences struct {
 	CostWarningUSD float64 `json:"costWarningUSD,omitempty"`
 	// MaxSpillBytes caps a large result's spill file (0 = default).
 	MaxSpillBytes int64 `json:"maxSpillBytes,omitempty"`
+	// StudioRegion is where BigQuery Studio saved queries live ("" =
+	// us-central1, which holds the US multi-region's queries).
+	StudioRegion string `json:"studioRegion,omitempty"`
+}
+
+// DefaultStudioRegion holds saved queries for BigQuery's US multi-region.
+const DefaultStudioRegion = "us-central1"
+
+// Region returns the BigQuery Studio region to use.
+func (p Preferences) Region() string {
+	if p.StudioRegion == "" {
+		return DefaultStudioRegion
+	}
+
+	return p.StudioRegion
 }
 
 // PreferenceText is Preferences as the user types them.
 type PreferenceText struct {
-	Location, DefaultDataset, MaxBytesBilled, CostWarningUSD, MaxSpillBytes string
+	Location, DefaultDataset, MaxBytesBilled, CostWarningUSD, MaxSpillBytes, StudioRegion string
 }
 
 // Text formats preferences for editing.
 func (p Preferences) Text() PreferenceText {
-	t := PreferenceText{Location: p.Location, DefaultDataset: p.DefaultDataset}
+	t := PreferenceText{Location: p.Location, DefaultDataset: p.DefaultDataset, StudioRegion: p.StudioRegion}
 
 	if p.MaxBytesBilled > 0 {
 		t.MaxBytesBilled = FormatBytes(p.MaxBytesBilled)
@@ -55,6 +70,14 @@ func (t PreferenceText) Parse() (Preferences, error) {
 
 	p.Location = strings.TrimSpace(t.Location)
 	p.DefaultDataset = strings.TrimSpace(t.DefaultDataset)
+	p.StudioRegion = strings.ToLower(strings.TrimSpace(t.StudioRegion))
+
+	switch p.StudioRegion {
+	case "us":
+		p.StudioRegion = DefaultStudioRegion // the console's "US" lives here
+	case "eu":
+		return p, errors.New("studio region: enter the region shown in the Dataform API (for example europe-west4)")
+	}
 
 	if p.DefaultDataset != "" {
 		parts := strings.Split(p.DefaultDataset, ".")

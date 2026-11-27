@@ -30,7 +30,7 @@ func TestTabsPersistAcrossReopen(t *testing.T) {
 
 	tabs := []Tab{
 		{ID: "b", Position: 1, Title: "Two", SQL: "SELECT 2"},
-		{ID: "a", Position: 0, Title: "One", SQL: "SELECT 1", CursorLine: 3, SessionMode: true, SessionID: "s1"},
+		{ID: "a", Position: 0, Title: "One", SQL: "SELECT 1", CursorLine: 3, SessionMode: true, SessionID: "s1", Remote: "projects/p/locations/l/repositories/r", RemoteHead: "abc"},
 	}
 
 	for _, tab := range tabs {
@@ -61,7 +61,7 @@ func TestTabsPersistAcrossReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(got) != 2 || got[0].ID != "a" || got[0].SQL != "SELECT 1 -- edited" || !got[0].SessionMode || got[0].SessionID != "s1" || got[0].CursorLine != 3 {
+	if len(got) != 2 || got[0].ID != "a" || got[0].SQL != "SELECT 1 -- edited" || !got[0].SessionMode || got[0].SessionID != "s1" || got[0].CursorLine != 3 || got[0].RemoteHead != "abc" {
 		t.Fatalf("tabs = %+v", got)
 	}
 

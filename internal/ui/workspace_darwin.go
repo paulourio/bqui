@@ -83,7 +83,7 @@ func (s *Shell) onEdited(text string, line, character int) {
 
 func (s *Shell) updateTitle() {
 	t := s.Workspace.Tab()
-	edited := s.Workspace.Dirty() && t.File != ""
+	edited := s.Workspace.Dirty() && (t.File != "" || t.Remote != "")
 	appkit.SetWindowDocument(s.Window, s.Workspace.Title(), edited)
 }
 
@@ -94,6 +94,10 @@ func (s *Shell) keepChanges() bool {
 	}
 
 	t := s.Workspace.Tab()
+	if t.File == "" && t.Remote != "" {
+		return s.keepStudioChanges(t.Title)
+	}
+
 	if t.File == "" {
 		switch appkit.Confirm("Save this query before replacing it?",
 			"The editor text is not saved to a file. It stays in run history only if it was run.",
@@ -155,8 +159,19 @@ func (s *Shell) OpenQuery(path string) {
 	s.Editor.Focus()
 }
 
-// SaveQuery saves to the linked file, or asks for one; false if not saved.
+// SaveQuery saves to the linked file and/or BigQuery Studio saved query,
+// or asks for a file; false if the local save did not happen.
 func (s *Shell) SaveQuery() bool {
+	t := s.Workspace.Tab()
+
+	if t.Remote != "" {
+		s.SaveStudio(false)
+
+		if t.File == "" {
+			return true
+		}
+	}
+
 	err := s.Workspace.Save()
 	if errors.Is(err, app.ErrNoFile) {
 		return s.SaveQueryAs()
@@ -258,4 +273,27 @@ func (s *Shell) recordFinished(r *app.Run, snap app.RunSnapshot) {
 
 	s.Workspace.Finished(snap, s.BillingProject())
 	s.History.LocalChanged()
+}
+
+// keepStudioChanges offers to save edits to a BigQuery Studio query before
+// replacing them; the save runs synchronously (bounded by a timeout).
+func (s *Shell) keepStudioChanges(title string) bool {
+	switch appkit.Confirm("Save changes to “"+title+"” in BigQuery Studio?",
+		"Your changes will be lost if you don't save them.", "Save", "Cancel", "Don't Save") {
+	case appkit.AlertFirst:
+		ctx, cancel := app.StudioContext()
+		defer cancel()
+
+		if err := s.Workspace.SaveRemote(ctx, s.opts.Studio, s.studioAuthor(), false); err != nil {
+			s.status("✕ " + err.Error())
+
+			return false
+		}
+
+		return true
+	case appkit.AlertThird:
+		return true
+	}
+
+	return false
 }

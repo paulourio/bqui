@@ -201,3 +201,25 @@ func SetWindowDocument(window objc.ID, subtitle string, edited bool) {
 	objc.Msg(window, "setSubtitle:", objc.String(subtitle))
 	objc.Msg(window, "setDocumentEdited:", edited)
 }
+
+const promptFieldWidth = 280.0
+
+// Prompt asks for one line of text (OK/Cancel); ok is false on Cancel.
+func Prompt(message, info, value string) (text string, ok bool) {
+	alert := objc.New("NSAlert")
+	objc.Msg(alert, "setMessageText:", objc.String(message))
+	objc.Msg(alert, "setInformativeText:", objc.String(info))
+	objc.Msg(alert, "addButtonWithTitle:", objc.String("OK"))
+	objc.Msg(alert, "addButtonWithTitle:", objc.String("Cancel"))
+
+	field := objc.Msg(objc.Msg(objc.Cls("NSTextField"), "alloc"), "initWithFrame:", MakeRect(0, 0, promptFieldWidth, 24))
+	objc.Msg(field, "setStringValue:", objc.String(value))
+	objc.Msg(alert, "setAccessoryView:", field)
+	objc.Msg(objc.Msg(alert, "window"), "setInitialFirstResponder:", field)
+
+	if objc.Send[int64](alert, "runModal") != AlertFirst {
+		return "", false
+	}
+
+	return objc.GoString(objc.Msg(field, "stringValue")), true
+}

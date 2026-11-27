@@ -180,7 +180,10 @@ func (w *Workspace) Dirty() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.tab.File == "" {
+	switch {
+	case w.tab.File == "" && w.tab.Remote != "":
+		return !sameSQL(w.tab.SQL, w.tab.RemoteText)
+	case w.tab.File == "":
 		return strings.TrimSpace(w.tab.SQL) != "" && w.tab.SQL != w.opts.InitialSQL
 	}
 
@@ -192,11 +195,11 @@ func (w *Workspace) Title() string {
 	t := w.Tab()
 
 	title := t.Title
-	if t.File == "" {
+	if t.File == "" && t.Remote == "" {
 		title = "Untitled"
 	}
 
-	if w.Dirty() && t.File != "" {
+	if w.Dirty() && (t.File != "" || t.Remote != "") {
 		title += " — Edited"
 	}
 
@@ -209,6 +212,7 @@ func (w *Workspace) New() {
 	defer w.mu.Unlock()
 
 	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = "", "", "Untitled", 0, 0
+	w.tab.Remote, w.tab.RemoteHead, w.tab.RemoteText = "", "", ""
 	w.fileText = ""
 	w.scheduleLocked()
 }
@@ -225,6 +229,7 @@ func (w *Workspace) Open(path string) (string, error) {
 
 	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = body, path, q.Title, 0, 0
 	w.fileText = body
+	w.linkFromFile(q, body)
 	w.scheduleLocked()
 
 	return body, nil
@@ -254,7 +259,9 @@ func (w *Workspace) SaveAs(path, title, project string) error {
 		title = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	}
 
-	return w.write(store.SavedQuery{Path: path, Title: title, Project: project}, w.Tab().SQL)
+	t := w.Tab()
+
+	return w.write(store.SavedQuery{Path: path, Title: title, Project: project, LinkID: t.Remote}, t.SQL)
 }
 
 func (w *Workspace) write(q store.SavedQuery, sql string) error {

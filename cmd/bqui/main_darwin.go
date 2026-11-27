@@ -20,6 +20,7 @@ import (
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/bqstorage"
+	"github.com/paulourio/bqui/internal/dataform"
 	"github.com/paulourio/bqui/internal/logs"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/smoke"
@@ -93,6 +94,8 @@ func main() {
 			SpillDir:      spillDir(),
 			Workspace:     workspace,
 			ThemesDir:     themesDir(*smokeDir),
+			Studio:        backends.studio,
+			StudioAuthor:  backends.author,
 		})
 		if err != nil {
 			fatal(err)
@@ -130,6 +133,8 @@ type backends struct {
 	queries  app.QueryBackend
 	storage  app.StorageOpener
 	jobs     app.JobsBackend
+	studio   app.StudioBackend
+	author   func() dataform.Author
 }
 
 // newBackends wires BigQuery (REST + Storage Read API) or the fixture fake.
@@ -138,7 +143,7 @@ func newBackends(fake bool, billing func() string) (backends, error) {
 	if fake {
 		f := &app.FakeBackend{Latency: fakeLatency}
 
-		return backends{metadata: f, queries: f, jobs: f}, nil
+		return backends{metadata: f, queries: f, jobs: f, studio: app.NewFakeStudio(app.FakeProject)}, nil
 	}
 
 	ctx := context.Background()
@@ -153,7 +158,24 @@ func newBackends(fake bool, billing func() string) (backends, error) {
 		return backends{}, err
 	}
 
-	return backends{metadata: client, queries: client, jobs: client, storage: app.NewStorageOpener(sc, billing)}, nil
+	studio, err := dataform.New(ctx, option.WithTokenSource(client.Tokens()))
+	if err != nil {
+		return backends{}, err
+	}
+
+	author := func() dataform.Author {
+		a, err := dataform.WhoAmI(context.Background(), client.Tokens())
+		if err != nil {
+			slog.Default().Warn("commit author unknown", "err", err)
+		}
+
+		return a
+	}
+
+	return backends{
+		metadata: client, queries: client, jobs: client, storage: app.NewStorageOpener(sc, billing),
+		studio: studio, author: author,
+	}, nil
 }
 
 const staleSpill = 24 * time.Hour

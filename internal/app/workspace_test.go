@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/paulourio/bqui/internal/bq"
+	"github.com/paulourio/bqui/internal/dataform"
 	"github.com/paulourio/bqui/internal/store"
 )
 
@@ -223,5 +224,96 @@ func TestApplyPreferencesAndBytesLimit(t *testing.T) {
 	rn, _ := newTestRunner(t)
 	if s := wait(t, rn.Start(req)); s.State != RunFailed || !strings.Contains(s.Err.Error(), "exceeded limit for bytes billed") {
 		t.Errorf("limited run = %v %v", s.State, s.Err)
+	}
+}
+
+func TestStudioOpenSaveConflictAndLink(t *testing.T) {
+	ctx := context.Background()
+	tmp := t.TempDir()
+	dir := filepath.Join(tmp, "queries")
+	w := openWorkspace(t, filepath.Join(tmp, "bqui.db"), dir)
+	sb := NewFakeStudio("p")
+	me := dataform.Author{Name: "me", Email: "me@example.com"}
+
+	list, _ := sb.List(ctx, "p", dataform.DefaultRegion)
+	if len(list) != 2 {
+		t.Fatalf("fake list = %+v", list)
+	}
+
+	sql, err := w.OpenRemote(ctx, sb, list[1])
+	if err != nil || !strings.HasPrefix(sql, "SELECT i.sku") || w.Dirty() || w.Title() != "Top items" {
+		t.Fatalf("open = %q %v dirty=%v title=%q", sql, err, w.Dirty(), w.Title())
+	}
+
+	w.Edited(sql+"\nLIMIT 10", 0, 0)
+
+	if !w.Dirty() || w.Title() != "Top items — Edited" {
+		t.Fatalf("edited: dirty=%v title=%q", w.Dirty(), w.Title())
+	}
+
+	if err = w.SaveRemote(ctx, sb, me, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, _, _ := sb.Read(ctx, list[1].Name); got != sql+"\nLIMIT 10" || w.Dirty() {
+		t.Fatalf("remote = %q dirty=%v", got, w.Dirty())
+	}
+
+	// A console edit makes our next save conflict, without overwriting.
+	sb.EditInConsole(list[1].Name, "SELECT 'console'")
+	w.Edited("SELECT 'mine'", 0, 0)
+
+	if err = w.SaveRemote(ctx, sb, me, false); !errors.Is(err, dataform.ErrConflict) {
+		t.Fatalf("conflicting save = %v", err)
+	}
+
+	if got, _, _ := sb.Read(ctx, list[1].Name); got != "SELECT 'console'" {
+		t.Fatalf("overwritten: %q", got)
+	}
+
+	if err = w.SaveRemote(ctx, sb, me, true); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, _, _ := sb.Read(ctx, list[1].Name); got != "SELECT 'mine'" {
+		t.Fatalf("overwrite = %q", got)
+	}
+
+	// Publish a local file: the header links it; reopening restores the link
+	// with an unknown head, accepted only while the remote is unchanged.
+	w.New()
+	w.Edited("SELECT 42", 0, 0)
+
+	path := filepath.Join(dir, "answer.sql")
+	if err = w.SaveAs(path, "Answer", "p"); err != nil {
+		t.Fatal(err)
+	}
+
+	q, err := w.PublishRemote(ctx, sb, "p", dataform.DefaultRegion, "Answer", me)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if meta, _, _ := store.ReadQuery(path); meta.LinkID != q.Name {
+		t.Fatalf("link_id = %q", meta.LinkID)
+	}
+
+	w.New()
+
+	if _, err := w.Open(path); err != nil || w.Tab().Remote != q.Name || w.Tab().RemoteHead != "" {
+		t.Fatalf("reopen link = %+v %v", w.Tab(), err)
+	}
+
+	w.Edited("SELECT 43", 0, 0)
+
+	if err := w.SaveRemote(ctx, sb, me, false); err != nil {
+		t.Fatalf("save with unknown head, remote unchanged: %v", err)
+	}
+
+	w.New()
+	_, _ = w.Open(path) // file still says 42; remote is 43 now
+
+	if err := w.SaveRemote(ctx, sb, me, false); !errors.Is(err, dataform.ErrConflict) {
+		t.Errorf("stale linked file save = %v", err)
 	}
 }

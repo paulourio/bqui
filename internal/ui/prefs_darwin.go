@@ -11,7 +11,7 @@ import (
 
 const (
 	prefsWidth   = 520.0
-	prefsHeight  = 300.0
+	prefsHeight  = 340.0
 	prefsField   = 260.0
 	prefsPadding = 20.0
 )
@@ -19,7 +19,7 @@ const (
 // prefsWindow is the Settings window.
 type prefsWindow struct {
 	window  objc.ID
-	fields  []objc.ID // location, dataset, max billed, cost warning, spill
+	fields  []objc.ID // location, dataset, max billed, cost warning, spill, studio region
 	message objc.ID
 }
 
@@ -39,7 +39,7 @@ func (s *Shell) ShowPreferences() {
 	}
 
 	t := s.settings.Prefs.Text()
-	for i, v := range []string{t.Location, t.DefaultDataset, t.MaxBytesBilled, t.CostWarningUSD, t.MaxSpillBytes} {
+	for i, v := range []string{t.Location, t.DefaultDataset, t.MaxBytesBilled, t.CostWarningUSD, t.MaxSpillBytes, t.StudioRegion} {
 		appkit.SetString(s.prefs.fields[i], v)
 	}
 
@@ -51,10 +51,11 @@ func (s *Shell) ShowPreferences() {
 func (s *Shell) newPrefsWindow() *prefsWindow {
 	p := &prefsWindow{window: appkit.NewPanelWindow(AppName+" Settings", appkit.MakeRect(0, 0, prefsWidth, prefsHeight))}
 
-	labels := []string{"Default location:", "Default dataset:", "Maximum bytes billed:", "Cost warning:", "Result spill limit:"}
+	labels := []string{"Default location:", "Default dataset:", "Maximum bytes billed:", "Cost warning:", "Result spill limit:", "Studio saved queries:"}
 	placeholders := []string{
 		"Automatic (where the data lives)", "project.dataset",
 		"No limit — e.g. 10 GB", "Off — e.g. 1.50 ($ per query)", "8 GiB (default) — e.g. 20 GB",
+		"us-central1 (holds the US multi-region)",
 	}
 
 	rows := make([][]objc.ID, 0, len(labels)+2)
@@ -95,6 +96,7 @@ func (s *Shell) applyPrefsWindow() {
 	text := store.PreferenceText{
 		Location: appkit.StringValue(f[0]), DefaultDataset: appkit.StringValue(f[1]),
 		MaxBytesBilled: appkit.StringValue(f[2]), CostWarningUSD: appkit.StringValue(f[3]), MaxSpillBytes: appkit.StringValue(f[4]),
+		StudioRegion: appkit.StringValue(f[5]),
 	}
 
 	if err := s.ApplyPreferences(text); err != nil {
@@ -118,6 +120,7 @@ func (s *Shell) ApplyPreferences(text store.PreferenceText) error {
 	s.saveSettings()
 	s.Runner.SetMaxSpillBytes(p.MaxSpillBytes)
 	s.Editor.ConfigureLSP(s.lspOptions())
+	s.Saved.ReloadStudio()
 
 	return nil
 }

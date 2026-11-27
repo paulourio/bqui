@@ -48,6 +48,10 @@ var schema = []string{
 	`CREATE TRIGGER runs_ai AFTER INSERT ON runs BEGIN
 		INSERT INTO runs_fts(rowid, sql, job_id) VALUES (new.id, new.sql, new.job_id);
 	END`,
+	// M11: link to a BigQuery Studio saved query.
+	`ALTER TABLE tabs ADD COLUMN remote TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE tabs ADD COLUMN remote_head TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE tabs ADD COLUMN remote_text TEXT NOT NULL DEFAULT ''`,
 }
 
 // DB is bqui's local database: editor tabs (sessions) and run history.
@@ -137,18 +141,26 @@ type Tab struct {
 	SessionMode bool   // run queries in a BigQuery session
 	SessionID   string // active BigQuery session
 	LastJob     string // project:location.job of the last run
+	// Remote is the linked BigQuery Studio saved query (Dataform repository
+	// name); RemoteHead and RemoteText are the commit and text last synced.
+	Remote     string
+	RemoteHead string
+	RemoteText string
 }
 
 // SaveTab inserts or updates a tab (autosave).
 func (d *DB) SaveTab(ctx context.Context, t Tab) error {
 	_, err := d.db.ExecContext(ctx, `
-		INSERT INTO tabs (id, position, title, sql, file, cursor_line, cursor_col, session_mode, session_id, last_job, updated)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO tabs (id, position, title, sql, file, cursor_line, cursor_col, session_mode, session_id, last_job,
+			remote, remote_head, remote_text, updated)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET position=excluded.position, title=excluded.title, sql=excluded.sql,
 			file=excluded.file, cursor_line=excluded.cursor_line, cursor_col=excluded.cursor_col,
 			session_mode=excluded.session_mode, session_id=excluded.session_id, last_job=excluded.last_job,
+			remote=excluded.remote, remote_head=excluded.remote_head, remote_text=excluded.remote_text,
 			updated=excluded.updated`,
-		t.ID, t.Position, t.Title, t.SQL, t.File, t.CursorLine, t.CursorCol, t.SessionMode, t.SessionID, t.LastJob, time.Now().UnixMilli())
+		t.ID, t.Position, t.Title, t.SQL, t.File, t.CursorLine, t.CursorCol, t.SessionMode, t.SessionID, t.LastJob,
+		t.Remote, t.RemoteHead, t.RemoteText, time.Now().UnixMilli())
 	if err != nil {
 		return fmt.Errorf("store: save tab: %w", err)
 	}
@@ -168,7 +180,8 @@ func (d *DB) DeleteTab(ctx context.Context, id string) error {
 // Tabs returns all tabs in position order.
 func (d *DB) Tabs(ctx context.Context) ([]Tab, error) {
 	rows, err := d.db.QueryContext(ctx, `
-		SELECT id, position, title, sql, file, cursor_line, cursor_col, session_mode, session_id, last_job
+		SELECT id, position, title, sql, file, cursor_line, cursor_col, session_mode, session_id, last_job,
+			remote, remote_head, remote_text
 		FROM tabs ORDER BY position, updated`)
 	if err != nil {
 		return nil, fmt.Errorf("store: tabs: %w", err)
@@ -179,7 +192,8 @@ func (d *DB) Tabs(ctx context.Context) ([]Tab, error) {
 
 	for rows.Next() {
 		var t Tab
-		if err := rows.Scan(&t.ID, &t.Position, &t.Title, &t.SQL, &t.File, &t.CursorLine, &t.CursorCol, &t.SessionMode, &t.SessionID, &t.LastJob); err != nil {
+		if err := rows.Scan(&t.ID, &t.Position, &t.Title, &t.SQL, &t.File, &t.CursorLine, &t.CursorCol, &t.SessionMode, &t.SessionID, &t.LastJob,
+			&t.Remote, &t.RemoteHead, &t.RemoteText); err != nil {
 			return nil, fmt.Errorf("store: tabs: %w", err)
 		}
 

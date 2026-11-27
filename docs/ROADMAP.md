@@ -478,10 +478,31 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M11 — BigQuery Studio saved queries (Dataform)
 
-**Status: blocked on the spike.**
-- The Dataform API is enabled for `ff-homelab`, but no repositories exist in any location, so there is no console-saved query to inspect yet.
-- The local side is ready: saved-query headers carry `link_id`.
-- Next step: save a query in BigQuery Studio, then document its representation (repository labels, workspace/file layout, commits) before writing the sync.
+**Status: done.** What shipped, and where it differs from the plan below:
+- **Spike:** findings are in `internal/dataform/README.md`.
+  - Each saved query is a repository labeled `single-file-asset-type=sql`, holding one file, `content.sql`. Each save is a commit, and there are no workspaces.
+  - The "US" multi-region lives in `us-central1`.
+  - A stale `requiredHeadCommitSha` is rejected with 400 "does not match actual HEAD commit SHA", so it can't overwrite.
+- **`internal/dataform`:** list, read (text plus head), save (commit against a base head, giving `ErrConflict`), create (private), rename, delete, and a shared check.
+  - Errors carry actionable messages: API disabled, wrong region, missing roles.
+  - The commit author is the account email from tokeninfo.
+  - Offline tests use a fake modeled on the recorded responses. A live test creates, edits, conflicts, renames and deletes its own temporary query.
+- **`app` (Workspace and FakeStudio):**
+  - Tabs link to a saved query and store the synced head and text; this needed a schema migration.
+  - A save commits against the synced head.
+  - A linked `.sql` file (`link_id` in its header) opened without a known head is accepted only if the remote text still equals the file's synced text. Otherwise it is a conflict.
+- **UI:**
+  - The Saved sidebar has two sections, "On this Mac" (a link icon for linked files) and "BigQuery Studio", for the billing project and Studio region.
+  - Studio queries can be opened, renamed and deleted.
+  - ⌘S saves to the file and/or Studio.
+  - File menu ▸ Save to BigQuery Studio… creates a private query and links the open file. Reload from BigQuery Studio takes BigQuery's version.
+  - Conflict alert: Overwrite, Cancel, or Open BigQuery Version.
+  - A Studio region setting; "US" maps to us-central1.
+- **Not done:**
+  - A side-by-side diff on conflict (the alert offers a choice instead).
+  - Sharing controls; new queries are private.
+  - Team folders.
+  - Background polling for remote changes; conflicts surface on save.
 
 1. **Spike first.** Create saved queries in the console, then inspect them through `dataform.googleapis.com/v1` (repositories, labels, workspaces, files, commits) and document the actual representation in `internal/dataform/README.md`.
 2. Add a **BigQuery** library per project and region in the sidebar: list, open, save (commit), create, rename and delete.

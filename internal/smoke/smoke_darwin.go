@@ -6,6 +6,7 @@
 package smoke
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
+	"github.com/paulourio/bqui/internal/dataform"
 	"github.com/paulourio/bqui/internal/editor"
 	"github.com/paulourio/bqui/internal/export"
 	"github.com/paulourio/bqui/internal/objc"
@@ -120,6 +122,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	ts := themeFlow(s, dir)
 	phase("prefs")
 	pr := prefsFlow(s, dir)
+	phase("studio")
+	st := studioFlow(s, dir)
 	phase("checks")
 
 	queued := time.Now()
@@ -150,6 +154,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		workspaceChecks(rep, ws)
 		themeChecks(rep, ts)
 		prefsChecks(rep, pr)
+		studioChecks(rep, st)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -901,6 +906,113 @@ func prefsFlow(s *ui.Shell, dir string) prefsResult {
 	}
 
 	return r
+}
+
+// studioResult captures the BigQuery Studio saved-query flow.
+type studioResult struct {
+	Listed                       []string
+	Opened, Saved, Overwritten   bool
+	ConflictErr, RemoteAfterConf string
+	Published                    bool
+	Shot, Err                    string
+}
+
+func studioFlow(s *ui.Shell, dir string) studioResult {
+	var r studioResult
+
+	fake, ok := s.StudioBackend().(*app.FakeStudio)
+	if !ok {
+		r.Err = "no fake BigQuery Studio backend"
+
+		return r
+	}
+
+	idle := func() bool { return !s.StudioBusy() }
+
+	onMain(func() { s.SelectSidebar(ui.SidebarSaved) })
+	waitMain(loadTimeout, func() bool { return !s.Saved.StudioLoading() && len(s.Saved.StudioQueries()) >= 2 })
+
+	var target dataform.SavedQuery
+
+	onMain(func() {
+		for _, q := range s.Saved.StudioQueries() {
+			r.Listed = append(r.Listed, q.Title)
+
+			if q.Title == "Top items" {
+				target = q
+			}
+		}
+
+		s.OpenStudioQuery(target)
+	})
+	waitMain(loadTimeout, idle)
+	r.Opened = s.Workspace.Tab().Remote == target.Name && strings.HasPrefix(s.Workspace.Tab().SQL, "SELECT i.sku")
+
+	// Edit and save: the commit lands in Studio.
+	onMain(func() { s.Editor.InsertText("-- smoke edit\n") })
+	waitMain(loadTimeout, s.Workspace.RemoteDirty)
+	onMain(func() { s.SaveQuery() })
+	waitMain(loadTimeout, idle)
+
+	remote, _, _ := fake.Read(context.Background(), target.Name)
+	r.Saved = s.StudioErr() == nil && !s.Workspace.RemoteDirty() && strings.Contains(remote, "-- smoke edit")
+
+	// Someone saves in the console: our next save must conflict, not
+	// overwrite; overwriting is then explicit.
+	fake.EditInConsole(target.Name, "SELECT 'edited in the console'")
+	onMain(func() { s.Editor.InsertText("-- second edit\n") })
+	waitMain(loadTimeout, s.Workspace.RemoteDirty)
+	onMain(func() { s.SaveQuery() })
+	waitMain(loadTimeout, idle)
+	onMain(func() {
+		if err := s.StudioErr(); err != nil {
+			r.ConflictErr = err.Error()
+		}
+	})
+
+	r.RemoteAfterConf, _, _ = fake.Read(context.Background(), target.Name)
+
+	onMain(func() { s.SaveStudio(true) })
+	waitMain(loadTimeout, idle)
+
+	remote, _, _ = fake.Read(context.Background(), target.Name)
+	r.Overwritten = s.StudioErr() == nil && strings.Contains(remote, "-- second edit")
+
+	// Publish a new query from the editor.
+	onMain(func() { s.NewQuery(); s.Editor.InsertText("SELECT 7 AS smoke_published") })
+	waitMain(loadTimeout, func() bool { return s.Workspace.Tab().SQL == "SELECT 7 AS smoke_published" })
+	onMain(func() { s.PublishStudioAs("Smoke published") })
+	waitMain(loadTimeout, idle)
+	waitMain(loadTimeout, func() bool {
+		for _, q := range s.Saved.StudioQueries() {
+			if q.Title == "Smoke published" {
+				return !s.Saved.StudioLoading()
+			}
+		}
+
+		return false
+	})
+	r.Published = s.Workspace.Tab().Remote != "" && !s.Workspace.Dirty()
+
+	time.Sleep(settleDelay)
+	onMain(func() {
+		r.Shot = "studio.png"
+		if err := appkit.WriteWindowPNG(s.Window, filepath.Join(dir, r.Shot)); err != nil {
+			r.Shot = "✕ " + err.Error()
+		}
+
+		s.SelectSidebar(ui.SidebarExplorer)
+	})
+
+	return r
+}
+
+func studioChecks(rep *Report, r studioResult) {
+	rep.check("studio-list-open", r.Err == "" && len(r.Listed) >= 2 && r.Opened, "listed %q, opened %v %s", r.Listed, r.Opened, r.Err)
+	rep.check("studio-save", r.Saved, "edit committed to BigQuery Studio: %v", r.Saved)
+	rep.check("studio-conflict", strings.Contains(r.ConflictErr, "changed in BigQuery") && r.RemoteAfterConf == "SELECT 'edited in the console'" && r.Overwritten,
+		"conflict %q, console version kept %q, explicit overwrite %v", r.ConflictErr, r.RemoteAfterConf, r.Overwritten)
+	rep.check("studio-publish", r.Published && !strings.HasPrefix(r.Shot, "✕"), "published and linked %v, %s", r.Published, r.Shot)
 }
 
 func prefsChecks(rep *Report, r prefsResult) {
