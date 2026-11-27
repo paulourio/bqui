@@ -52,6 +52,7 @@ func newWorkbooksPane(s *Shell) *WorkbooksPane {
 		OnSelect:      p.onSelect,
 		OnDoubleClick: func(id uint64) { objc.Main(func() { p.open(id) }) },
 		Menu:          p.menu,
+		OnKey:         p.onKey,
 	})
 	p.initJobs()
 
@@ -300,6 +301,32 @@ func (p *WorkbooksPane) onSelect(id uint64) {
 	}
 }
 
+// onKey renames the selected workbook or query on F2.
+func (p *WorkbooksPane) onKey(id uint64, key appkit.Key) bool {
+	if !key.Plain(appkit.KeyF2) {
+		return false
+	}
+
+	n, ok := p.nodes[id]
+	if !ok {
+		return false
+	}
+
+	// Ask after the key event is handled (the prompt is modal).
+	switch {
+	case n.workbook != nil:
+		w := *n.workbook
+		objc.Main(func() { p.s.RenameWorkbook(w) })
+	case n.query != nil:
+		q := *n.query
+		objc.Main(func() { p.s.RenameQuery(q) })
+	default:
+		return false
+	}
+
+	return true
+}
+
 func (p *WorkbooksPane) open(id uint64) {
 	p.jobActivate(id)
 }
@@ -485,7 +512,7 @@ func (s *Shell) NewWorkbook() {
 
 // RenameWorkbook asks for a new workbook name.
 func (s *Shell) RenameWorkbook(w store.Workbook) {
-	name, ok := appkit.Prompt("Rename Workbook", "", w.Name)
+	name, ok := s.prompt("Rename Workbook", "", w.Name)
 	if ok {
 		s.RenameWorkbookTo(w, name)
 	}
@@ -511,7 +538,7 @@ func (s *Shell) RenameWorkbookTo(w store.Workbook, name string) {
 
 // RenameQuery asks for a new query name (without .sql).
 func (s *Shell) RenameQuery(q store.Query) {
-	name, ok := appkit.Prompt("Rename Query", "", q.Name)
+	name, ok := s.prompt("Rename Query", "", q.Name)
 	if ok {
 		s.MoveQuery(q, q.Workbook, name)
 	}

@@ -82,7 +82,29 @@ type OutlineOptions struct {
 	AutomaticRowHeights bool
 	// NoHorizontalScroll disables the horizontal scrollbar even with multiple columns.
 	NoHorizontalScroll bool
+	// OnKey sees key presses while the outline has focus, with the
+	// selected item (0 = none); returning true consumes the key, false
+	// leaves it to NSOutlineView (arrows, type-select).
+	OnKey func(item uint64, key Key) bool
 }
+
+// Key is a pressed key: its hardware key code and modifier flags.
+type Key struct {
+	Code  uint16
+	Flags uint64
+}
+
+// KeyF2 is the F2 key's code (kVK_F2).
+const KeyF2 uint16 = 120
+
+// modifierMask keeps the user-pressed modifiers (Shift, Control, Option,
+// Command) out of NSEvent.modifierFlags; function keys also report the
+// Function flag, which is not a modifier here.
+const modifierMask uint64 = 1<<17 | 1<<18 | 1<<19 | 1<<20
+
+// Plain reports whether code was pressed without Shift/Control/Option/
+// Command.
+func (k Key) Plain(code uint16) bool { return k.Code == code && k.Flags&modifierMask == 0 }
 
 // Outline is a Go-backed NSOutlineView inside an NSScrollView.
 type Outline struct {
@@ -110,6 +132,22 @@ const (
 )
 
 var (
+	// outlineViews maps the NSOutlineView (a BQUIOutlineView) to its
+	// Outline for keyDown:.
+	outlineViews     objc.Registry[*Outline]
+	outlineViewClass = objc.LazyClass("BQUIOutlineView", "NSOutlineView", nil, func() []objc.Method {
+		return []objc.Method{{Sel: "keyDown:", Fn: func(self objc.ID, cmd objc.SEL, event objc.ID) {
+			if o, ok := outlineViews.Get(self); ok && o.opts.OnKey != nil {
+				key := Key{Code: objc.Send[uint16](event, "keyCode"), Flags: objc.Send[uint64](event, "modifierFlags")}
+				if o.opts.OnKey(o.Selected(), key) {
+					return
+				}
+			}
+
+			self.SendSuper(cmd, event)
+		}}}
+	})
+
 	outlines     objc.Registry[*Outline]
 	outlineClass = objc.LazyClass("BQUIOutlineController", "NSObject",
 		[]string{"NSOutlineViewDataSource", "NSOutlineViewDelegate", "NSMenuDelegate"}, outlineMethods)
@@ -203,7 +241,8 @@ func outlineMethods() []objc.Method {
 // NewOutline creates an outline view fed by src.
 func NewOutline(src OutlineSource, opts OutlineOptions) *Outline {
 	o := &Outline{src: src, opts: opts}
-	o.View = objc.New("NSOutlineView")
+	o.View = objc.Msg(objc.Msg(outlineViewClass(), "alloc"), "init")
+	outlineViews.Put(o.View, o)
 
 	cols := opts.Columns
 	if len(cols) == 0 {

@@ -140,6 +140,10 @@ type Shell struct {
 
 	projectsLoading bool
 	projectsErr     error
+
+	// prompt asks for one line of text (appkit.Prompt; smoke checks
+	// answer it with SetPrompt).
+	prompt func(message, info, value string) (string, bool)
 }
 
 // NewShell builds the application menu, main window, toolbar and panes.
@@ -153,7 +157,7 @@ func NewShell(opts Options) (*Shell, error) {
 		opts.Settings.BillingProject = ""
 	}
 
-	s := &Shell{App: appkit.SharedApplication(), opts: opts, settings: opts.Settings, Workspace: opts.Workspace}
+	s := &Shell{App: appkit.SharedApplication(), opts: opts, settings: opts.Settings, Workspace: opts.Workspace, prompt: appkit.Prompt}
 	s.billing.Store(&opts.Settings.BillingProject)
 
 	if s.Workspace == nil {
@@ -981,6 +985,16 @@ func (s *Shell) errorLinks(c app.DocCost) []appkit.BannerLink {
 	}
 
 	return links
+}
+
+// SetPrompt replaces the text prompt for rename dialogs (smoke checks; nil
+// restores the modal dialog).
+func (s *Shell) SetPrompt(fn func(message, info, value string) (string, bool)) {
+	if fn == nil {
+		fn = appkit.Prompt
+	}
+
+	s.prompt = fn
 }
 
 // CostText returns the toolbar estimate text (smoke checks).
