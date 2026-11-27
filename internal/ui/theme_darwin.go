@@ -65,6 +65,9 @@ func (s *Shell) ApplyTheme(name string) {
 	h := max(minGridRowHeight, t.Fonts.GridSize+gridRowPadding)
 	s.Results.Table.SetRowHeight(h)
 	s.JSON.Table.SetRowHeight(h)
+	s.History.Table.SetRowHeight(h)
+	s.Runs.Table.SetRowHeight(h)
+	s.Inspector.PreviewPane().Table.SetRowHeight(h)
 
 	s.restyle()
 
@@ -96,7 +99,9 @@ func (s *Shell) restyle() {
 
 	s.themeColors = s.themeColors[:0]
 
+	preview := s.Inspector.PreviewPane()
 	s.Results.NullColor, s.Results.NumberColor = s.color(p.Grid.Null), s.color(p.Grid.Number)
+	preview.NullColor, preview.NumberColor = s.Results.NullColor, s.Results.NumberColor
 	s.JSON.colors = map[results.JSONKind]objc.ID{
 		results.JSONKey: s.color(p.JSON.Key), results.JSONString: s.color(p.JSON.String),
 		results.JSONNumber: s.color(p.JSON.Number), results.JSONLiteral: s.color(p.JSON.Literal),
@@ -105,6 +110,9 @@ func (s *Shell) restyle() {
 
 	s.Results.Table.Reload()
 	s.JSON.Table.Reload()
+	s.History.Table.Reload()
+	s.Runs.Table.Reload()
+	preview.Table.Reload()
 	appkit.SetNeedsDisplay(s.Graph.Canvas)
 }
 
