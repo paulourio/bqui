@@ -28,24 +28,40 @@ func (r TableRef) SQL() string {
 
 // ParseTableRef parses "project.dataset.table", "project:dataset.table",
 // "dataset.table" (with defaultProject), and backtick-quoted forms. Domain-
-// scoped projects ("example.com:proj") must use the full three-part form.
+// scoped projects ("example.com:proj") are accepted in both standard
+// ("example.com:proj.dataset.table") and legacy ("example.com:proj:dataset.table")
+// three-part forms.
 func ParseTableRef(s, defaultProject string) (TableRef, error) {
 	s = strings.TrimSpace(strings.ReplaceAll(s, "`", ""))
-	if s == "" {
-		return TableRef{}, fmt.Errorf("%w: empty", ErrBadRef)
+	if s == "" || strings.ContainsAny(s, " \t\r\n") {
+		return TableRef{}, fmt.Errorf("%w: %q", ErrBadRef, s)
 	}
 
-	// Legacy "project:dataset.table" form.
 	if i := strings.LastIndex(s, ":"); i >= 0 {
-		proj, rest := s[:i], s[i+1:]
+		prefix, rest := s[:i], s[i+1:]
 
+		if strings.Contains(prefix, ".") && !strings.Contains(prefix, ":") {
+			// Domain-scoped project with dot separator, e.g. "example.com:proj.dataset.table".
+			if strings.HasPrefix(prefix, ".") || strings.HasSuffix(prefix, ".") || strings.Contains(prefix, "..") ||
+				strings.Count(rest, ".") != 2 {
+				return TableRef{}, fmt.Errorf("%w: %q", ErrBadRef, s)
+			}
+
+			parts := strings.Split(rest, ".")
+			if parts[0] == "" {
+				return TableRef{}, fmt.Errorf("%w: %q", ErrBadRef, s)
+			}
+
+			return validRef(TableRef{Project: prefix + ":" + parts[0], Dataset: parts[1], Table: parts[2]}, s)
+		}
+
+		// Legacy "project:dataset.table" (including "example.com:proj:dataset.table").
 		parts := strings.Split(rest, ".")
 		if len(parts) != 2 {
 			return TableRef{}, fmt.Errorf("%w: %q", ErrBadRef, s)
 		}
 
-		// "example.com:proj.dataset.table" is not legal here; "example.com:proj:..." neither.
-		return validRef(TableRef{Project: proj, Dataset: parts[0], Table: parts[1]}, s)
+		return validRef(TableRef{Project: prefix, Dataset: parts[0], Table: parts[1]}, s)
 	}
 
 	parts := strings.Split(s, ".")
@@ -64,7 +80,10 @@ func ParseTableRef(s, defaultProject string) (TableRef, error) {
 }
 
 func validRef(r TableRef, raw string) (TableRef, error) {
-	if r.Project == "" || r.Dataset == "" || r.Table == "" {
+	if r.Project == "" || r.Dataset == "" || r.Table == "" ||
+		strings.ContainsAny(r.Project, " \t\r\n") ||
+		strings.ContainsAny(r.Dataset, " \t\r\n") ||
+		strings.ContainsAny(r.Table, " \t\r\n") {
 		return TableRef{}, fmt.Errorf("%w: %q", ErrBadRef, raw)
 	}
 
@@ -80,13 +99,24 @@ type DatasetRef struct {
 // ParseDatasetRef parses "project.dataset", "project:dataset" or "dataset".
 func ParseDatasetRef(s, defaultProject string) (DatasetRef, error) {
 	s = strings.TrimSpace(strings.ReplaceAll(s, "`", ""))
+	if s == "" || strings.ContainsAny(s, " \t\r\n") {
+		return DatasetRef{}, fmt.Errorf("%w: dataset %q", ErrBadRef, s)
+	}
 
 	var r DatasetRef
 
 	switch {
 	case strings.Contains(s, ":"):
 		i := strings.LastIndex(s, ":")
-		r = DatasetRef{Project: s[:i], Dataset: s[i+1:]}
+		prefix, rest := s[:i], s[i+1:]
+
+		if strings.Contains(prefix, ".") && strings.Count(rest, ".") == 1 {
+			// Domain-scoped project with dot separator, e.g. "example.com:proj.dataset".
+			j := strings.LastIndex(s, ".")
+			r = DatasetRef{Project: s[:j], Dataset: s[j+1:]}
+		} else {
+			r = DatasetRef{Project: prefix, Dataset: rest}
+		}
 	case strings.Count(s, ".") == 1:
 		p, d, _ := strings.Cut(s, ".")
 		r = DatasetRef{Project: p, Dataset: d}
@@ -94,7 +124,9 @@ func ParseDatasetRef(s, defaultProject string) (DatasetRef, error) {
 		r = DatasetRef{Project: defaultProject, Dataset: s}
 	}
 
-	if r.Project == "" || r.Dataset == "" || strings.Contains(r.Dataset, ".") {
+	if r.Project == "" || r.Dataset == "" || strings.Contains(r.Dataset, ".") ||
+		strings.ContainsAny(r.Project, " \t\r\n") ||
+		strings.ContainsAny(r.Dataset, " \t\r\n") {
 		return DatasetRef{}, fmt.Errorf("%w: dataset %q", ErrBadRef, s)
 	}
 
