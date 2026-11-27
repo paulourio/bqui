@@ -66,7 +66,9 @@
     },
   };
 
-  var state = { editor: null, mode: 'system' };
+  var state = { editor: null, mode: 'system', pendingObjects: {}, nextObject: 1 };
+  var OBJECT_SCHEME = 'bqui-object';
+  var OBJECT_LOOKUP_TIMEOUT_MS = 2000;
 
   function modelURI(model) {
     // Monaco's LSP client lowercases URIs; report them the same way.
@@ -152,6 +154,20 @@
         ed.focus();
         break;
       }
+      case 'runAction':
+        window.bqui.action(p.id);
+        break;
+      case 'objectAt': {
+        var done = state.pendingObjects[p.id];
+        if (!done) break;
+        delete state.pendingObjects[p.id];
+        if (!p.ref) { done(null); break; }
+        done([{
+          uri: monaco.Uri.from({ scheme: OBJECT_SCHEME, path: '/' + p.ref }),
+          range: new monaco.Range(p.line + 1, p.start + 1, p.line + 1, p.end + 1),
+        }]);
+        break;
+      }
       default:
         console.warn('bqui: unknown app message', method);
     }
@@ -171,8 +187,13 @@
     requestRun: function (atCursor) { if (state.editor) app('run', runPayload(atCursor)); },
     format: function () { if (state.editor) state.editor.getAction('editor.action.formatDocument').run(); },
     action: function (id) {
-      var a = state.editor && state.editor.getAction(id);
-      if (a) { state.editor.focus(); a.run(); } else { console.warn('bqui: unknown editor action', id); }
+      var ed = state.editor;
+      if (!ed) return;
+      ed.focus();
+      var a = ed.getAction(id);
+      // Some contributed actions (e.g. revealDefinition) are not returned by
+      // getAction; trigger dispatches them through the command service.
+      if (a) a.run(); else ed.trigger('bqui', id, {});
     },
     // selfTest is used by the smoke harness: it exercises completion, markers
     // and semantic tokens end to end and reports what Monaco actually shows.
@@ -310,6 +331,28 @@
     // Monaco's own LSP client drives completion, hover, signature help,
     // diagnostics, semantic tokens, formatting, code lenses, symbols, ...
     new monaco.lsp.MonacoLspClient(monaco.lsp.createTransportToWorker(port));
+
+    // Tables, views, routines and models: bqui resolves the reference and
+    // reveals it in the explorer (bqls covers CTEs, aliases and variables).
+    monaco.languages.registerDefinitionProvider('sql', {
+      provideDefinition: function (m, position) {
+        var id = state.nextObject++;
+        return new Promise(function (resolve) {
+          state.pendingObjects[id] = resolve;
+          app('objectAt', { id: id, text: m.getValue(), line: position.lineNumber - 1, character: position.column - 1 });
+          setTimeout(function () {
+            if (state.pendingObjects[id]) { delete state.pendingObjects[id]; resolve(null); }
+          }, OBJECT_LOOKUP_TIMEOUT_MS);
+        });
+      },
+    });
+    monaco.editor.registerEditorOpener({
+      openCodeEditor: function (source, resource) {
+        if (resource.scheme !== OBJECT_SCHEME) return false;
+        app('openObject', { ref: resource.path.replace(/^\//, '') });
+        return true;
+      },
+    });
 
     var K = monaco.KeyMod, C = monaco.KeyCode;
     ed.addCommand(K.CtrlCmd | C.Enter, function () { window.bqui.requestRun(false); });

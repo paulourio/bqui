@@ -596,6 +596,19 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M14 — Go to definition from the editor
 
+**Status: done.** What shipped:
+- **Resolving the reference:** `app.ObjectRefAt` finds the name under the cursor, a Go function tested on Linux.
+  - It accepts a backticked name, or `project.dataset.table`, anywhere.
+  - It accepts `dataset.table`, resolved in the billing project, only after FROM, JOIN and similar keywords. A bare name needs the same keywords and resolves through the default dataset setting.
+  - CTEs and `alias.column` are not treated as tables.
+- **Monaco wiring:**
+  - An extra definition provider asks Go, and an editor opener intercepts `bqui-object:` URIs. So F12, ⌘-click and the context menu's Go to Definition all work, and bqls keeps its CTE and variable jumps.
+  - Query ▸ Go to Definition is also in the menu.
+- **Revealing the object:**
+  - It switches to the Explorer, turns off the starred-only filter if it would hide the target, and adds an unpinned project for the current launch.
+  - It loads the project and dataset in steps, selects and scrolls to the node, and shows the Schema tab. A missing object gets a clear message.
+- **Fix:** editor actions now go through the ordered app message queue. Before, `Eval` overtook a preceding `setText`, so actions ran against stale text and Monaco cancelled them.
+
 - **Trigger:** right-click a table reference in the editor and choose **Go to Definition** (Monaco's action, also F12 / ⌘-click).
   - bqls already resolves `textDocument/definition` for tables. bqui intercepts results that point at BigQuery objects instead of opening a document.
 - **Result:**

@@ -127,6 +127,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	st := studioFlow(s, dir)
 	phase("inspect")
 	is := inspectFlow(s, dir)
+	phase("definition")
+	gd := definitionFlow(s)
 	phase("checks")
 
 	queued := time.Now()
@@ -159,6 +161,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		prefsChecks(rep, pr)
 		studioChecks(rep, st)
 		inspectChecks(rep, is)
+		definitionChecks(rep, gd)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -1153,6 +1156,57 @@ func inspectFlow(s *ui.Shell, dir string) inspectResult {
 	})
 
 	return r
+}
+
+// definitionResult captures Go to Definition from the editor.
+type definitionResult struct {
+	Full, Partial       string // inspector object after each jump
+	FullSeg, Selected   int
+	SelectedName, Error string
+}
+
+func definitionFlow(s *ui.Shell) definitionResult {
+	var r definitionResult
+
+	jump := func(sql string, character int, want string) string {
+		onMain(func() {
+			s.Editor.SetTextAt(sql, 0, character)
+			s.Editor.Focus()
+			s.Editor.GoToDefinition()
+		})
+		waitMain(loadTimeout, func() bool { return s.Inspector.Current().Name == want && s.Inspector.TableLoaded() })
+
+		var got string
+
+		onMain(func() { got = s.Inspector.Current().FullID() })
+
+		return got
+	}
+
+	// Fully qualified, backticked: dataset loaded lazily, node selected.
+	r.Full = jump("SELECT x FROM `bigquery-public-data.samples.natality` LIMIT 1", 25, "natality")
+	onMain(func() {
+		r.FullSeg = s.Inspector.Segment()
+
+		if info, ok := s.Explorer.Model.Info(s.Explorer.Outline.Selected()); ok {
+			r.SelectedName = info.Name
+		}
+	})
+
+	// dataset.table after JOIN resolves in the billing project.
+	r.Partial = jump("SELECT 1 FROM x JOIN analytics.users AS u ON TRUE", 30, "users")
+
+	lookups, opens := s.Editor.ObjectRequests()
+	_, boot := s.Editor.Diagnostics()
+	r.Error = fmt.Sprintf("lookups %d, opens %d %s", lookups, opens, boot)
+
+	return r
+}
+
+func definitionChecks(rep *Report, r definitionResult) {
+	rep.check("definition-full", strings.HasSuffix(r.Full, "samples.natality") && r.FullSeg == 0 && r.SelectedName == "natality",
+		"inspector %q (tab %d), explorer selected %q; %s", r.Full, r.FullSeg, r.SelectedName, r.Error)
+	rep.check("definition-partial", r.Partial == app.FakeProject+".analytics.users", "inspector %q", r.Partial)
 }
 
 func inspectChecks(rep *Report, r inspectResult) {

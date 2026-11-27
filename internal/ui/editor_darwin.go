@@ -16,6 +16,7 @@ import (
 	"github.com/paulourio/bqlang/bqconfig"
 	"github.com/paulourio/bqlang/lsp"
 
+	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/editor"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/theme"
@@ -57,7 +58,11 @@ type EditorOptions struct {
 	OnConsole   func(level, message string) // main thread
 	// OnChange receives the text and cursor after edits (debounced; main thread).
 	OnChange func(text string, line, character int)
-	Logger   *slog.Logger
+	// ObjectAt resolves a table/view/routine/model reference at a position
+	// (Go to Definition); OnOpenObject reveals "project.dataset.name".
+	ObjectAt     func(text string, line, character int) (app.ObjectAt, bool)
+	OnOpenObject func(ref string)
+	Logger       *slog.Logger
 }
 
 // EditorPane is the Monaco editor hosted in a WKWebView.
@@ -73,6 +78,8 @@ type EditorPane struct {
 	mu            sync.Mutex
 	uri           string
 	changes       int
+	objectLookups int
+	objectOpens   int
 	appliedTheme  string
 	consoleErrors []string
 	bootError     string
@@ -206,7 +213,9 @@ func (p *EditorPane) RequestRun(atCursor bool) {
 // Action runs a Monaco editor action by ID (e.g. "actions.find").
 func (p *EditorPane) Action(id string) {
 	p.Focus()
-	p.Web.Eval("window.bqui&&window.bqui.action(" + mustJSON(id) + ")")
+	// Through the app queue, so the action runs after earlier setText /
+	// insertText messages (Eval would overtake them).
+	_ = p.Bridge.SendApp("runAction", map[string]string{"id": id})
 }
 
 // Format formats the document through bqls (bqfmt).
@@ -288,6 +297,23 @@ func (p *EditorPane) onApp(method string, params json.RawMessage) {
 			if p.opts.OnChange != nil {
 				p.opts.OnChange(c.Text, c.Line, c.Character)
 			}
+		}
+	case "objectAt":
+		p.mu.Lock()
+		p.objectLookups++
+		p.mu.Unlock()
+		p.resolveObject(params)
+	case "openObject":
+		var o struct {
+			Ref string `json:"ref"`
+		}
+
+		p.mu.Lock()
+		p.objectOpens++
+		p.mu.Unlock()
+
+		if json.Unmarshal(params, &o) == nil && p.opts.OnOpenObject != nil {
+			p.opts.OnOpenObject(o.Ref)
 		}
 	case "themeApplied":
 		var t struct {
@@ -382,4 +408,40 @@ func mustJSON(v any) string {
 	b, _ := json.Marshal(v)
 
 	return string(b)
+}
+
+// resolveObject answers the page's definition lookup.
+func (p *EditorPane) resolveObject(params json.RawMessage) {
+	var q struct {
+		ID        int    `json:"id"`
+		Text      string `json:"text"`
+		Line      int    `json:"line"`
+		Character int    `json:"character"`
+	}
+
+	if json.Unmarshal(params, &q) != nil {
+		return
+	}
+
+	reply := map[string]any{"id": q.ID}
+
+	if p.opts.ObjectAt != nil {
+		if o, ok := p.opts.ObjectAt(q.Text, q.Line, q.Character); ok {
+			reply["ref"] = o.Ref.Project + "." + o.Ref.Dataset + "." + o.Ref.Table
+			reply["line"], reply["start"], reply["end"] = o.Line, o.Start, o.End
+		}
+	}
+
+	_ = p.Bridge.SendApp("objectAt", reply)
+}
+
+// GoToDefinition runs Monaco's Go to Definition at the cursor.
+func (p *EditorPane) GoToDefinition() { p.Action("editor.action.revealDefinition") }
+
+// ObjectRequests counts definition lookups and opens from the page (smoke).
+func (p *EditorPane) ObjectRequests() (lookups, opens int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	return p.objectLookups, p.objectOpens
 }

@@ -108,6 +108,7 @@ type Shell struct {
 	themeErrs   []error
 	themeColors []objc.ID
 	prefs       *prefsWindow
+	revealGen   int
 	studio      studioState
 
 	exportCancel func()
@@ -155,6 +156,10 @@ func NewShell(opts Options) (*Shell, error) {
 		OnRun:       s.onRun,
 		OnCost:      s.onCost,
 		OnChange:    s.onEdited,
+		ObjectAt:    s.objectAt,
+		OnOpenObject: func(ref string) {
+			s.RevealObject(ref)
+		},
 		OnConsole: func(level, msg string) {
 			if level == "error" || level == "warn" {
 				fmt.Fprintf(os.Stderr, "bqui editor [%s] %s\n", level, msg)
@@ -514,6 +519,7 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Stop", Key: ".", Run: s.Stop},
 			{},
 			{Title: "Format", Key: "f", Mods: cmd | shift, Run: func() { s.Editor.Format() }},
+			{Title: "Go to Definition", Run: func() { s.Editor.GoToDefinition() }},
 			{},
 			{Title: "BigQuery Session Mode", Run: s.ToggleSessionMode, Checked: s.sessionOn},
 			{Title: "End Session", Run: s.EndSession},
