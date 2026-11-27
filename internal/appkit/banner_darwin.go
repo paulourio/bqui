@@ -23,10 +23,10 @@ const (
 	// NSFontWeightMedium.
 	bannerTitleSize  = 13.0
 	fontWeightMedium = 0.23
-	boxTypeCustom = int64(4)
-	bannerNoTitle = int64(0)
-	vertical      = int64(1)
-	stackLeading  = int64(5) // NSLayoutAttributeLeading
+	boxTypeCustom    = int64(4)
+	bannerNoTitle    = int64(0)
+	vertical         = int64(1)
+	stackLeading     = int64(5) // NSLayoutAttributeLeading
 )
 
 // NewBanner creates a hidden error banner (use with Auto Layout).
