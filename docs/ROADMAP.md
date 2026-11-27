@@ -10,7 +10,7 @@
 - query runs with a console-style results grid that handles deep nesting, plus a JSON view with memory limits
 - job history, query plan details and an execution graph
 - export through the BigQuery Storage Read API
-- local saved queries and sessions, plus sync with BigQuery Studio saved queries
+- local saved queries and sessions (BigQuery Studio sync was built in M11 and later removed)
 - saveable themes
 
 ### Decisions made with the user
@@ -19,10 +19,10 @@
 | UI stack | Real **AppKit through `github.com/ebitengine/purego` + `purego/objc`** (no cgo). The only web content is the SQL editor |
 | Editor | **Monaco** in a `WKWebView` (assets embedded, served via a custom `bqui://` scheme). Go only relays LSP frames between Monaco and the in-process bqls |
 | bqlang reuse | **Promote public packages in bqlang** (`lsp`, `catalog`, `bqconfig`). bqui runs bqls **in-process** over `io.Pipe`, so there is a single binary |
-| Auth | ADC first, with gcloud fallback (bqlang's existing chain), plus a `cloud-platform` scope option for Dataform |
+| Auth | ADC first, with gcloud fallback (bqlang's existing chain), requesting the `cloud-platform` scope |
 | Dev and test | Develop on Gentoo (i9-13900K) and cross-compile. **QEMU macOS Tahoe x86_64 VM** for interactive UI work (no GPU acceleration, so no perf or visual-polish judgments there). **Private GitHub mirror + GitHub Actions arm64 macOS runner** for the arm64 ABI and smoke screenshots |
 | Results grid | **BigQuery console style only.** Leaf-path columns `a.b.c`, REPEATED fields shown as stacked sub-rows, at any depth. **Never JSON inside a cell**, including arrays of structs |
-| Persistence | Local: SQLite (history, sessions) + `.sql` files (saved queries) + TOML (themes). Plus **BigQuery Studio saved queries** (Dataform) as a second library, with an optional per-query link |
+| Persistence | Local: SQLite (history, sessions) + `.sql` files (saved queries) + TOML (themes). BigQuery Studio saved queries (Dataform) were a second library until their removal on 2026-11-27 |
 | MVP | Browse + edit + run + grid + job history |
 
 ---
@@ -46,7 +46,6 @@ bqui/
     webkit/            WKWebView, URL scheme handler, script message handler, JS evaluation (darwin)
     editor/            Monaco host: embedded assets (web/), JS↔Go bridge, LSP relay to in-process bqls (UI-agnostic core)
     store/             SQLite schema/migrations (history, sessions, tabs, links), saved-query folder, settings
-    dataform/          BigQuery Studio saved-query sync (Dataform API)
     theme/             theme model, TOML load/save, VS Code theme import, appearance resolution
     smoke/             --smoke-test harness: scripted UI walk, offscreen PNG capture, AX tree dump
   tools/bundle/        Go program: builds bqui.app (Info.plist, .icns, ad-hoc signing via rcodesign), zips artifact
@@ -68,7 +67,6 @@ bqui/
 - `modernc.org/sqlite` (already used by bqlang)
 - `monaco-editor@0.57.0` (MIT; static JS/CSS assets embedded with `go:embed`, not a Go dependency)
 - `github.com/BurntSushi/toml`
-- `google.golang.org/api/dataform/v1`
 - `github.com/paulourio/bqlang` v1.2.0 (public `lsp`, `catalog`, `bqconfig`)
 
 The build always uses `CGO_ENABLED=0`, and CI enforces it.
@@ -447,7 +445,7 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
   - SQLite (modernc, WAL) with versioned migrations.
   - Stores tabs (text, cursor, linked file, session mode and ID, last job), small metadata, and local run history with FTS5 search. User input is always quoted, so it is never parsed as FTS syntax.
 - **Saved queries:**
-  - `.sql` files in `~/Documents/bqui/queries` with a `/* bqui … */` TOML header (title, project, default dataset, labels, link_id for M11).
+  - `.sql` files in `~/Documents/bqui/queries` with a `/* bqui … */` TOML header (title, project, default dataset, labels). Headers written before M11's removal may still carry a `link_id`, which is ignored.
   - Atomic writes and a stable header order, so the files diff cleanly in git.
 - **`app.Workspace`:**
   - Autosave with a debounce, and no explicit flush, so a killed app restores its text and cursor.
@@ -479,7 +477,9 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M11 — BigQuery Studio saved queries (Dataform)
 
-**Status: done.** What shipped, and where it differs from the plan below:
+**Status: removed (2026-11-27).** The user asked to drop the feature. The `internal/dataform` package, the Studio sync in `app` and `ui`, the Studio region setting, the File menu items and the smoke checks were deleted. The `tabs.remote*` SQLite columns stay, unused, so the migration sequence is unchanged. The notes below record what had shipped.
+
+What had shipped, and where it differed from the plan below:
 - **Spike:** findings are in `internal/dataform/README.md`.
   - Each saved query is a repository labeled `single-file-asset-type=sql`, holding one file, `content.sql`. Each save is a commit, and there are no workspaces.
   - The "US" multi-region lives in `us-central1`.
@@ -641,12 +641,11 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
   - The sidebar switcher is **Explorer | Workbooks**, with New Workbook and New Query buttons.
   - A single click opens a query.
   - Context menus: rename, duplicate, move to another workbook, Show in Finder, Move to Trash. Workbooks can also be renamed and trashed.
-  - The BigQuery Studio section moved into this tree. ⌘N and ⇧⌘N create a query and a workbook.
+  - The BigQuery Studio section moved into this tree, until M11's removal. ⌘N and ⇧⌘N create a query and a workbook.
 - **`bqui --library <name>`:** selects `~/Documents/bqui/libraries/<name>`. Fake runs use a separate cache library.
 - **Not done:**
   - Drag and drop between workbooks (use the Move to menu).
   - Inline rename in the tree (a prompt is used instead).
-  - The link icon for Studio-linked files.
 
 **Goal:** an IDE-like tree. A **library** holds **workbooks**, which are folders, and each workbook holds **queries**, which are `.sql` files.
 
@@ -716,8 +715,6 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 These are pending items, collected from the milestone notes above.
 
 ### Verification still owed
-- **M11 console round trip (exit criterion):** open `select-replace` in bqui, edit it and save. Edit it again in the BigQuery Studio console, then save once more in bqui. Expect the conflict prompt, not a silent overwrite. Also confirm a bqui save shows up in the console's history.
-- **M11 shared queries:** share a saved query in the console and check what its IAM policy looks like. All current samples are private, so `Shared` is unverified for shared ones.
 - **Real Apple silicon** (CI runner or a rental):
   - Scroll FPS, launch time and memory profiles.
   - The M5 50M-row memory test and the M9 10 GiB export (≤ 512 MiB RSS).
@@ -758,11 +755,6 @@ These come from a user's hands-on testing. Each item must be discussed and agree
 - **Editor:**
   - Multiple editor tabs and named workspaces. The schema is ready, but the UI has one tab.
   - A keybinding editor and Vim mode.
-- **BigQuery Studio:**
-  - A side-by-side diff on conflict.
-  - Sharing controls.
-  - Team folders.
-  - Background polling for remote changes.
 - **Export:**
   - XLSX.
   - Resume.

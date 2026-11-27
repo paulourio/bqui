@@ -126,7 +126,7 @@ Keep `WithOnUpdate` and `OnUpdate` working, implemented on top of `Subscribe`, a
 
 ### 3.2 Default auth exposed with selectable scopes
 
-bqui needs the same ADC → `gcloud` fallback chain (`defaultTokenCache` in `internal/catalog/bqrest.go`), but for the scopes it chooses. Its jobs, Storage Read API and Dataform calls need `https://www.googleapis.com/auth/bigquery` and `https://www.googleapis.com/auth/cloud-platform`.
+bqui needs the same ADC → `gcloud` fallback chain (`defaultTokenCache` in `internal/catalog/bqrest.go`), but for the scopes it chooses. Its jobs and Storage Read API calls need `https://www.googleapis.com/auth/bigquery` and `https://www.googleapis.com/auth/cloud-platform`.
 
 ```go
 // NewDefaultTokenProvider returns a cached ADC→gcloud token provider for the
