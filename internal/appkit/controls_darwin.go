@@ -331,6 +331,25 @@ const promptFieldWidth = 280.0
 
 // Prompt asks for one line of text (OK/Cancel); ok is false on Cancel.
 func Prompt(message, info, value string) (text string, ok bool) {
+	return runPrompt(message, info, value, nil)
+}
+
+// PromptFocus reports, from inside a real prompt, whether its text field
+// has keyboard focus and how much of value is selected, then cancels the
+// prompt (smoke checks).
+func PromptFocus(value string) (focused bool, selected uint64) {
+	runPrompt("Prompt focus check", "", value, func(window, field objc.ID) {
+		focused, selected = fieldFocus(window, field)
+		objc.Msg(objc.Msg(objc.Cls("NSApplication"), "sharedApplication"), "abortModal")
+	})
+
+	return focused, selected
+}
+
+// runPrompt shows the prompt with its text field focused and its text
+// selected, so typing replaces it. inspect, if set, runs once the prompt
+// is up (smoke checks).
+func runPrompt(message, info, value string, inspect func(window, field objc.ID)) (text string, ok bool) {
 	alert := objc.New("NSAlert")
 	objc.Msg(alert, "setMessageText:", objc.String(message))
 	objc.Msg(alert, "setInformativeText:", objc.String(info))
@@ -340,13 +359,53 @@ func Prompt(message, info, value string) (text string, ok bool) {
 	field := objc.Msg(objc.Msg(objc.Cls("NSTextField"), "alloc"), "initWithFrame:", MakeRect(0, 0, promptFieldWidth, 24))
 	objc.Msg(field, "setStringValue:", objc.String(value))
 	objc.Msg(alert, "setAccessoryView:", field)
-	objc.Msg(objc.Msg(alert, "window"), "setInitialFirstResponder:", field)
+
+	// NSAlert lays itself out in runModal and then focuses its default
+	// button; laying out first keeps the field as initial first responder.
+	objc.Msg(alert, "layout")
+	window := objc.Msg(alert, "window")
+	objc.Msg(window, "setInitialFirstResponder:", field)
+
+	// Once the prompt runs, focus the field and select all of its text.
+	// A run-loop perform in the modal mode (not objc.Main) also fires when
+	// the prompt was opened from inside an objc.Main callback, whose
+	// dispatch block keeps the main queue busy until the prompt closes.
+	target := objc.NewTarget(func(objc.ID) {
+		objc.Msg(window, "makeFirstResponder:", field)
+		objc.Msg(field, "selectText:", objc.Nil)
+
+		if inspect != nil {
+			inspect(window, field)
+		}
+	})
+	defer objc.ReleaseTarget(target)
+
+	modes := objc.Array(objc.String("NSModalPanelRunLoopMode"), objc.String("kCFRunLoopDefaultMode"))
+	objc.Msg(target, "performSelector:withObject:afterDelay:inModes:", objc.Sel(objc.ActionSelector), objc.Nil, 0.0, modes)
 
 	if objc.Send[int64](alert, "runModal") != AlertFirst {
 		return "", false
 	}
 
 	return objc.GoString(objc.Msg(field, "stringValue")), true
+}
+
+// fieldFocus reports whether field is being edited in window (its field
+// editor is the first responder) and the length of the selected text.
+func fieldFocus(window, field objc.ID) (focused bool, selected uint64) {
+	editor := objc.Msg(field, "currentEditor")
+	if editor == objc.Nil || objc.Msg(window, "firstResponder") != editor {
+		return false, 0
+	}
+
+	r := objc.Send[textRange](editor, "selectedRange")
+
+	return true, r.Length
+}
+
+// textRange is NSRange.
+type textRange struct {
+	Location, Length uint64
 }
 
 // Trash moves a file or folder to the Trash (recoverable, unlike delete).
