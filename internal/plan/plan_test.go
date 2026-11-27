@@ -1,9 +1,9 @@
 package plan
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -11,18 +11,16 @@ import (
 	bigquery "google.golang.org/api/bigquery/v2"
 )
 
+//go:embed testdata/job.json
+var jobFixture []byte
+
 // testdata/job.json is a real 13-stage plan (public shakespeare data),
 // with identities scrubbed.
 func fixture(t *testing.T) *Plan {
 	t.Helper()
 
-	b, err := os.ReadFile("testdata/job.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var j bigquery.Job
-	if err := json.Unmarshal(b, &j); err != nil {
+	if err := json.Unmarshal(jobFixture, &j); err != nil {
 		t.Fatal(err)
 	}
 
@@ -154,5 +152,29 @@ func TestFlags(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("flags %q missing %q", got, want)
 		}
+	}
+}
+
+func TestPlanNilReceiver(t *testing.T) {
+	var p *Plan
+
+	if _, ok := p.Stage(0); ok {
+		t.Error("nil Plan.Stage(0) = ok, want false")
+	}
+
+	if got := p.Flags(Stage{ID: 1, ComputeAvgMs: 100, ComputeMaxMs: 900}); got != nil {
+		t.Errorf("nil Plan.Flags() = %v, want nil", got)
+	}
+
+	if got := p.TotalSlotMs(); got != 0 {
+		t.Errorf("nil Plan.TotalSlotMs() = %d, want 0", got)
+	}
+
+	if got := p.MaxSlotMs(); got != 0 {
+		t.Errorf("nil Plan.MaxSlotMs() = %d, want 0", got)
+	}
+
+	if l := p.Layout(); len(l.Nodes) != 0 || len(l.Edges) != 0 {
+		t.Errorf("nil Plan.Layout() = %+v, want empty", l)
 	}
 }

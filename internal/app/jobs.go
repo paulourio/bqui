@@ -43,6 +43,10 @@ func (r JobRow) Summary() string {
 
 // JobRowFromList converts a jobs.list entry.
 func JobRowFromList(j *bigquery.JobListJobs) JobRow {
+	if j == nil {
+		return JobRow{}
+	}
+
 	r := JobRow{User: j.UserEmail, State: strings.ToLower(j.State)}
 
 	if ref := j.JobReference; ref != nil {
@@ -60,6 +64,10 @@ func JobRowFromList(j *bigquery.JobListJobs) JobRow {
 
 // JobRowFromJob converts a full job.
 func JobRowFromJob(j *bigquery.Job) JobRow {
+	if j == nil {
+		return JobRow{}
+	}
+
 	r := JobRow{User: j.UserEmail}
 
 	if ref := j.JobReference; ref != nil {
@@ -115,6 +123,10 @@ func Destination(j *bigquery.Job) *bq.TableRef {
 
 // JobSections renders the console's "Job information" for a job.
 func (f Formatter) JobSections(j *bigquery.Job) []Section {
+	if j == nil {
+		return nil
+	}
+
 	row := JobRowFromJob(j)
 
 	query := Section{Title: "Query"}

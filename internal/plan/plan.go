@@ -133,6 +133,10 @@ func standaloneInsight(in *bigquery.StagePerformanceStandaloneInsight) []string 
 
 // Stage returns a stage by ID.
 func (p *Plan) Stage(id int64) (Stage, bool) {
+	if p == nil {
+		return Stage{}, false
+	}
+
 	i, ok := p.byID[id]
 	if !ok {
 		return Stage{}, false
@@ -151,6 +155,10 @@ const (
 // Flags explains what stands out in a stage: BigQuery's insights, compute
 // or read skew (max ≫ avg), shuffle spill to disk, and dominating slot time.
 func (p *Plan) Flags(s Stage) []string {
+	if p == nil {
+		return nil
+	}
+
 	flags := slices.Clone(p.Insights[s.ID])
 
 	if skewed(s.ComputeAvgMs, s.ComputeMaxMs) {
@@ -186,6 +194,10 @@ func ratio(a, b int64) float64 {
 
 // TotalSlotMs sums slot time over stages.
 func (p *Plan) TotalSlotMs() int64 {
+	if p == nil {
+		return 0
+	}
+
 	var t int64
 	for _, s := range p.Stages {
 		t += s.SlotMs
@@ -196,6 +208,10 @@ func (p *Plan) TotalSlotMs() int64 {
 
 // MaxSlotMs is the largest per-stage slot time (heat-map scale).
 func (p *Plan) MaxSlotMs() int64 {
+	if p == nil {
+		return 0
+	}
+
 	var m int64
 	for _, s := range p.Stages {
 		m = max(m, s.SlotMs)

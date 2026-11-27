@@ -215,3 +215,45 @@ func TestFormattingHelpers(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatterAndSchemaTreeNilInputs(t *testing.T) {
+	if got := testFmt.TableSections(nil); got != nil {
+		t.Errorf("TableSections(nil) = %+v, want nil", got)
+	}
+
+	if got := testFmt.DatasetSections(nil); got != nil {
+		t.Errorf("DatasetSections(nil) = %+v, want nil", got)
+	}
+
+	if got := testFmt.RoutineSections(nil); got != nil {
+		t.Errorf("RoutineSections(nil) = %+v, want nil", got)
+	}
+
+	if got := testFmt.ModelSections(nil); got != nil {
+		t.Errorf("ModelSections(nil) = %+v, want nil", got)
+	}
+
+	if got := SchemaTree(nil); got != nil {
+		t.Errorf("SchemaTree(nil) = %+v, want nil", got)
+	}
+
+	if got := FieldType(nil); got != "" {
+		t.Errorf("FieldType(nil) = %q, want empty", got)
+	}
+
+	tree := SchemaTree(&bigquery.Table{
+		Schema: &bigquery.TableSchema{
+			Fields: []*bigquery.TableFieldSchema{
+				nil,
+				{
+					Name:   "parent",
+					Type:   "RECORD",
+					Fields: []*bigquery.TableFieldSchema{nil, {Name: "child", Type: "STRING"}},
+				},
+			},
+		},
+	})
+	if len(tree) != 1 || tree[0].Name != "parent" || len(tree[0].Children) != 1 || tree[0].Children[0].Name != "child" {
+		t.Errorf("SchemaTree with nil elements = %+v", tree)
+	}
+}

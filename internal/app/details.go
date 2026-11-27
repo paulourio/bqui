@@ -201,6 +201,10 @@ func FormatSQL(sql string) string {
 
 // TableSections renders the console's "Details" tab for a table-like object.
 func (f Formatter) TableSections(t *bigquery.Table) []Section {
+	if t == nil {
+		return nil
+	}
+
 	info := Section{Title: "Table info"}
 
 	if r := t.TableReference; r != nil {
@@ -360,6 +364,10 @@ func (f Formatter) lineageSection(t *bigquery.Table) Section {
 
 // DatasetSections renders dataset metadata.
 func (f Formatter) DatasetSections(d *bigquery.Dataset) []Section {
+	if d == nil {
+		return nil
+	}
+
 	info := Section{Title: "Dataset info"}
 
 	if r := d.DatasetReference; r != nil {
@@ -387,6 +395,10 @@ func (f Formatter) DatasetSections(d *bigquery.Dataset) []Section {
 
 // RoutineSections renders routine metadata.
 func (f Formatter) RoutineSections(r *bigquery.Routine) []Section {
+	if r == nil {
+		return nil
+	}
+
 	info := Section{Title: "Routine info"}
 
 	if ref := r.RoutineReference; ref != nil {
@@ -451,6 +463,10 @@ func StandardSQLType(t *bigquery.StandardSqlDataType) string {
 
 // ModelSections renders BigQuery ML model metadata.
 func (f Formatter) ModelSections(m *bigquery.Model) []Section {
+	if m == nil {
+		return nil
+	}
+
 	info := Section{Title: "Model info"}
 
 	if ref := m.ModelReference; ref != nil {
@@ -520,7 +536,7 @@ func (f SchemaField) Badges() []string {
 // partitioning and clustering columns. Pseudo-column partitioning
 // (_PARTITIONTIME) is not part of the schema and is reported in details.
 func SchemaTree(t *bigquery.Table) []SchemaField {
-	if t.Schema == nil {
+	if t == nil || t.Schema == nil {
 		return nil
 	}
 
@@ -547,6 +563,10 @@ func schemaFields(fields []*bigquery.TableFieldSchema, prefix, partition string,
 	out := make([]SchemaField, 0, len(fields))
 
 	for _, f := range fields {
+		if f == nil {
+			continue
+		}
+
 		path := strings.ToLower(prefix + f.Name)
 		mode := f.Mode
 
@@ -577,6 +597,10 @@ func schemaFields(fields []*bigquery.TableFieldSchema, prefix, partition string,
 
 // FieldType renders a REST field type the way the console shows it.
 func FieldType(f *bigquery.TableFieldSchema) string {
+	if f == nil {
+		return ""
+	}
+
 	t := f.Type
 
 	switch t {

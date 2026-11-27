@@ -133,3 +133,17 @@ func TestJobRecordingDetailsAndOpenJob(t *testing.T) {
 		t.Errorf("OpenJob of failed job = %v", f.State)
 	}
 }
+
+func TestJobSectionsNil(t *testing.T) {
+	if got := testFmt.JobSections(nil); got != nil {
+		t.Errorf("JobSections(nil) = %+v, want nil", got)
+	}
+
+	if got := JobRowFromList(nil); got != (JobRow{}) {
+		t.Errorf("JobRowFromList(nil) = %+v, want zero", got)
+	}
+
+	if got := JobRowFromJob(nil); got != (JobRow{}) {
+		t.Errorf("JobRowFromJob(nil) = %+v, want zero", got)
+	}
+}

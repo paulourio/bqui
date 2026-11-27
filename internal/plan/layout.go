@@ -44,7 +44,7 @@ type Layout struct {
 // layers horizontally.
 func (p *Plan) Layout() Layout {
 	l := Layout{Nodes: make(map[int64]*Node)}
-	if len(p.Stages) == 0 {
+	if p == nil || len(p.Stages) == 0 {
 		return l
 	}
 

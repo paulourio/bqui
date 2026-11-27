@@ -40,4 +40,13 @@ func TestStageSectionsFromRecordedPlan(t *testing.T) {
 	if len(half.Stages) != 13 || done != 4 || running != 1 {
 		t.Errorf("progress replay: %d stages, %d complete, %d running", len(half.Stages), done, running)
 	}
+
+	// Nil plan must not panic (GAP-11).
+	nilSecs := StageSections(nil, plan.Stage{
+		ID: 1, Name: "S01: Join", Status: "COMPLETE",
+		Inputs: []int64{0}, ComputeAvgMs: 100, ComputeMaxMs: 900,
+	})
+	if section(nilSecs, "Stage")["Name"] != "S01: Join" {
+		t.Errorf("StageSections(nil) = %+v", nilSecs)
+	}
 }

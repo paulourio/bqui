@@ -53,6 +53,10 @@ func StageSections(p *plan.Plan, s plan.Stage) []Section {
 }
 
 func stageNames(p *plan.Plan, ids []int64) string {
+	if p == nil {
+		return ""
+	}
+
 	names := make([]string, 0, len(ids))
 	for _, id := range ids {
 		if s, ok := p.Stage(id); ok {
