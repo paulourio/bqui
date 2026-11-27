@@ -78,7 +78,15 @@ func decodeField(f *bigquery.TableFieldSchema, raw any) (any, error) {
 	}
 
 	// Repeated values arrive as [{"v": ...}, ...]; NULL arrays arrive as null or [].
-	items, _ := raw.([]any)
+	if raw == nil {
+		return []any{}, nil
+	}
+
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("%w: REPEATED is %T", ErrBadRow, raw)
+	}
+
 	out := make([]any, 0, len(items))
 
 	for _, it := range items {
@@ -178,7 +186,12 @@ func parseScalar(typ, s string) (any, error) {
 	case "FLOAT", "FLOAT64":
 		return parseFloat(s)
 	case "BOOLEAN", "BOOL":
-		return s == "true", nil
+		v, err := strconv.ParseBool(strings.ToLower(s))
+		if err != nil {
+			return nil, fmt.Errorf("%w: BOOL %q", ErrBadRow, s)
+		}
+
+		return v, nil
 	case "BYTES":
 		b, err := base64.StdEncoding.DecodeString(s)
 		if err != nil {
@@ -222,11 +235,16 @@ func parseTimestamp(s string) (time.Time, error) {
 	}
 
 	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 		return time.Time{}, fmt.Errorf("%w: TIMESTAMP %q", ErrBadRow, s)
 	}
 
-	return time.UnixMicro(int64(math.Round(f * 1e6))).UTC(), nil
+	us := math.Round(f * 1e6)
+	if math.IsNaN(us) || math.IsInf(us, 0) || us < -0x1p63 || us >= 0x1p63 {
+		return time.Time{}, fmt.Errorf("%w: TIMESTAMP %q", ErrBadRow, s)
+	}
+
+	return time.UnixMicro(int64(us)).UTC(), nil
 }
 
 // AppendRowJSON appends one decoded row as a JSON object in the BigQuery

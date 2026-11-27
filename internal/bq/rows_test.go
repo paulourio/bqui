@@ -2,6 +2,7 @@ package bq
 
 import (
 	"encoding/json"
+	"errors"
 	"math"
 	"testing"
 	"time"
@@ -137,6 +138,53 @@ func TestDecodeRowsErrors(t *testing.T) {
 	short := []*bigquery.TableRow{{F: nil}}
 	if _, err := DecodeRows(fields, short); err == nil {
 		t.Error("expected error for cell count mismatch")
+	}
+
+	boolFields := []*bigquery.TableFieldSchema{{Name: "flag", Type: "BOOL"}}
+	for _, tc := range []struct {
+		raw  string
+		want bool
+	}{
+		{"true", true},
+		{"TRUE", true},
+		{"True", true},
+		{"false", false},
+		{"FALSE", false},
+		{"False", false},
+	} {
+		rows, err := DecodeRows(boolFields, []*bigquery.TableRow{{F: []*bigquery.TableCell{{V: tc.raw}}}})
+		if err != nil || rows[0][0] != tc.want {
+			t.Errorf("DecodeRows(BOOL %q) = (%v, %v), want (%v, nil)", tc.raw, rows, err, tc.want)
+		}
+	}
+
+	for _, badBool := range []string{"", "not_a_bool", "yes", "2"} {
+		if _, err := DecodeRows(boolFields, []*bigquery.TableRow{{F: []*bigquery.TableCell{{V: badBool}}}}); !errors.Is(err, ErrBadRow) {
+			t.Errorf("DecodeRows(BOOL %q) err = %v, want ErrBadRow", badBool, err)
+		}
+	}
+
+	tsFields := []*bigquery.TableFieldSchema{{Name: "ts", Type: "TIMESTAMP"}}
+	for _, badTS := range []string{"NaN", "nan", "Inf", "+Inf", "-Inf", "Infinity", "-Infinity", "1e20", "-1e20", "1e305"} {
+		if _, err := DecodeRows(tsFields, []*bigquery.TableRow{{F: []*bigquery.TableCell{{V: badTS}}}}); !errors.Is(err, ErrBadRow) {
+			t.Errorf("DecodeRows(TIMESTAMP %q) err = %v, want ErrBadRow", badTS, err)
+		}
+	}
+
+	repFields := []*bigquery.TableFieldSchema{{Name: "tags", Type: "STRING", Mode: "REPEATED"}}
+	for _, badRep := range []any{"not-a-slice", map[string]any{"v": "x"}, float64(42)} {
+		if _, err := DecodeRows(repFields, []*bigquery.TableRow{{F: []*bigquery.TableCell{{V: badRep}}}}); !errors.Is(err, ErrBadRow) {
+			t.Errorf("DecodeRows(REPEATED %T) err = %v, want ErrBadRow", badRep, err)
+		}
+	}
+
+	nilRepRows, err := DecodeRows(repFields, []*bigquery.TableRow{{F: []*bigquery.TableCell{{V: nil}}}})
+	if err != nil {
+		t.Fatalf("DecodeRows(REPEATED nil) err = %v", err)
+	}
+
+	if s, ok := nilRepRows[0][0].([]any); !ok || len(s) != 0 {
+		t.Errorf("DecodeRows(REPEATED nil) = %#v, want non-nil empty slice", nilRepRows[0][0])
 	}
 }
 
