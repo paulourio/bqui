@@ -24,7 +24,11 @@ type menuResult struct {
 	Items      int    `json:"items"`
 	Shot       string `json:"-"`
 	Err        string `json:"-"`
+	Pasted     bool   `json:"-"` // the menu's Paste action inserted the pasteboard text
 }
+
+// pasteMarker is put on the pasteboard for the Paste check.
+const pasteMarker = "bqui_smoke_paste_marker"
 
 func menuFlow(s *ui.Shell, dir string) menuResult {
 	var r menuResult
@@ -48,6 +52,15 @@ func menuFlow(s *ui.Shell, dir string) menuResult {
 		s.Editor.CloseContextMenu()
 	})
 
+	// Monaco's Paste (the context-menu item) must paste the pasteboard
+	// right away, without WebKit's own Paste confirmation in between.
+	onMain(func() {
+		appkit.CopyToPasteboard(pasteMarker)
+		s.Editor.Action("editor.action.clipboardPasteAction")
+	})
+
+	r.Pasted = waitMain(loadTimeout, func() bool { return strings.Contains(s.Workspace.Tab().SQL, pasteMarker) })
+
 	return r
 }
 
@@ -62,4 +75,5 @@ func menuChecks(rep *Report, r menuResult) {
 	rep.check("editor-context-menu", r.Err == "" && r.Found && r.Items > 0 && opaque(r.Background) && r.MenuVar != "",
 		"found %v (%d items, shadow %v, host %q, in editor %v), background %q, --vscode-menu-background %q, %s %s",
 		r.Found, r.Items, r.Shadow, r.HostClass, r.InEditor, r.Background, r.MenuVar, r.Shot, r.Err)
+	rep.check("editor-menu-paste", r.Pasted, "context-menu Paste inserted the pasteboard text: %v", r.Pasted)
 }
