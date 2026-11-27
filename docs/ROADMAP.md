@@ -730,6 +730,29 @@ These are pending items, collected from the milestone notes above.
 - The toolbar overflows at 1280 pt width.
 - The binary is about 190 MB, mostly bqlang's wasm2go parser.
 
+### User feedback (polish backlog, 2026-11-27)
+
+These come from a user's hands-on testing. Each item must be discussed and agreed before any implementation starts, including the defects: the scope, the approach and whether to do it at all are still open. The causes noted below are guesses to check, not decisions.
+
+**Defects**
+- **Editor, completion duplicates the typed prefix:** the user types part of a word and accepts a suggestion with Tab or Enter. The full word is then inserted after the typed text instead of replacing it, so `SEL` becomes `SELSELECT`.
+  - It is intermittent: sometimes the completion replaces the prefix correctly.
+  - The likely cause is the replace range: either bqls sends a `textEdit` range that doesn't cover the prefix, or Monaco's word range doesn't match it. A stale document version on the bqls side would also explain the intermittency.
+  - A smoke check should type a prefix, accept the suggestion and compare the line text.
+- **JSON view, long lines don't expand:** a very long line is cut off instead of widening the view or wrapping.
+- **Editor, stale schema in hover:** after a table's schema changes, the bqls hover still shows the old schema. The app needs a way to refresh the cached metadata, per table and for the whole catalog.
+
+**Requests**
+- **Inspector, copy the table name:** add a copy button next to the table name in the right-hand details pane.
+- **Results, copy or export the output:** add a button to copy or export the results.
+- **Editor, expose Monaco configuration:** give access to editor settings, keymaps and snippets, in the style of VS Code.
+  - User-defined snippets matter most: users write their own in VS Code's snippet format (prefix, body with `$1`/`${2:default}` placeholders, description), and they appear in completion.
+- **Editor, lint severity:** let the user choose the diagnostic level, for example off, basic or restricted.
+
+**Working well**
+- Session restore: after a macOS restart, the app reopened in the last session.
+- VS Code-style multi-cursor shortcuts.
+
 ### Deferred features
 - **Editor:**
   - Multiple editor tabs and named workspaces. The schema is ready, but the UI has one tab.
