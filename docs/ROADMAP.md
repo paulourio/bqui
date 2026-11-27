@@ -592,6 +592,58 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ---
 
+## Follow-ups (open after M0–M13)
+
+These are pending items, collected from the milestone notes above.
+
+### Verification still owed
+- **M11 console round trip (exit criterion):** open `select-replace` in bqui, edit it and save. Edit it again in the BigQuery Studio console, then save once more in bqui. Expect the conflict prompt, not a silent overwrite. Also confirm a bqui save shows up in the console's history.
+- **M11 shared queries:** share a saved query in the console and check what its IAM policy looks like. All current samples are private, so `Shared` is unverified for shared ones.
+- **Real Apple silicon** (CI runner or a rental):
+  - Scroll FPS, launch time and memory profiles.
+  - The M5 50M-row memory test and the M9 10 GiB export (≤ 512 MiB RSS).
+  - The M7 1M-row JSON view.
+  - VoiceOver and keyboard audit.
+- **First CI run** with the new `jq` smoke gate and release-zip upload.
+
+### Known issues
+- AppKit "reentrant operation in its NSTableView delegate" warnings (6 per smoke run). These need `lldb` with a symbolic breakpoint (M8).
+- The inspector segment label is invisible in the VM (Liquid Glass rendering); check on real hardware.
+- The toolbar overflows at 1280 pt width.
+- The binary is about 190 MB, mostly bqlang's wasm2go parser.
+
+### Deferred features
+- **Editor:**
+  - Multiple editor tabs and named workspaces. The schema is ready, but the UI has one tab.
+  - A keybinding editor and Vim mode.
+- **BigQuery Studio:**
+  - A side-by-side diff on conflict.
+  - Sharing controls.
+  - Team folders.
+  - Background polling for remote changes.
+- **Export:**
+  - XLSX.
+  - Resume.
+  - A large-export confirmation.
+  - EXPORT DATA / extract jobs to GCS.
+  - Dock badge progress.
+- **Plan:**
+  - Selectable heat metrics.
+  - Edge weights by shuffle bytes.
+  - The timeline chart.
+- **Themes:**
+  - A preferences pane with live preview and in-app color editing.
+  - Vibrancy and accent options.
+  - The UI font size.
+- **Saved queries:**
+  - Watching the folder with FSEvents.
+  - Query parameters in the header.
+  - Scroll position in session restore.
+- **Release:**
+  - Notarization (needs an Apple Developer account).
+  - Update checks against Gitea releases.
+- **Extras:** a charts tab and a lineage view.
+
 ## Critical files
 
 - **bqlang (M0):**
