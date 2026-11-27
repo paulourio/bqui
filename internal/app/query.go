@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apache/arrow-go/v18/arrow"
 	bigquery "google.golang.org/api/bigquery/v2"
 
 	"github.com/paulourio/bqui/internal/bq"
@@ -29,6 +30,11 @@ var _ QueryBackend = (*bq.Client)(nil)
 type StorageSession interface {
 	RawBatches(ctx context.Context) iter.Seq2[bqstorage.RawBatch, error]
 	DecodeRows(fields []results.Field, raw []byte) ([][]any, error)
+	// DecodeRecord returns the raw batch as an Arrow record (caller releases).
+	DecodeRecord(raw []byte) (arrow.RecordBatch, error)
+	Schema() *arrow.Schema
+	EstimatedRows() int64
+	EstimatedBytes() int64
 }
 
 // StorageOpener opens a read session for a table (nil when unavailable).
@@ -53,6 +59,12 @@ type storageSession struct{ s *bqstorage.Session }
 func (s storageSession) RawBatches(ctx context.Context) iter.Seq2[bqstorage.RawBatch, error] {
 	return s.s.RawBatches(ctx)
 }
+
+func (s storageSession) DecodeRecord(raw []byte) (arrow.RecordBatch, error) { return s.s.Decode(raw) }
+func (s storageSession) Schema() *arrow.Schema                              { return s.s.Schema() }
+func (s storageSession) EstimatedRows() int64                               { return s.s.EstimatedRows() }
+
+func (s storageSession) EstimatedBytes() int64 { return s.s.EstimatedBytes() }
 
 func (s storageSession) DecodeRows(fields []results.Field, raw []byte) ([][]any, error) {
 	rec, err := s.s.Decode(raw)
@@ -92,12 +104,14 @@ type RunSnapshot struct {
 	Job        *bq.JobRef
 	Result     *bq.QueryResult
 	JobDetails *bigquery.Job // latest job snapshot (plan, statistics)
-	Grid       *results.Grid
-	Stages     int
-	StagesDone int
-	SlotMs     int64
-	Source     string // "inline", "rest", "storage"
-	Truncated  bool   // stopped at a row or size limit
+	// ResultTable holds the full results (destination or previewed table).
+	ResultTable *bq.TableRef
+	Grid        *results.Grid
+	Stages      int
+	StagesDone  int
+	SlotMs      int64
+	Source      string // "inline", "rest", "storage"
+	Truncated   bool   // stopped at a row or size limit
 }
 
 // Run is one query execution or table preview.
@@ -330,6 +344,7 @@ func (rn *Runner) execute(ctx context.Context, r *Run, req bq.QueryRequest) erro
 
 	r.update(func(s *RunSnapshot) {
 		s.Result = res
+		s.ResultTable = res.Destination
 		if res.Job != nil {
 			s.Job = res.Job
 		}
@@ -511,6 +526,8 @@ func (rn *Runner) openJob(ctx context.Context, r *Run, ref bq.JobRef) error {
 		return nil // no result set (DDL, DML, scripts)
 	}
 
+	r.update(func(s *RunSnapshot) { s.ResultTable = dest })
+
 	if rn.opts.Storage != nil && rn.opts.Metadata != nil {
 		t, terr := rn.opts.Metadata.GetTable(ctx, *dest)
 		if terr != nil {
@@ -578,6 +595,8 @@ func (rn *Runner) preview(ctx context.Context, r *Run, ref bq.TableRef) error {
 	if t.Schema == nil {
 		return errors.New("app: table has no schema")
 	}
+
+	r.update(func(s *RunSnapshot) { s.ResultTable = &ref })
 
 	return rn.storageResult(ctx, r, results.FieldsFromREST(t.Schema.Fields), ref, previewRows)
 }

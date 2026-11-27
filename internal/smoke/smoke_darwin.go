@@ -20,6 +20,7 @@ import (
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/editor"
+	"github.com/paulourio/bqui/internal/export"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/results"
 	"github.com/paulourio/bqui/internal/ui"
@@ -110,6 +111,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	vs := valueFlow(s)
 	phase("plan")
 	ps := planFlow(s)
+	phase("export")
+	xs := exportFlow(s, dir)
 	phase("checks")
 
 	queued := time.Now()
@@ -136,6 +139,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		jobsChecks(rep, js)
 		valueChecks(rep, vs)
 		planChecks(rep, ps)
+		exportChecks(rep, xs)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -624,6 +628,62 @@ func planFlow(s *ui.Shell) planResult {
 	onMain(func() { r.Inspector = s.Inspector.Current().Name })
 
 	return r
+}
+
+// exportResult captures the export flow.
+type exportResult struct {
+	CSVLines, JSONLines, GridLines int64
+	Status                         string
+	Err                            string
+}
+
+func exportFlow(s *ui.Shell, dir string) exportResult {
+	var r exportResult
+
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
+		r.Err = err.Error()
+
+		return r
+	}
+
+	exportOne := func(name string, f export.Format) string {
+		path := filepath.Join(dir, name)
+
+		onMain(func() {
+			src := app.ExportSource{Grid: s.Results.Current().Snapshot().Grid}
+			_, r.GridLines, _ = src.Grid.Size()
+			s.ExportTo(src, path, f, export.Options{})
+		})
+		waitMain(loadTimeout, func() bool { return s.LastExport().Done && s.LastExport().Path == path })
+		onMain(func() {
+			r.Status = s.Status()
+			if err := s.LastExport().Err; err != nil {
+				r.Err = err.Error()
+			}
+		})
+
+		return path
+	}
+
+	countLines := func(path string) int64 {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return -1
+		}
+
+		return int64(strings.Count(string(b), "\n"))
+	}
+
+	r.CSVLines = countLines(exportOne("export.csv", export.CSV))
+	r.JSONLines = countLines(exportOne("export.jsonl", export.NDJSON))
+
+	return r
+}
+
+func exportChecks(rep *Report, r exportResult) {
+	rep.check("export-csv", r.CSVLines == r.GridLines+1, "%d CSV lines for %d grid lines (+ header)", r.CSVLines, r.GridLines)
+	rep.check("export-json", r.JSONLines == 5000 && strings.HasPrefix(r.Status, "✓ Exported") && r.Err == "",
+		"%d JSON lines; status %q %s", r.JSONLines, r.Status, r.Err)
 }
 
 func planChecks(rep *Report, r planResult) {

@@ -8,6 +8,7 @@ package app
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/bqstorage"
+	"github.com/paulourio/bqui/internal/export"
 )
 
 // liveAllTypes covers every type, NULLs, empty arrays and nesting.
@@ -94,5 +96,49 @@ func TestLiveRESTAndStorageAgree(t *testing.T) {
 				t.Errorf("row %d field %s: REST %#v vs storage %#v", i, restRun.Grid.Fields()[c].Name, a[c], b[c])
 			}
 		}
+	}
+}
+
+func TestLiveExportParquetAndArrow(t *testing.T) {
+	project := os.Getenv("BQUI_LIVE_PROJECT")
+	if project == "" {
+		t.Skip("BQUI_LIVE_PROJECT not set")
+	}
+
+	ctx := context.Background()
+
+	client, err := bq.New(ctx, bq.Options{Project: project})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sc, err := bqstorage.New(ctx, option.WithTokenSource(client.Tokens()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sc.Close()
+
+	rn := NewRunner(RunnerOptions{
+		Backend: client, Metadata: client, Storage: NewStorageOpener(sc, func() string { return project }),
+		Post: func(fn func()) { fn() }, SpillDir: t.TempDir(),
+	})
+
+	ref := &bq.TableRef{Project: "bigquery-public-data", Dataset: "samples", Table: "shakespeare"}
+	dir := t.TempDir()
+
+	for _, f := range []export.Format{export.Parquet, export.Arrow, export.CSV} {
+		path := filepath.Join(dir, "shakespeare."+f.Ext())
+
+		p := runExport(t, rn, ExportSource{Table: ref}, path, f)
+		if p.Err != nil || p.Rows != 164656 {
+			t.Fatalf("%s export: %+v", f, p)
+		}
+
+		info, err := os.Stat(path)
+		if err != nil || info.Size() == 0 {
+			t.Fatalf("%s file: %v", f, err)
+		}
+
+		t.Logf("%s: %d rows, %d bytes", f, p.Rows, info.Size())
 	}
 }

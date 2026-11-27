@@ -400,6 +400,26 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M9 — Export via the Storage Read API
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **`internal/export`:**
+  - CSV, flattened into console-style lines by default, or with JSON cells as an option. NULLs and blank continuation cells are empty.
+  - NDJSON in the console's JSON encoding.
+  - Parquet (zstd, nested types preserved) and Arrow IPC (zstd), written straight from Storage Read API Arrow records.
+- **`Runner.Export`:**
+  - Tables and query results (the destination table) stream through the Storage Read API; in-memory results (the fake backend, or no destination) export CSV/NDJSON from the grid.
+  - It writes to `<file>.partial` and renames on success; failures and cancellations leave nothing behind.
+  - It checks free disk space against the scan estimate and shows a Storage Read API cost hint.
+  - Progress shows rows, bytes, elapsed time and estimated rows, and Stop cancels.
+- **Live test** (`-tags live`): `bigquery-public-data.samples.shakespeare` (164,656 rows) exports to Parquet (1.0 MB), Arrow (1.9 MB) and CSV (4.6 MB).
+- **UI:** Export Results submenus in the Query menu and the results context menu, and Export Table in the explorer, each with a save panel.
+- **Not done:**
+  - XLSX.
+  - Resume.
+  - A large-export confirmation dialog; the cost appears in the status line instead.
+  - EXPORT DATA / extract jobs to GCS.
+  - Dock badge progress.
+  - The 10 GiB memory benchmark, which needs real hardware.
+
 **Sources:** the full table, a table with selected columns plus a row restriction or snapshot time, or query results (the destination temp table).
 
 **Formats**

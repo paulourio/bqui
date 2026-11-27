@@ -156,6 +156,10 @@ func (p *ExplorerPane) menu(id uint64) []appkit.MenuItem {
 		// Storage Read API previews cover native tables, snapshots and shards.
 		if info.Kind == app.KindTable || info.Kind == app.KindSnapshot || info.Kind == app.KindShardGroup {
 			items = append(items, appkit.MenuItem{Title: "Preview", Run: func() { p.s.Preview(info) }})
+
+			if p.s.opts.Storage != nil {
+				items = append(items, p.s.exportMenu("Export Table", tableExportSource(info)))
+			}
 		}
 
 		return append(items, appkit.MenuItem{}, copyID, copySQL, console)

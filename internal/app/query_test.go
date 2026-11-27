@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/arrow-go/v18/arrow"
 	bigquery "google.golang.org/api/bigquery/v2"
 
 	"github.com/paulourio/bqui/internal/bq"
@@ -157,6 +158,14 @@ func (f fakeStorage) RawBatches(ctx context.Context) iter.Seq2[bqstorage.RawBatc
 		}
 	}
 }
+
+func (f fakeStorage) DecodeRecord([]byte) (arrow.RecordBatch, error) {
+	return nil, errors.New("fake storage has no Arrow records")
+}
+
+func (f fakeStorage) Schema() *arrow.Schema { return nil }
+func (f fakeStorage) EstimatedRows() int64  { return int64(f.rows) }
+func (f fakeStorage) EstimatedBytes() int64 { return int64(f.rows) * 100 }
 
 func (f fakeStorage) DecodeRows(_ []results.Field, raw []byte) ([][]any, error) {
 	var rows []*bigquery.TableRow

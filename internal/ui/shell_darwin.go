@@ -87,6 +87,9 @@ type Shell struct {
 	tabs      *appkit.Segmented
 	tabViews  []objc.ID
 
+	exportCancel func()
+	lastExport   app.ExportProgress
+
 	opts     Options
 	settings *store.Settings
 	billing  atomic.Pointer[string] // readable from any goroutine
@@ -130,6 +133,7 @@ func NewShell(opts Options) (*Shell, error) {
 
 	s.Results = newResultsPane()
 	s.Results.Inspect = func(f []results.Field, row []any, i int64, path string) { s.Inspector.ShowRow(f, row, i, path) }
+	s.Results.ExportMenu = func() appkit.MenuItem { return s.exportMenu("Export Results", s.resultsExportSource) }
 	s.JSON = newJSONPane(s)
 	s.Plan = newPlanPane(s)
 	s.Graph = newGraphPane(s)
@@ -371,6 +375,8 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Stop", Key: ".", Run: s.Stop},
 			{},
 			{Title: "Format", Key: "f", Mods: cmd | shift, Run: func() { s.Editor.Format() }},
+			{},
+			s.exportMenu("Export Results", s.resultsExportSource),
 		}},
 		{Role: appkit.MenuWindows, Title: "Window", Items: []appkit.MenuItem{
 			{Title: "Minimize", Action: "performMiniaturize:", Key: "m"},
@@ -556,8 +562,14 @@ func (s *Shell) CancelJob(ref bq.JobRef) {
 	}()
 }
 
-// Stop cancels the current run.
+// Stop cancels a running export, else the current run.
 func (s *Shell) Stop() {
+	if s.exportCancel != nil {
+		s.exportCancel()
+
+		return
+	}
+
 	if r := s.Results.Current(); r != nil {
 		r.Cancel()
 	}

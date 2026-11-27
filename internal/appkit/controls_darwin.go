@@ -107,3 +107,19 @@ func OpenURL(url string) bool {
 func SetHidden(v objc.ID, hidden bool) {
 	objc.Msg(v, "setHidden:", hidden)
 }
+
+const modalResponseOK int64 = 1
+
+// SaveFile runs a save panel and returns the chosen path.
+func SaveFile(title, defaultName string) (string, bool) {
+	panel := objc.Msg(objc.Cls("NSSavePanel"), "savePanel")
+	objc.Msg(panel, "setTitle:", objc.String(title))
+	objc.Msg(panel, "setNameFieldStringValue:", objc.String(defaultName))
+	objc.Msg(panel, "setCanCreateDirectories:", true)
+
+	if objc.Send[int64](panel, "runModal") != modalResponseOK {
+		return "", false
+	}
+
+	return objc.GoString(objc.Msg(objc.Msg(panel, "URL"), "path")), true
+}

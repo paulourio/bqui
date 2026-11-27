@@ -37,6 +37,8 @@ type ResultsPane struct {
 
 	// Inspect receives a double-clicked row and the clicked value's path.
 	Inspect func(fields []results.Field, row []any, index int64, path string)
+	// ExportMenu builds the Export submenu for the context menu.
+	ExportMenu func() appkit.MenuItem
 
 	status, empty objc.ID
 
@@ -478,6 +480,10 @@ func (p *ResultsPane) menu(row int, column string) []appkit.MenuItem {
 				Title: "Copy Cell Value", Run: func() { appkit.CopyToPasteboard(value) },
 			})
 		}
+	}
+
+	if p.ExportMenu != nil {
+		items = append(items, appkit.MenuItem{}, p.ExportMenu())
 	}
 
 	return items
