@@ -12,12 +12,14 @@ import (
 
 // renameResult captures F2 renaming in the Workbooks tree.
 type renameResult struct {
-	ArrowMoved    bool   // Down arrow still moves the selection
-	QueryAsked    string // prompt title after F2 on a query
-	QueryName     string // the open query's name after the rename
-	WorkbookAsked string // prompt title after F2 on a workbook
-	WorkbookName  string // the open query's workbook after the rename
-	Err           string
+	PromptFocused  bool   // the rename prompt's field has keyboard focus
+	PromptSelected uint64 // characters selected in it when it opens
+	ArrowMoved     bool   // Down arrow still moves the selection
+	QueryAsked     string // prompt title after F2 on a query
+	QueryName      string // the open query's name after the rename
+	WorkbookAsked  string // prompt title after F2 on a workbook
+	WorkbookName   string // the open query's workbook after the rename
+	Err            string
 }
 
 const (
@@ -97,10 +99,16 @@ func renameFlow(s *ui.Shell) renameResult {
 		r.WorkbookName = cq.Workbook
 	})
 
+	// A real prompt, opened from inside a main-thread callback like F2's,
+	// focuses its field with the whole name selected.
+	onMain(func() { r.PromptFocused, r.PromptSelected = appkit.PromptFocus(renamedQuery) })
+
 	return r
 }
 
 func renameChecks(rep *Report, r renameResult) {
+	rep.check("rename-prompt-focus", r.PromptFocused && r.PromptSelected == uint64(len(renamedQuery)),
+		"field focused %v, %d of %d characters selected", r.PromptFocused, r.PromptSelected, len(renamedQuery))
 	rep.check("workbooks-arrow-keys", r.ArrowMoved, "Down arrow moved the selection: %v", r.ArrowMoved)
 	rep.check("workbooks-f2-query", r.Err == "" && r.QueryAsked == "Rename Query" && r.QueryName == renamedQuery,
 		"prompt %q, query now %q %s", r.QueryAsked, r.QueryName, r.Err)
