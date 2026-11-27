@@ -12,14 +12,15 @@ import (
 )
 
 // pagingResult captures on-demand fetching, auto-fit, Add Project and
-// focus after double-click.
+// double-click in the explorer.
 type pagingResult struct {
 	FirstRows, AfterScroll int64
 	FirstMore              bool
 	Status                 string
 	ColWidth, HeaderWidth  float64
 	Added                  bool
-	Focused                bool
+	ClickEdited            bool // double-clicking a table changed the buffer
+	ActErr                 string
 	Err                    string
 }
 
@@ -54,16 +55,52 @@ func pagingFlow(s *ui.Shell) pagingResult {
 		s.UnpinProject("smoke-extra-project")
 	})
 
-	// Double-clicking a table inserts it and focuses the editor.
+	// Double-clicking a table shows it but leaves the buffer alone.
+	m := s.Explorer.Model
+
+	for _, ds := range []string{"", "samples"} {
+		var id uint64
+
+		onMain(func() {
+			id, _ = m.Find("bigquery-public-data", ds, "")
+			m.Expand(id)
+			s.Explorer.Outline.Expand(id, false)
+		})
+		waitMain(loadTimeout, func() bool { return m.Loaded(id) })
+	}
+
+	var (
+		info   app.ObjectInfo
+		before string
+	)
+
 	onMain(func() {
-		if id, ok := s.Explorer.Model.Find("bigquery-public-data", "samples", "shakespeare"); ok {
-			s.SelectSidebar(ui.SidebarExplorer)
-			objc0(s)
-			s.Explorer.Activate(id)
+		before = s.Workspace.Tab().SQL
+
+		id, ok := m.Find("bigquery-public-data", "samples", "shakespeare")
+		if !ok {
+			return
 		}
+
+		info, _ = m.Info(id)
+		s.SelectSidebar(ui.SidebarExplorer)
+		objc0(s)
+		s.Explorer.Outline.Select(id)
+		s.Explorer.Activate(id)
 	})
+
+	if info.Name == "" {
+		r.ActErr = "shakespeare not in the explorer"
+
+		return r
+	}
+
+	waitMain(loadTimeout, func() bool { return s.Inspector.Current().FullID() == info.FullID() })
+
 	time.Sleep(settleDelay)
-	onMain(func() { r.Focused = s.EditorFocused() })
+	onMain(func() {
+		r.ClickEdited = s.Workspace.Tab().SQL != before
+	})
 
 	return r
 }
@@ -77,5 +114,5 @@ func pagingChecks(rep *Report, r pagingResult) {
 		"first window %d (more %v), after scrolling %d; status %q %s", r.FirstRows, r.FirstMore, r.AfterScroll, r.Status, r.Err)
 	rep.check("results-autofit", r.ColWidth >= r.HeaderWidth, "order_id column %.0fpt (header text %.0fpt)", r.ColWidth, r.HeaderWidth)
 	rep.check("explorer-add-project", r.Added, "added %v", r.Added)
-	rep.check("explorer-doubleclick-focus", r.Focused, "editor focused %v", r.Focused)
+	rep.check("explorer-doubleclick-no-insert", r.ActErr == "" && !r.ClickEdited, "buffer changed %v %s", r.ClickEdited, r.ActErr)
 }

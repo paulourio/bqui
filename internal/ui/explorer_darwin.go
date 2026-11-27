@@ -170,12 +170,11 @@ func (p *ExplorerPane) onDoubleClick(id uint64) {
 			p.Outline.Expand(id, false)
 		}
 	case app.KindTable, app.KindView, app.KindMaterializedView, app.KindExternalTable,
-		app.KindSnapshot, app.KindShardGroup, app.KindRoutine:
-		p.s.Editor.InsertText(info.SQLName())
-		// Move keyboard focus to the editor (after the double-click is
-		// handled, so the outline does not take it back).
-		objc.Main(p.s.Editor.Focus)
-	case app.KindModel, app.KindRoot, app.KindSection, app.KindPlaceholder:
+		app.KindSnapshot, app.KindShardGroup, app.KindRoutine, app.KindModel,
+		app.KindRoot, app.KindSection, app.KindPlaceholder:
+		// Selecting an object already shows it in the inspector, whose
+		// Query and Insert Reference actions edit the buffer; a click
+		// never does.
 	}
 }
 
