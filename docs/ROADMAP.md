@@ -630,6 +630,16 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
   - The local `link_id` header keeps working.
 - **Replaces:** the Saved tab. The sidebar switcher becomes Explorer | Sessions.
 - **Tests:** session/file naming and collisions, rename and move on disk, migration from `queries/`, and restoring the selection (Linux). Smoke: create a session, create a file, rename both, switch files with autosave.
+- **Runs per file:** every run from a file is tracked, so a file's job history is one click away.
+  - **Storage:**
+    - The local `runs` table gains a `file_id` column. Each file gets a stable ID in its header comment (`id = "…"`), so the link survives renames and moves, including ones made in Finder.
+    - Each recorded run keeps the job ID, location, SQL as run (the selection or statement, which may differ from the whole file), state, duration, bytes and row count.
+  - **Panel:**
+    - A **Runs** tab in the bottom pane lists the current file's runs, newest first. It switches with the selected file, and its count shows in the tab title, for example "Runs (12)".
+    - Each row shows state, started, duration, bytes and the first line of the SQL that ran.
+    - **Double-click** reopens that job's results and plan (`Runner.OpenJob`). The context menu offers Copy Job ID, Open in Console, Restore this SQL into the editor, and Compare with current text.
+  - **Tree hint:** the file's tooltip in the Sessions tree shows its last run (state and time).
+  - **Tests:** a file ID survives rename and move, runs are attributed to the right file, and rows come back newest first (Linux). Smoke: run twice from one file and once from another; the Runs tab shows 2, then 1 after switching files.
 
 ### M16 — Job browser
 
