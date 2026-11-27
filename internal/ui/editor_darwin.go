@@ -445,3 +445,13 @@ func (p *EditorPane) ObjectRequests() (lookups, opens int) {
 
 	return p.objectLookups, p.objectOpens
 }
+
+// SetReadOnly makes the editor read-only (job documents) or editable.
+func (p *EditorPane) SetReadOnly(on bool) {
+	opts := map[string]any{"readOnly": on}
+	if on {
+		opts["readOnlyMessage"] = map[string]string{"value": "This is a job's SQL (read-only). Use File ▸ Save Job SQL to Workbook to edit a copy."}
+	}
+
+	_ = p.Bridge.SendApp("setOptions", opts)
+}

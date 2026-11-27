@@ -129,6 +129,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	is := inspectFlow(s, dir)
 	phase("definition")
 	gd := definitionFlow(s)
+	phase("jobs")
+	jb := jobTreeFlow(s, dir)
 	phase("layout")
 	ly := layoutFlow(s, dir)
 	phase("checks")
@@ -164,6 +166,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		studioChecks(rep, st)
 		inspectChecks(rep, is)
 		definitionChecks(rep, gd)
+		jobTreeChecks(rep, jb)
 		layoutChecks(rep, ly)
 
 		if err := run(s, dir, rep, done); err != nil {

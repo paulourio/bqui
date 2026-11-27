@@ -42,6 +42,8 @@ func (w *Workspace) OpenRemote(ctx context.Context, sb StudioBackend, q dataform
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	w.clearJobDocLocked()
+
 	if w.tab.Remote != q.Name {
 		w.tab.File, w.fileText = "", ""
 	}

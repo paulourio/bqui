@@ -83,6 +83,8 @@ func (s *Shell) onEdited(text string, line, character int) {
 }
 
 func (s *Shell) updateTitle() {
+	s.syncReadOnly()
+
 	t := s.Workspace.Tab()
 	edited := s.Workspace.Dirty() && (t.File != "" || t.Remote != "")
 	appkit.SetWindowDocument(s.Window, s.Workspace.Title(), edited)
@@ -271,6 +273,10 @@ func (s *Shell) recordFinished(r *app.Run, snap app.RunSnapshot) {
 
 	s.Workspace.Finished(snap, s.BillingProject(), fileID)
 	s.History.LocalChanged()
+
+	if snap.Job != nil && s.sideTabs.Selected() == SidebarWorkbooks {
+		s.Workbooks.ReloadJobs()
+	}
 
 	// Recording is asynchronous; refresh the Runs tab shortly after.
 	if fileID != "" && fileID == s.Workspace.FileID() {

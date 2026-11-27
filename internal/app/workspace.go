@@ -51,8 +51,9 @@ type Workspace struct {
 
 	mu        sync.Mutex
 	tab       store.Tab
-	fileText  string // text as last read from/written to tab.File
-	fileID    string // tab.File's stable ID (run history)
+	fileText  string     // text as last read from/written to tab.File
+	fileID    string     // tab.File's stable ID (run history)
+	jobDoc    *bq.JobRef // read-only job document shown (M16)
 	timer     *time.Timer
 	pending   bool
 	saveErr   error
@@ -225,12 +226,16 @@ func (w *Workspace) Edited(text string, line, col int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	if w.jobDoc != nil {
+		return // job documents are read-only
+	}
+
 	w.tab.SQL, w.tab.CursorLine, w.tab.CursorCol = text, line, col
 	w.scheduleLocked()
 }
 
 func (w *Workspace) scheduleLocked() {
-	if w.opts.DB == nil && w.opts.Library == nil {
+	if w.opts.DB == nil && w.opts.Library == nil || w.jobDoc != nil {
 		return
 	}
 
@@ -298,6 +303,10 @@ func (w *Workspace) Dirty() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	if w.jobDoc != nil {
+		return false
+	}
+
 	switch {
 	case w.tab.File == "" && w.tab.Remote != "":
 		return !sameSQL(w.tab.SQL, w.tab.RemoteText)
@@ -321,6 +330,10 @@ func (w *Workspace) Title() string {
 		title = q.Workbook + " / " + q.Name
 	}
 
+	if ref, ok := w.JobDoc(); ok {
+		title = JobHistoryTitle + " / " + ref.JobID
+	}
+
 	if w.Dirty() && (t.File != "" || t.Remote != "") {
 		title += " — Edited"
 	}
@@ -333,6 +346,7 @@ func (w *Workspace) New() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	w.clearJobDocLocked()
 	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = "", "", "Untitled", 0, 0
 	w.tab.Remote, w.tab.RemoteHead, w.tab.RemoteText = "", "", ""
 	w.fileText = ""
@@ -360,6 +374,7 @@ func (w *Workspace) Open(path string) (string, error) {
 		title = lq.Name
 	}
 
+	w.clearJobDocLocked()
 	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = body, path, title, 0, 0
 	w.fileText, w.fileID = body, id
 	w.linkFromFile(q, body)

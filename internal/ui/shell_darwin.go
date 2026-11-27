@@ -127,6 +127,7 @@ type Shell struct {
 	themeErrs   []error
 	themeColors []objc.ID
 	prefs       *prefsWindow
+	readOnly    bool // editor read-only (job document)
 	revealGen   int
 	studio      studioState
 
@@ -320,6 +321,7 @@ func (s *Shell) SetBillingProject(project string) {
 
 	if s.Workbooks != nil && s.sideTabs.Selected() == SidebarWorkbooks {
 		s.Workbooks.ReloadStudio()
+		s.Workbooks.ReloadJobs()
 	}
 	s.saveSettings()
 }
@@ -503,6 +505,7 @@ func (s *Shell) menus() []appkit.Menu {
 			{Title: "Save", Key: "s", Run: func() { s.SaveQuery() }},
 			{Title: "Save As…", Key: "s", Mods: cmd | shift, Run: func() { s.SaveQueryAs() }},
 			{Title: "Save to BigQuery Studio…", Key: "s", Mods: cmd | opt, Run: s.PublishStudio},
+			{Title: "Save Job SQL to Workbook", Run: func() { s.SaveJobDocToWorkbook() }},
 			{Title: "Reload from BigQuery Studio", Run: s.ReloadStudio},
 			{Title: "New Workbook", Key: "n", Mods: cmd | shift, Run: func() { s.NewWorkbook() }},
 			{Title: "Show Workbooks", Key: "1", Mods: cmd | opt, Run: func() { s.SelectSidebar(SidebarWorkbooks) }},

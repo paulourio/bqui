@@ -46,6 +46,8 @@ type WorkbooksPane struct {
 	kids    map[uint64][]uint64
 	loadErr error
 
+	jobs jobTree
+
 	studio        []dataform.SavedQuery
 	studioShown   []dataform.SavedQuery
 	studioErr     error
@@ -61,6 +63,7 @@ func newWorkbooksPane(s *Shell) *WorkbooksPane {
 		OnDoubleClick: func(id uint64) { objc.Main(func() { p.open(id) }) },
 		Menu:          p.menu,
 	})
+	p.initJobs()
 
 	search := appkit.NewSearchField("Filter", func(q string) {
 		p.filter = strings.ToLower(strings.TrimSpace(q))
@@ -119,6 +122,7 @@ func (p *WorkbooksPane) id(path string) uint64 {
 func (p *WorkbooksPane) Reload() {
 	p.rebuild()
 	p.ReloadStudio()
+	p.ReloadJobs()
 }
 
 // rebuild rereads the library from disk (it is small: folder listings).
@@ -137,6 +141,7 @@ func (p *WorkbooksPane) rebuild() {
 		}
 	}
 
+	p.filterJobs()
 	p.Outline.Reload(0)
 
 	for _, id := range p.roots {
@@ -144,6 +149,7 @@ func (p *WorkbooksPane) rebuild() {
 	}
 
 	p.Outline.Expand(studioGroupID, false)
+	p.Outline.Expand(jobsGroupID, false)
 	p.selectCurrent()
 }
 
@@ -296,7 +302,7 @@ func (p *WorkbooksPane) StudioLoading() bool { return p.studioLoading }
 func (p *WorkbooksPane) StudioExpanded() bool { return p.Outline.IsExpanded(studioGroupID) }
 
 func (p *WorkbooksPane) remote(id uint64) (dataform.SavedQuery, bool) {
-	if id <= studioBase || id >= studioGroupID || id-studioBase > uint64(len(p.studioShown)) {
+	if id <= studioBase || id >= jobBase || id-studioBase > uint64(len(p.studioShown)) {
 		return dataform.SavedQuery{}, false
 	}
 
@@ -319,12 +325,18 @@ func (p *WorkbooksPane) open(id uint64) {
 	if q, ok := p.remote(id); ok {
 		p.s.OpenStudioQuery(q)
 	}
+
+	p.jobActivate(id)
 }
 
 func (p *WorkbooksPane) menu(id uint64) []appkit.MenuItem {
 	lib := p.s.Workspace.Library()
 	newWorkbook := appkit.MenuItem{Title: "New Workbook", Run: p.s.NewWorkbook}
 	refresh := appkit.MenuItem{Title: "Refresh", Run: p.Reload}
+
+	if items, ok := p.jobMenu(id); ok {
+		return items
+	}
 
 	if items, ok := p.remoteMenu(id, refresh); ok {
 		return items
@@ -372,7 +384,13 @@ func (s workbooksSource) Children(parent uint64) []uint64 {
 			out = append(out, studioGroupID)
 		}
 
+		if p.jobs.model != nil {
+			out = append(out, jobsGroupID)
+		}
+
 		return out
+	case jobsGroupID:
+		return p.jobChildren()
 	case studioGroupID:
 		if len(p.studioShown) == 0 {
 			return []uint64{studioEmptyID}
@@ -390,7 +408,7 @@ func (s workbooksSource) Children(parent uint64) []uint64 {
 }
 
 func (s workbooksSource) Expandable(id uint64) bool {
-	if id == studioGroupID {
+	if id == studioGroupID || id == jobsGroupID {
 		return true
 	}
 
@@ -401,6 +419,10 @@ func (s workbooksSource) Expandable(id uint64) bool {
 
 func (s workbooksSource) Cell(id uint64) appkit.OutlineCell {
 	p := s.p
+
+	if cell, ok := p.jobCell(id); ok {
+		return cell
+	}
 
 	switch id {
 	case studioGroupID:
