@@ -44,6 +44,11 @@ type InspectorPane struct {
 	fmt  app.Formatter
 
 	title, subtitle, status objc.ID
+	copyButton, actions     objc.ID
+	queryButton, insertBtn  objc.ID
+	segBelowSubtitle        objc.ID // tab bar under the subtitle (no actions)
+	segBelowActions         objc.ID // tab bar under the action row
+	copyText                string  // what the copy button copies ("" hides it)
 	seg                     *appkit.TabBar
 	schema, details, values *appkit.Outline
 	valueSrc                *valueSource
@@ -120,10 +125,20 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 		p.showSegment(i)
 	})
 
+	// The copy button follows the title text: the title hugs its text and
+	// wraps only when the pane is too narrow for both.
+	p.copyButton = symbolButton("doc.on.doc", "Copy ID", func() { appkit.CopyToPasteboard(p.copyText) })
+	appkit.SetHuggingPriority(p.title, 0, hugHigh)
+	appkit.SetCompressionResistance(p.copyButton, 0, hugRequired)
+	p.queryButton = appkit.ActionButton("Query", "text.badge.plus", p.QueryCurrent)
+	p.insertBtn = appkit.ActionButton("Insert Reference", "text.insert", p.InsertCurrent)
+	p.actions = objc.Msg(objc.Cls("NSStackView"), "stackViewWithViews:", objc.Array(p.queryButton, p.insertBtn))
+	objc.Msg(p.actions, "setSpacing:", actionSpacing)
+
 	p.View = appkit.NewView()
 	content := appkit.NewView()
 
-	for _, v := range []objc.ID{p.title, p.subtitle, p.seg.View, content} {
+	for _, v := range []objc.ID{p.title, p.copyButton, p.subtitle, p.actions, p.seg.View, content} {
 		appkit.UseAutoLayout(v)
 		objc.Msg(p.View, "addSubview:", v)
 	}
@@ -151,17 +166,27 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 	appkit.Activate(
 		appkit.Equal(appkit.Anchor(p.title, "topAnchor"), safeTop, inspectorInset),
 		appkit.Equal(appkit.Anchor(p.title, "leadingAnchor"), lead, inspectorInset),
-		appkit.Equal(appkit.Anchor(p.title, "trailingAnchor"), trail, -inspectorInset),
+		appkit.Equal(appkit.Anchor(p.copyButton, "leadingAnchor"), appkit.Anchor(p.title, "trailingAnchor"), copyGap),
+		appkit.LessOrEqual(appkit.Anchor(p.copyButton, "trailingAnchor"), trail, -inspectorInset),
+		appkit.Equal(appkit.Anchor(p.copyButton, "firstBaselineAnchor"), appkit.Anchor(p.title, "firstBaselineAnchor"), 0),
 		appkit.Equal(appkit.Anchor(p.subtitle, "topAnchor"), appkit.Anchor(p.title, "bottomAnchor"), 2),
 		appkit.Equal(appkit.Anchor(p.subtitle, "leadingAnchor"), lead, inspectorInset),
 		appkit.Equal(appkit.Anchor(p.subtitle, "trailingAnchor"), trail, -inspectorInset),
-		appkit.Equal(appkit.Anchor(p.seg.View, "topAnchor"), appkit.Anchor(p.subtitle, "bottomAnchor"), 10),
+		appkit.Equal(appkit.Anchor(p.actions, "topAnchor"), appkit.Anchor(p.subtitle, "bottomAnchor"), actionsGap),
+		appkit.Equal(appkit.Anchor(p.actions, "leadingAnchor"), lead, inspectorInset),
+		appkit.LessOrEqual(appkit.Anchor(p.actions, "trailingAnchor"), trail, -inspectorInset),
 		appkit.Equal(appkit.Anchor(p.seg.View, "leadingAnchor"), lead, inspectorInset),
 		appkit.Equal(appkit.Anchor(content, "topAnchor"), appkit.Anchor(p.seg.View, "bottomAnchor"), 8),
 		appkit.Equal(appkit.Anchor(content, "leadingAnchor"), lead, 0),
 		appkit.Equal(appkit.Anchor(content, "trailingAnchor"), trail, 0),
 		appkit.Equal(appkit.Anchor(content, "bottomAnchor"), appkit.Anchor(p.View, "bottomAnchor"), 0),
 	)
+
+	// The tab bar sits under the action row when it is shown, else under
+	// the subtitle; setActions switches between the two.
+	p.segBelowSubtitle = appkit.Equal(appkit.Anchor(p.seg.View, "topAnchor"), appkit.Anchor(p.subtitle, "bottomAnchor"), segGap)
+	p.segBelowActions = appkit.Equal(appkit.Anchor(p.seg.View, "topAnchor"), appkit.Anchor(p.actions, "bottomAnchor"), actionsGap)
+	p.setActions(app.ObjectInfo{}, "")
 
 	p.setState(stateEmpty)
 
@@ -197,6 +222,7 @@ func (p *InspectorPane) ShowSections(title, subtitle string, sections []app.Sect
 
 	p.setTitle(title)
 	p.setSubtitle(subtitle)
+	p.setActions(app.ObjectInfo{}, "")
 	p.schemaSrc.set(nil)
 	p.detailsSrc.set(sections)
 	p.schema.Reload(0)
@@ -219,6 +245,7 @@ func (p *InspectorPane) ShowRow(fields []results.Field, row []any, index int64, 
 
 	p.setTitle(p.current.Name)
 	p.setSubtitle("result row · " + strconv.Itoa(len(fields)) + " fields")
+	p.setActions(app.ObjectInfo{}, "")
 
 	p.valueSrc.set(results.Tree(fields, row))
 	p.values.Reload(0)
@@ -507,6 +534,7 @@ func (p *InspectorPane) ShowTable(info app.ObjectInfo, tbl *bigquery.Table) {
 	p.current = info
 	p.setTitle(displayName(info))
 	p.setSubtitle(info.Kind.String() + " · " + info.FullID())
+	p.setActions(info, info.FullID())
 	p.apply(p.gen, info, tbl, nil)
 }
 
@@ -523,6 +551,7 @@ func (p *InspectorPane) ShowJob(ref bq.JobRef) {
 
 	p.setTitle(ref.JobID)
 	p.setSubtitle("job · " + ref.Project + " · " + ref.Location)
+	p.setActions(app.ObjectInfo{}, ref.JobID)
 	appkit.SetString(p.status, "Loading…")
 	p.setState(stateLoading)
 
@@ -551,6 +580,7 @@ func (p *InspectorPane) Show(info app.ObjectInfo) {
 
 	p.setTitle(displayName(info))
 	p.setSubtitle(info.Kind.String() + " · " + info.FullID())
+	p.setActions(info, info.FullID())
 
 	if info.Kind == app.KindProject || info.Kind == app.KindPlaceholder {
 		p.apply(gen, info, nil, nil)
@@ -579,6 +609,69 @@ func (p *InspectorPane) Show(info app.ObjectInfo) {
 		objc.Main(func() { p.apply(gen, info, v, err) })
 	}()
 }
+
+const (
+	copyGap       = 6.0
+	segGap        = 10.0
+	actionsGap    = 8.0
+	actionSpacing = 16.0
+	hugHigh       = 750 // NSLayoutPriorityDefaultHigh
+	hugRequired   = 1000
+)
+
+// setActions shows the copy button (copying copyText) and the editor
+// actions that fit the object: Query for tables and table-like objects,
+// Insert Reference for those and routines.
+func (p *InspectorPane) setActions(info app.ObjectInfo, copyText string) {
+	p.copyText = copyText
+	appkit.SetHidden(p.copyButton, copyText == "")
+
+	query, insert := false, false
+
+	switch info.Kind {
+	case app.KindTable, app.KindView, app.KindMaterializedView, app.KindExternalTable,
+		app.KindSnapshot, app.KindShardGroup:
+		query, insert = true, true
+	case app.KindRoutine:
+		insert = true
+	case app.KindRoot, app.KindProject, app.KindDataset, app.KindSection, app.KindModel, app.KindPlaceholder:
+	}
+
+	shown := (query || insert) && p.s != nil
+	appkit.SetHidden(p.queryButton, !query)
+	appkit.SetHidden(p.insertBtn, !insert)
+	appkit.SetHidden(p.actions, !shown)
+	objc.Msg(p.segBelowActions, "setActive:", shown)
+	objc.Msg(p.segBelowSubtitle, "setActive:", !shown)
+}
+
+// QueryCurrent appends a SELECT of the shown object to the editor and
+// focuses it.
+func (p *InspectorPane) QueryCurrent() {
+	if p.s == nil {
+		return
+	}
+
+	p.s.Editor.AppendText(selectStar(p.current))
+	p.s.Editor.Focus()
+}
+
+// InsertCurrent inserts the shown object's SQL reference at the editor's
+// cursor and focuses it.
+func (p *InspectorPane) InsertCurrent() {
+	if p.s == nil {
+		return
+	}
+
+	p.s.Editor.InsertText(p.current.SQLName())
+	p.s.Editor.Focus()
+}
+
+// ActionViews returns the copy button and the action row (smoke checks).
+func (p *InspectorPane) ActionViews() (copyButton, actions objc.ID) { return p.copyButton, p.actions }
+
+// CopyText returns what the copy button copies (smoke checks).
+func (p *InspectorPane) CopyText() string { return p.copyText }
 
 func displayName(info app.ObjectInfo) string {
 	switch info.Kind {

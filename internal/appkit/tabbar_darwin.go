@@ -87,3 +87,29 @@ func (t *TabBar) Enabled(i int) bool { return t.enabled[i] }
 
 // Button returns one tab's button (diagnostics).
 func (t *TabBar) Button(i int) objc.ID { return t.buttons[i] }
+
+// ActionButton creates a borderless button with an SF Symbol and an
+// accent-colored title, for actions in inspector panes (where bezeled
+// buttons do not draw; see TabBar).
+func ActionButton(title, symbol string, fn func()) objc.ID {
+	b := Button(title, fn)
+	objc.Msg(b, "setBordered:", false)
+
+	if img := SymbolImage(symbol, title); img != objc.Nil {
+		objc.Msg(b, "setImage:", img)
+		objc.Msg(b, "setImagePosition:", int64(imageLeading))
+		objc.Msg(b, "setContentTintColor:", SystemColor("controlAccentColor"))
+	}
+
+	fontKey, colorKey := attributeKeys()
+	font := objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", tabFontSize)
+	attrs := objc.Msg(objc.Cls("NSDictionary"), "dictionaryWithObjects:forKeys:",
+		objc.Array(font, SystemColor("controlAccentColor")), objc.Array(fontKey, colorKey))
+	objc.Msg(b, "setAttributedTitle:", objc.Msg(objc.Msg(objc.Msg(objc.Cls("NSAttributedString"), "alloc"),
+		"initWithString:attributes:", objc.String(title), attrs), "autorelease"))
+
+	return b
+}
+
+// imageLeading is NSImageLeading: the image before the title.
+const imageLeading = 7

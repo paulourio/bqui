@@ -8,18 +8,23 @@ import (
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
+	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/ui"
 )
 
-// pagingResult captures on-demand fetching, auto-fit, Add Project and
-// double-click in the explorer.
+// pagingResult captures on-demand fetching, auto-fit, Add Project and the
+// inspector's editor actions.
 type pagingResult struct {
 	FirstRows, AfterScroll int64
 	FirstMore              bool
 	Status                 string
 	ColWidth, HeaderWidth  float64
 	Added                  bool
-	ClickEdited            bool // double-clicking a table changed the buffer
+	ClickEdited            bool   // double-clicking a table changed the buffer
+	ActionsShown           bool   // the inspector shows the copy button and actions
+	CopyText, WantCopy     string // what the copy button copies, and the table ID
+	Inserted, Queried      bool   // Insert Reference / Query edited the buffer
+	Focused                bool   // the editor has focus after Insert Reference
 	ActErr                 string
 	Err                    string
 }
@@ -55,7 +60,8 @@ func pagingFlow(s *ui.Shell) pagingResult {
 		s.UnpinProject("smoke-extra-project")
 	})
 
-	// Double-clicking a table shows it but leaves the buffer alone.
+	// Double-clicking a table shows it but leaves the buffer alone; the
+	// inspector's actions edit it and focus the editor.
 	m := s.Explorer.Model
 
 	for _, ds := range []string{"", "samples"} {
@@ -100,12 +106,25 @@ func pagingFlow(s *ui.Shell) pagingResult {
 	time.Sleep(settleDelay)
 	onMain(func() {
 		r.ClickEdited = s.Workspace.Tab().SQL != before
+		copyButton, actions := s.Inspector.ActionViews()
+		r.ActionsShown = !objc.Send[bool](copyButton, "isHidden") && !objc.Send[bool](actions, "isHidden")
+		r.CopyText, r.WantCopy = s.Inspector.CopyText(), info.FullID()
+		s.Inspector.InsertCurrent()
 	})
+
+	r.Inserted = waitMain(loadTimeout, func() bool { return strings.Contains(s.Workspace.Tab().SQL, info.SQLName()) })
+	onMain(func() {
+		r.Focused = s.EditorFocused()
+		s.Inspector.QueryCurrent()
+	})
+
+	r.Queried = waitMain(loadTimeout, func() bool { return strings.Contains(s.Workspace.Tab().SQL, "FROM "+info.SQLName()) })
 
 	return r
 }
 
-// objc0 moves focus to the explorer first, so the check proves the move.
+// objc0 moves focus to the explorer first, so the editor focus check
+// proves that Insert Reference moves it.
 func objc0(s *ui.Shell) { s.Explorer.Outline.Focus() }
 
 func pagingChecks(rep *Report, r pagingResult) {
@@ -115,4 +134,7 @@ func pagingChecks(rep *Report, r pagingResult) {
 	rep.check("results-autofit", r.ColWidth >= r.HeaderWidth, "order_id column %.0fpt (header text %.0fpt)", r.ColWidth, r.HeaderWidth)
 	rep.check("explorer-add-project", r.Added, "added %v", r.Added)
 	rep.check("explorer-doubleclick-no-insert", r.ActErr == "" && !r.ClickEdited, "buffer changed %v %s", r.ClickEdited, r.ActErr)
+	rep.check("inspector-actions", r.ActionsShown && r.CopyText == r.WantCopy && r.Inserted && r.Queried && r.Focused,
+		"shown %v, copies %q (want %q), inserted %v, queried %v, editor focused %v",
+		r.ActionsShown, r.CopyText, r.WantCopy, r.Inserted, r.Queried, r.Focused)
 }
