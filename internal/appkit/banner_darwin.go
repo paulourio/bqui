@@ -18,6 +18,11 @@ const (
 	bannerGap     = 4.0
 	bannerIcon    = 18.0
 	bannerFill    = 0.08
+	noteFill      = 0.05
+	// bannerTitleSize is the title's point size; fontWeightMedium is
+	// NSFontWeightMedium.
+	bannerTitleSize  = 13.0
+	fontWeightMedium = 0.23
 	boxTypeCustom = int64(4)
 	bannerNoTitle = int64(0)
 	vertical      = int64(1)
@@ -105,10 +110,31 @@ func (b *Banner) ShowStyled(title, detail, hint string, warning bool) {
 	}
 
 	objc.Msg(b.View, "setBorderColor:", color)
+	objc.Msg(b.View, "setBorderWidth:", 1.0)
 	objc.Msg(b.View, "setFillColor:", objc.Msg(color, "colorWithAlphaComponent:", bannerFill))
 	objc.Msg(b.title, "setTextColor:", color)
+	objc.Msg(b.title, "setFont:", objc.Msg(objc.Cls("NSFont"), "boldSystemFontOfSize:", bannerTitleSize))
+	objc.Msg(b.icon, "setImage:", SymbolImage("exclamationmark.triangle.fill", "Error"))
 	objc.Msg(b.icon, "setContentTintColor:", color)
 
+	b.fill(title, detail, hint)
+}
+
+// ShowNote reveals the banner as a quiet note: no border, a faint neutral
+// fill, a gray icon and plain text. For expected, transient states (SQL
+// being typed) where red would read as a serious failure.
+func (b *Banner) ShowNote(title, detail, hint string) {
+	objc.Msg(b.View, "setBorderWidth:", 0.0)
+	objc.Msg(b.View, "setFillColor:", objc.Msg(SystemColor("labelColor"), "colorWithAlphaComponent:", noteFill))
+	objc.Msg(b.title, "setTextColor:", SystemColor("labelColor"))
+	objc.Msg(b.title, "setFont:", objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:weight:", bannerTitleSize, fontWeightMedium))
+	objc.Msg(b.icon, "setImage:", SymbolImage("exclamationmark.circle", "Note"))
+	objc.Msg(b.icon, "setContentTintColor:", SystemColor("secondaryLabelColor"))
+
+	b.fill(title, detail, hint)
+}
+
+func (b *Banner) fill(title, detail, hint string) {
 	SetString(b.title, title)
 	SetString(b.detail, detail)
 	SetString(b.hint, hint)

@@ -22,7 +22,7 @@ func TestDocCostKeepsEstimateWithErrors(t *testing.T) {
 		t.Errorf("estimate = %q", got)
 	}
 
-	if !c.Errored() || c.ErrorBadge() != "1 error" || c.ErrorTitle() != "Invalid SQL" {
+	if !c.Errored() || c.ErrorBadge() != "1 error" || c.ErrorTitle() != "1 error in this query" {
 		t.Errorf("errors: %v %q %q", c.Errored(), c.ErrorBadge(), c.ErrorTitle())
 	}
 
@@ -51,7 +51,7 @@ func TestDocCostSummaries(t *testing.T) {
 		bad.Errors = append(bad.Errors, CostError{Line: i + 1, Message: "Syntax error"})
 	}
 
-	if bad.Estimate() != "" || bad.ErrorBadge() != "7 errors" || bad.ErrorTitle() != "Invalid SQL: 7 errors" {
+	if bad.Estimate() != "" || bad.ErrorBadge() != "7 errors" || bad.ErrorTitle() != "7 errors in this query" {
 		t.Errorf("bad = %q %q %q", bad.Estimate(), bad.ErrorBadge(), bad.ErrorTitle())
 	}
 

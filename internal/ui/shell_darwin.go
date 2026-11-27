@@ -926,7 +926,7 @@ const sqlErrorInset = 8.0
 
 // onCost shows bqls' estimate in the toolbar and its SQL errors in the
 // error bar. The estimate matches the editor's code lenses even when some
-// statement has an error; the error count is shown next to it in red.
+// statement has an error; the error count follows it after a red dot.
 func (s *Shell) onCost(c app.DocCost) {
 	var runs []appkit.TextRun
 
@@ -939,7 +939,8 @@ func (s *Shell) onCost(c app.DocCost) {
 			runs = append(runs, appkit.TextRun{Text: " · ", Color: "secondaryLabelColor"})
 		}
 
-		runs = append(runs, appkit.TextRun{Text: badge, Color: "systemRedColor"})
+		// A red dot (like the gutter's) marks it; the text stays quiet.
+		runs = append(runs, appkit.TextRun{Text: "● ", Color: "systemRedColor"}, appkit.TextRun{Text: badge, Color: "secondaryLabelColor"})
 	}
 
 	if len(runs) == 0 {
@@ -955,7 +956,7 @@ func (s *Shell) onCost(c app.DocCost) {
 
 	if c.Errored() {
 		tip = c.ErrorTitle() + "\n" + detail
-		s.SQLErrors.Show(c.ErrorTitle(), detail, more)
+		s.SQLErrors.ShowNote(c.ErrorTitle(), detail, more)
 	} else {
 		s.SQLErrors.Hide()
 	}

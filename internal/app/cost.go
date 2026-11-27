@@ -93,13 +93,10 @@ func (c DocCost) ErrorBadge() string {
 	}
 }
 
-// ErrorTitle heads the error bar under the editor.
+// ErrorTitle heads the error bar under the editor ("1 error in this
+// query"): matter-of-fact, since unfinished SQL is the normal case.
 func (c DocCost) ErrorTitle() string {
-	if n := c.errorCount(); n > 1 {
-		return "Invalid SQL: " + strconv.Itoa(n) + " errors"
-	}
-
-	return "Invalid SQL"
+	return c.ErrorBadge() + " in this query"
 }
 
 // ErrorDetail lists the errors, one per line with their position, and how

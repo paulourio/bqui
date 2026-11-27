@@ -77,7 +77,7 @@ func sqlErrorsFlow(s *ui.Shell, dir string) sqlErrorsResult {
 func sqlErrorsChecks(rep *Report, r sqlErrorsResult) {
 	rep.check("window-title-workbook", r.WantTitle != "" && r.Title == r.WantTitle && strings.HasPrefix(r.Subtitle, r.WantSubtitle),
 		"title %q subtitle %q (want %q / %q)", r.Title, r.Subtitle, r.WantTitle, r.WantSubtitle)
-	rep.check("sql-errors-shown", r.Err == "" && r.BarShown && strings.HasPrefix(r.BarTitle, "Invalid SQL") &&
+	rep.check("sql-errors-shown", r.Err == "" && r.BarShown && r.BarTitle == "1 error in this query" &&
 		strings.Contains(r.Detail, "Line 2") && r.GutterErrors == 1 && strings.Contains(r.Cost, "1 error") && !strings.HasPrefix(r.Shot, "✕"),
 		"bar %v %q %q, gutter error lines %d, toolbar %q, %s %s", r.BarShown, r.BarTitle, r.Detail, r.GutterErrors, r.Cost, r.Shot, r.Err)
 	rep.check("sql-errors-cleared", r.ClearedBar && r.ClearedGutter && !strings.Contains(r.ClearedCost, "error"),
