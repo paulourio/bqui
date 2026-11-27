@@ -349,6 +349,12 @@ func (s jsonSource) CellText(i int, column string) appkit.CellText {
 		return appkit.CellText{Text: strconv.Itoa(i + 1), Secondary: true, Right: true}
 	}
 
+	// Near the end of the loaded rows, fetch the next window (panes built
+	// without a shell, as in tests, have nothing to ask).
+	if sh := s.p.s; sh != nil && sh.Results != nil && int64(i) >= s.p.rows-jsonFetchAhead {
+		sh.Results.requestMore()
+	}
+
 	text := s.p.renderedLine(int64(i))
 	s.p.maybeWiden(text)
 
@@ -362,3 +368,5 @@ func (s jsonSource) CellText(i int, column string) appkit.CellText {
 
 	return c
 }
+
+const jsonFetchAhead = 100

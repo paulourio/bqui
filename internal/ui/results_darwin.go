@@ -58,6 +58,7 @@ type ResultsPane struct {
 	fontSize float64
 
 	ticking bool
+	asking  bool // a FetchMore is queued
 }
 
 func newResultsPane() *ResultsPane {
@@ -285,12 +286,7 @@ func (p *ResultsPane) doneText() string {
 	}
 
 	if p.grid != nil {
-		rows, _, _ := p.grid.Size()
-		parts = append(parts, "✓ "+app.Count(uint64(rows))+" rows") //nolint:gosec // non-negative
-
-		if s.Truncated {
-			parts = append(parts, "results truncated")
-		}
+		parts = append(parts, p.rowsText()...)
 	} else if res := s.Result; res != nil {
 		switch {
 		case res.DMLAffected > 0:
@@ -443,6 +439,10 @@ func (s *gridSource) CellText(row int, column string) appkit.CellText {
 	i, ok := columnIndex(column)
 	if !ok || i >= len(s.p.cols) {
 		return appkit.CellText{}
+	}
+
+	if i == 0 {
+		s.p.nearEnd(row)
 	}
 
 	cell, _, err := g.Cell(int64(row), i)
@@ -618,4 +618,69 @@ func (p *ResultsPane) menu(row int, column string) []appkit.MenuItem {
 	}
 
 	return items
+}
+
+// fetchAhead is how close (in lines) to the end of the loaded rows the grid
+// asks for the next window.
+const fetchAhead = 300
+
+// nearEnd asks the run for more rows when the table draws a line close to
+// the end of what is loaded (outside the drawing callback).
+func (p *ResultsPane) nearEnd(line int) {
+	if int64(line) >= p.lines-fetchAhead {
+		p.requestMore()
+	}
+}
+
+// requestMore asks the run for the next window (once at a time).
+func (p *ResultsPane) requestMore() {
+	if p.asking || p.run == nil || !p.snap.More || p.snap.LoadingMore {
+		return
+	}
+
+	p.asking = true
+	run := p.run
+
+	objc.Main(func() {
+		p.asking = false
+		run.FetchMore(app.DefaultFetchWindow)
+	})
+}
+
+// rowsText describes the loaded rows (and whether more can be fetched).
+func (p *ResultsPane) rowsText() []string {
+	s := p.snap
+
+	var parts []string
+
+	rows, _, _ := p.grid.Size()
+
+	switch {
+	case s.More || s.LoadingMore:
+		text := "✓ " + app.CountInt(rows)
+		if s.TotalRows > rows {
+			text += " of " + app.CountInt(s.TotalRows)
+		}
+
+		text += " rows loaded"
+		if s.LoadingMore {
+			text += " · loading more…"
+		} else {
+			text += " · scroll for more"
+		}
+
+		parts = append(parts, text)
+	default:
+		parts = append(parts, "✓ "+app.Count(uint64(rows))+" rows") //nolint:gosec // non-negative
+	}
+
+	if s.Truncated {
+		parts = append(parts, "results truncated")
+	}
+
+	if s.FetchErr != nil {
+		parts = append(parts, "✕ loading more failed: "+app.Explain(s.FetchErr).Title)
+	}
+
+	return parts
 }

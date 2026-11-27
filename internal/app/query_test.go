@@ -106,15 +106,63 @@ func TestRunnerInlineNestedResult(t *testing.T) {
 
 func TestRunnerPagesOverRESTWithoutStorage(t *testing.T) {
 	rn, _ := newTestRunner(t)
-	s := wait(t, rn.Start(bq.QueryRequest{SQL: "SELECT * FROM orders LIMIT 25000"}))
+	r := rn.Start(bq.QueryRequest{SQL: "SELECT * FROM orders LIMIT 25000"})
+	s := wait(t, r)
 
-	if s.State != RunDone || s.Source != "rest" {
+	if s.State != RunDone || s.Source != "rest" || s.TotalRows != 25000 {
 		t.Fatalf("snapshot = %+v", s)
 	}
 
-	rows, _, _ := s.Grid.Size()
-	if rows != 25000 {
+	// Only the first window loads; the rest comes on demand.
+	if rows := fetchAll(t, r); rows != 25000 {
 		t.Fatalf("rows = %d", rows)
+	}
+}
+
+// fetchAll checks the first window stopped short, then asks for more until
+// the run has no more rows; it returns the final row count.
+func fetchAll(t *testing.T, r *Run) int64 {
+	t.Helper()
+
+	waitFor(t, func() bool { s := r.Snapshot(); return s.More && !s.LoadingMore })
+
+	first, _, _ := r.Snapshot().Grid.Size()
+	if first < DefaultFetchWindow || first >= r.Snapshot().TotalRows {
+		t.Fatalf("first window = %d rows of %d", first, r.Snapshot().TotalRows)
+	}
+
+	for r.Snapshot().More {
+		r.FetchMore(DefaultFetchWindow)
+		waitFor(t, func() bool { s := r.Snapshot(); return !s.LoadingMore || !s.More })
+		waitFor(t, func() bool {
+			s := r.Snapshot()
+			n, _, _ := s.Grid.Size()
+
+			return !s.More || n > first && !s.LoadingMore
+		})
+
+		first, _, _ = r.Snapshot().Grid.Size()
+	}
+
+	if err := r.Snapshot().FetchErr; err != nil {
+		t.Fatal(err)
+	}
+
+	rows, _, _ := r.Snapshot().Grid.Size()
+
+	return rows
+}
+
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out; snapshot %+v", "")
+		}
+
+		time.Sleep(2 * time.Millisecond)
 	}
 }
 
@@ -212,6 +260,12 @@ func TestRunnerStreamsLargeResultsThroughSpill(t *testing.T) {
 	if s.State != RunDone || s.Source != "storage" {
 		t.Fatalf("snapshot = %+v", s)
 	}
+
+	if rows := fetchAll(t, r); rows != 50_000 {
+		t.Fatalf("rows after paging = %d", rows)
+	}
+
+	s = r.Snapshot()
 
 	rows, lines, _ := s.Grid.Size()
 	if rows != 50_000 || lines < rows {
@@ -493,4 +547,35 @@ func TestRunnerArrowStorageNestedPipeline(t *testing.T) {
 	if !reflect.DeepEqual(results.Leaves(s.Grid.Fields())[0].Name, "id") {
 		t.Fatal("unexpected first leaf")
 	}
+}
+
+func TestRunnerCloseWhilePaused(t *testing.T) {
+	opener := func(context.Context, bq.TableRef) (StorageSession, error) {
+		return fakeStorage{rows: 50_000, perBlob: 4096}, nil
+	}
+
+	rn := NewRunner(RunnerOptions{
+		Backend: &destBackend{}, Metadata: &FakeBackend{}, Storage: opener,
+		Post: func(fn func()) { fn() }, SpillDir: t.TempDir(),
+	})
+
+	r := rn.Start(bq.QueryRequest{SQL: "SELECT * FROM orders LIMIT 50000"})
+	wait(t, r)
+	waitFor(t, func() bool { return r.Snapshot().More })
+
+	closed := make(chan struct{})
+
+	go func() {
+		r.Close()
+		close(closed)
+	}()
+
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close hung on a paused fetcher")
+	}
+
+	// Asking for more after Close is harmless.
+	r.FetchMore(DefaultFetchWindow)
 }

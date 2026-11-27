@@ -114,6 +114,13 @@ type RunSnapshot struct {
 	SlotMs      int64
 	Source      string // "inline", "rest", "storage"
 	Truncated   bool   // stopped at a row or size limit
+	// TotalRows is the result size when known (0 = unknown).
+	TotalRows int64
+	// More means rows remain to be fetched on demand (FetchMore);
+	// LoadingMore that a window is being fetched now.
+	More, LoadingMore bool
+	// FetchErr is an error while fetching more rows after the first window.
+	FetchErr error
 }
 
 // Run is one query execution or table preview.
@@ -125,6 +132,7 @@ type Run struct {
 	snap  RunSnapshot
 	spill *results.SpillStore
 	done  chan struct{}
+	pager *pager
 }
 
 // Snapshot returns the run's current state.
@@ -168,6 +176,7 @@ func (r *Run) Cancel() {
 func (r *Run) Close() {
 	r.Cancel()
 	<-r.done
+	r.pager.wg.Wait() // the fetcher may still be appending to the spill file
 
 	r.mu.Lock()
 	sp := r.spill
@@ -197,6 +206,9 @@ type RunnerOptions struct {
 	Post     func(fn func())
 	OnUpdate func(*Run)
 	SpillDir string
+	// FetchWindow is how many rows load before pausing for demand
+	// (0 = DefaultFetchWindow).
+	FetchWindow int64
 	// MaxRESTRows caps rows paged over REST when storage is unavailable.
 	MaxRESTRows int64
 	// MaxSpillBytes caps the spill file per run.
@@ -244,6 +256,10 @@ func NewRunner(opts RunnerOptions) *Runner {
 		opts.MaxSpillBytes = defaultMaxSpillBytes
 	}
 
+	if opts.FetchWindow <= 0 {
+		opts.FetchWindow = DefaultFetchWindow
+	}
+
 	log := opts.Logger
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
@@ -262,7 +278,7 @@ func (rn *Runner) newRun(kind, title string) (*Run, context.Context) {
 	rn.mu.Unlock()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	r := &Run{runner: rn, cancel: cancel, done: make(chan struct{})}
+	r := &Run{runner: rn, cancel: cancel, done: make(chan struct{}), pager: newPager(rn.opts.FetchWindow)}
 	r.snap = RunSnapshot{ID: id, Kind: kind, Title: title, State: RunRunning, Started: time.Now()}
 
 	return r, ctx
@@ -382,6 +398,8 @@ func (rn *Runner) execute(ctx context.Context, r *Run, req bq.QueryRequest) erro
 		return err
 	}
 
+	r.update(func(s *RunSnapshot) { s.TotalRows = int64(res.TotalRows) }) //nolint:gosec // row counts fit int64
+
 	switch {
 	case uint64(len(rows)) >= res.TotalRows:
 		return rn.memoryResult(r, fields, rows, "inline")
@@ -419,41 +437,63 @@ func (rn *Runner) restResult(ctx context.Context, r *Run, fields []results.Field
 		s.Grid, s.Source, s.State = g, "rest", RunFetching
 	})
 
-	loaded := int64(len(first))
+	return r.fetchInBackground(func(ready func()) error {
+		loaded := int64(len(first))
 
-	for token != "" {
-		if loaded >= rn.opts.MaxRESTRows {
-			r.update(func(s *RunSnapshot) { s.Truncated = true })
+		for token != "" {
+			if loaded >= rn.opts.MaxRESTRows {
+				r.update(func(s *RunSnapshot) { s.Truncated = true })
 
-			return nil
+				return nil
+			}
+
+			if loaded >= r.pager.want.Load() {
+				ready()
+
+				if !r.waitDemand(ctx, loaded) {
+					return nil
+				}
+			}
+
+			page, err := rn.opts.Backend.ResultPage(ctx, job, token, restPageRows)
+			if err != nil {
+				return err
+			}
+
+			rows, err := bq.DecodeRows(schema, page.Rows)
+			if err != nil {
+				return err
+			}
+
+			results.AppendRows(g, m, rows)
+			loaded += int64(len(rows))
+			token = page.PageToken
+
+			r.update(func(*RunSnapshot) {})
 		}
 
-		page, err := rn.opts.Backend.ResultPage(ctx, job, token, restPageRows)
-		if err != nil {
-			return err
-		}
-
-		rows, err := bq.DecodeRows(schema, page.Rows)
-		if err != nil {
-			return err
-		}
-
-		results.AppendRows(g, m, rows)
-		loaded += int64(len(rows))
-		token = page.PageToken
-
-		r.update(func(*RunSnapshot) {})
-	}
-
-	return nil
+		return nil
+	})
 }
 
-// storageResult streams a table into a spill-backed grid. limit > 0 stops
-// after that many rows (previews).
-func (rn *Runner) storageResult(ctx context.Context, r *Run, fields []results.Field, ref bq.TableRef, limit int64) error {
+// storageResult streams a table into a spill-backed grid, a window at a
+// time. window > 0 overrides the first window (previews).
+func (rn *Runner) storageResult(ctx context.Context, r *Run, fields []results.Field, ref bq.TableRef, window int64) error {
 	sess, err := rn.opts.Storage(ctx, ref)
 	if err != nil {
 		return err
+	}
+
+	if window > 0 {
+		r.pager.want.Store(window)
+	}
+
+	if n := sess.EstimatedRows(); n > 0 {
+		r.update(func(s *RunSnapshot) {
+			if s.TotalRows == 0 {
+				s.TotalRows = n
+			}
+		})
 	}
 
 	spill, err := results.NewSpillStore(rn.opts.SpillDir, func(raw []byte) ([][]any, error) {
@@ -473,6 +513,14 @@ func (rn *Runner) storageResult(ctx context.Context, r *Run, fields []results.Fi
 	r.spill = spill
 	r.mu.Unlock()
 
+	return r.fetchInBackground(func(ready func()) error {
+		return rn.streamBatches(ctx, r, sess, g, spill, ready)
+	})
+}
+
+// streamBatches appends Storage Read batches to the grid, pausing after
+// each window until more rows are wanted.
+func (rn *Runner) streamBatches(ctx context.Context, r *Run, sess StorageSession, g *results.Grid, spill *results.SpillStore, ready func()) error {
 	sctx, stop := context.WithCancel(ctx)
 	defer stop()
 
@@ -487,15 +535,18 @@ func (rn *Runner) storageResult(ctx context.Context, r *Run, fields []results.Fi
 
 		r.update(func(*RunSnapshot) {})
 
-		rows, _, _ := g.Size()
-
-		switch {
-		case limit > 0 && rows >= limit:
-			return nil
-		case spill.Bytes() >= rn.maxSpill.Load():
+		if spill.Bytes() >= rn.maxSpill.Load() {
 			r.update(func(s *RunSnapshot) { s.Truncated = true })
 
 			return nil
+		}
+
+		if rows, _, _ := g.Size(); rows >= r.pager.want.Load() {
+			ready()
+
+			if !r.waitDemand(ctx, rows) {
+				return nil
+			}
 		}
 	}
 
@@ -615,7 +666,7 @@ func (rn *Runner) preview(ctx context.Context, r *Run, ref bq.TableRef) error {
 
 	r.update(func(s *RunSnapshot) { s.ResultTable = &ref })
 
-	return rn.storageResult(ctx, r, results.FieldsFromREST(t.Schema.Fields), ref, previewRows)
+	return rn.storageResult(ctx, r, results.FieldsFromREST(t.Schema.Fields), ref, PreviewWindow)
 }
 
 func (s *RunSnapshot) progress(j *bigquery.Job) {
