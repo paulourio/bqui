@@ -174,6 +174,7 @@ func (r *Run) update(fn func(s *RunSnapshot)) {
 type RunnerOptions struct {
 	Backend  QueryBackend
 	Metadata Backend       // table schemas for previews
+	Jobs     JobsBackend   // past jobs (OpenJob)
 	Storage  StorageOpener // nil disables the Storage Read API path
 	// Post runs fn on the UI thread; OnUpdate is called there.
 	Post     func(fn func())
@@ -354,7 +355,7 @@ func (rn *Runner) execute(ctx context.Context, r *Run, req bq.QueryRequest) erro
 	case rn.opts.Storage != nil && res.Destination != nil:
 		return rn.storageResult(ctx, r, fields, *res.Destination, 0)
 	case res.Job != nil:
-		return rn.restResult(ctx, r, fields, res, rows)
+		return rn.restResult(ctx, r, fields, res.Schema.Fields, *res.Job, rows, res.PageToken)
 	default:
 		return rn.memoryResult(r, fields, rows, "inline")
 	}
@@ -374,7 +375,9 @@ func (rn *Runner) memoryResult(r *Run, fields []results.Field, rows [][]any, sou
 
 // restResult pages getQueryResults (used when storage is unavailable, e.g.
 // script results without a destination table).
-func (rn *Runner) restResult(ctx context.Context, r *Run, fields []results.Field, res *bq.QueryResult, first [][]any) error {
+func (rn *Runner) restResult(ctx context.Context, r *Run, fields []results.Field, schema []*bigquery.TableFieldSchema,
+	job bq.JobRef, first [][]any, token string,
+) error {
 	m := &results.MemoryStore{}
 	g := results.NewGrid(fields, m)
 	results.AppendRows(g, m, first)
@@ -384,7 +387,6 @@ func (rn *Runner) restResult(ctx context.Context, r *Run, fields []results.Field
 	})
 
 	loaded := int64(len(first))
-	token := res.PageToken
 
 	for token != "" {
 		if loaded >= rn.opts.MaxRESTRows {
@@ -393,12 +395,12 @@ func (rn *Runner) restResult(ctx context.Context, r *Run, fields []results.Field
 			return nil
 		}
 
-		page, err := rn.opts.Backend.ResultPage(ctx, *res.Job, token, restPageRows)
+		page, err := rn.opts.Backend.ResultPage(ctx, job, token, restPageRows)
 		if err != nil {
 			return err
 		}
 
-		rows, err := bq.DecodeRows(res.Schema.Fields, page.Rows)
+		rows, err := bq.DecodeRows(schema, page.Rows)
 		if err != nil {
 			return err
 		}
@@ -465,6 +467,91 @@ func (rn *Runner) storageResult(ctx context.Context, r *Run, fields []results.Fi
 	}
 
 	return nil
+}
+
+// OpenJob shows a finished job's results: its destination table through the
+// Storage Read API, or getQueryResults pages when storage is unavailable.
+func (rn *Runner) OpenJob(ref bq.JobRef) *Run {
+	r, ctx := rn.newRun("job", "Results of "+ref.JobID)
+
+	go func() {
+		defer close(r.done)
+
+		r.finish(ctx, rn.openJob(ctx, r, ref))
+	}()
+
+	rn.notify(r)
+
+	return r
+}
+
+func (rn *Runner) openJob(ctx context.Context, r *Run, ref bq.JobRef) error {
+	if rn.opts.Jobs == nil {
+		return errors.New("app: job history is unavailable")
+	}
+
+	job, err := rn.opts.Jobs.GetJob(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	r.update(func(s *RunSnapshot) {
+		s.Job = &ref
+		s.progress(job)
+		s.Result = jobResult(job)
+	})
+
+	if job.Status != nil && job.Status.ErrorResult != nil {
+		return fmt.Errorf("%w: %s", bq.ErrQueryFailed, job.Status.ErrorResult.Message)
+	}
+
+	dest := Destination(job)
+	if dest == nil {
+		return nil // no result set (DDL, DML, scripts)
+	}
+
+	if rn.opts.Storage != nil && rn.opts.Metadata != nil {
+		t, terr := rn.opts.Metadata.GetTable(ctx, *dest)
+		if terr != nil {
+			return fmt.Errorf("results of %s are no longer available (temporary tables expire after about 24 hours): %w", ref.JobID, terr)
+		}
+
+		if t.Schema != nil {
+			return rn.storageResult(ctx, r, results.FieldsFromREST(t.Schema.Fields), *dest, 0)
+		}
+	}
+
+	page, err := rn.opts.Backend.ResultPage(ctx, ref, "", restPageRows)
+	if err != nil {
+		return err
+	}
+
+	if page.Schema == nil {
+		return nil
+	}
+
+	rows, err := bq.DecodeRows(page.Schema.Fields, page.Rows)
+	if err != nil {
+		return err
+	}
+
+	return rn.restResult(ctx, r, results.FieldsFromREST(page.Schema.Fields), page.Schema.Fields, ref, rows, page.PageToken)
+}
+
+// jobResult summarizes a finished job for the status line.
+func jobResult(j *bigquery.Job) *bq.QueryResult {
+	res := &bq.QueryResult{}
+
+	if st := j.Statistics; st != nil {
+		res.SlotMs = st.TotalSlotMs
+
+		if q := st.Query; q != nil {
+			res.Statement, res.BytesProc, res.BytesBilled = q.StatementType, q.TotalBytesProcessed, q.TotalBytesBilled
+			res.CacheHit, res.DMLAffected = q.CacheHit, q.NumDmlAffectedRows
+		}
+	}
+
+	return res
 }
 
 func (rn *Runner) preview(ctx context.Context, r *Run, ref bq.TableRef) error {

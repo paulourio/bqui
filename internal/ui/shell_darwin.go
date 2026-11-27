@@ -60,6 +60,8 @@ type Options struct {
 	// previews through the Storage Read API.
 	Queries app.QueryBackend
 	Storage app.StorageOpener
+	// Jobs lists and inspects job history.
+	Jobs app.JobsBackend
 	// SpillDir holds result spill files ("" = OS temp dir).
 	SpillDir string
 }
@@ -74,7 +76,11 @@ type Shell struct {
 	Editor    *EditorPane
 	Cost      objc.ID // toolbar cost estimate label
 	Results   *ResultsPane
+	Job       *JobPane
+	History   *HistoryPane
 	Runner    *app.Runner
+	tabs      *appkit.Segmented
+	tabViews  []objc.ID
 
 	opts     Options
 	settings *store.Settings
@@ -114,15 +120,19 @@ func NewShell(opts Options) (*Shell, error) {
 	appkit.SetIdentifier(s.Editor.Web.View, "editor")
 
 	s.Inspector = newInspectorPane(s, opts.Backend)
+	s.Inspector.jobs = opts.Jobs
 	s.Explorer = newExplorerPane(s, opts.Backend)
 
 	s.Results = newResultsPane()
+	s.Job = newJobPane(opts.Jobs)
+	s.History = newHistoryPane(s, opts.Jobs)
 	s.Runner = app.NewRunner(app.RunnerOptions{
 		Backend:  opts.Queries,
 		Metadata: opts.Backend,
+		Jobs:     opts.Jobs,
 		Storage:  opts.Storage,
 		Post:     objc.Main,
-		OnUpdate: s.Results.Update,
+		OnUpdate: s.onRunUpdate,
 		SpillDir: opts.SpillDir,
 	})
 
@@ -136,7 +146,7 @@ func NewShell(opts Options) (*Shell, error) {
 
 	content := appkit.SplitViewController(false, autosave("BQUIEditorResults"), []appkit.SplitItem{
 		{Controller: appkit.ViewController(s.Editor.Web.View), MinThickness: editorMin, HoldingWeight: editorHolding},
-		{Controller: appkit.ViewController(s.Results.View), MinThickness: resultsMin, HoldingWeight: resultsHolding},
+		{Controller: appkit.ViewController(s.bottomPane()), MinThickness: resultsMin, HoldingWeight: resultsHolding},
 	})
 
 	s.Split = appkit.SplitViewController(true, autosave("BQUIMainSplit"), []appkit.SplitItem{
@@ -424,6 +434,99 @@ func (s *Shell) RunSQL(sql string) {
 // Preview shows the first rows of a table (Storage Read API, no query cost).
 func (s *Shell) Preview(info app.ObjectInfo) {
 	s.Results.Show(s.Runner.Preview(info.ObjectRef()))
+}
+
+// Bottom-pane tabs.
+const (
+	tabResults = iota
+	tabJob
+	tabHistory
+)
+
+// bottomPane stacks the Results, Job information and History tabs under a
+// segmented switcher.
+func (s *Shell) bottomPane() objc.ID {
+	s.tabs = appkit.NewSegmented([]string{"Results", "Job information", "History"}, s.SelectTab)
+	s.tabViews = []objc.ID{s.Results.View, s.Job.View, s.History.View}
+
+	v := appkit.NewView()
+	appkit.UseAutoLayout(s.tabs.View)
+	objc.Msg(v, "addSubview:", s.tabs.View)
+
+	content := appkit.NewView()
+	appkit.UseAutoLayout(content)
+	objc.Msg(v, "addSubview:", content)
+
+	for _, tv := range s.tabViews {
+		appkit.AddFilling(content, tv, 0)
+	}
+
+	appkit.Activate(
+		appkit.Equal(appkit.Anchor(s.tabs.View, "topAnchor"), appkit.Anchor(v, "topAnchor"), 6),
+		appkit.Equal(appkit.Anchor(s.tabs.View, "leadingAnchor"), appkit.Anchor(v, "leadingAnchor"), 10),
+		appkit.Equal(appkit.Anchor(content, "topAnchor"), appkit.Anchor(s.tabs.View, "bottomAnchor"), 2),
+		appkit.Equal(appkit.Anchor(content, "leadingAnchor"), appkit.Anchor(v, "leadingAnchor"), 0),
+		appkit.Equal(appkit.Anchor(content, "trailingAnchor"), appkit.Anchor(v, "trailingAnchor"), 0),
+		appkit.Equal(appkit.Anchor(content, "bottomAnchor"), appkit.Anchor(v, "bottomAnchor"), 0),
+	)
+
+	s.SelectTab(tabResults)
+
+	return v
+}
+
+// SelectTab switches the bottom pane.
+func (s *Shell) SelectTab(i int) {
+	s.tabs.Select(i)
+
+	for j, tv := range s.tabViews {
+		appkit.SetHidden(tv, j != i)
+	}
+
+	if i == tabHistory {
+		s.History.Shown()
+	}
+}
+
+// onRunUpdate routes runner updates to the panes.
+func (s *Shell) onRunUpdate(r *app.Run) {
+	s.Results.Update(r)
+
+	if r != s.Results.Current() {
+		return
+	}
+
+	snap := r.Snapshot()
+
+	switch snap.State {
+	case app.RunDone, app.RunFailed, app.RunCancelled:
+		if snap.Job != nil {
+			s.Job.ShowJob(*snap.Job)
+		} else {
+			s.Job.Clear("This run has no BigQuery job (previews read tables directly).")
+		}
+
+		s.History.RefreshIfShown()
+	case app.RunRunning, app.RunFetching:
+	}
+}
+
+// CancelJob asks BigQuery to cancel a job from the history.
+func (s *Shell) CancelJob(ref bq.JobRef) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), projectsTimeout)
+		defer cancel()
+
+		err := s.opts.Jobs.CancelJob(ctx, ref)
+
+		objc.Main(func() {
+			if err != nil {
+				s.status("Cancel failed: " + err.Error())
+			}
+
+			s.History.Reload()
+		})
+	}()
 }
 
 // Stop cancels the current run.

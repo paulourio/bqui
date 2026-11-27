@@ -66,6 +66,7 @@ func main() {
 			Backend:       backends.metadata,
 			Queries:       backends.queries,
 			Storage:       backends.storage,
+			Jobs:          backends.jobs,
 			Live:          !*fake,
 			Settings:      settings,
 			SettingsPath:  settingsPath,
@@ -101,6 +102,7 @@ type backends struct {
 	metadata app.Backend
 	queries  app.QueryBackend
 	storage  app.StorageOpener
+	jobs     app.JobsBackend
 }
 
 // newBackends wires BigQuery (REST + Storage Read API) or the fixture fake.
@@ -109,7 +111,7 @@ func newBackends(fake bool, billing func() string) (backends, error) {
 	if fake {
 		f := &app.FakeBackend{Latency: fakeLatency}
 
-		return backends{metadata: f, queries: f}, nil
+		return backends{metadata: f, queries: f, jobs: f}, nil
 	}
 
 	ctx := context.Background()
@@ -124,7 +126,7 @@ func newBackends(fake bool, billing func() string) (backends, error) {
 		return backends{}, err
 	}
 
-	return backends{metadata: client, queries: client, storage: app.NewStorageOpener(sc, billing)}, nil
+	return backends{metadata: client, queries: client, jobs: client, storage: app.NewStorageOpener(sc, billing)}, nil
 }
 
 const staleSpill = 24 * time.Hour

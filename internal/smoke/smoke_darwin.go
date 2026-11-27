@@ -18,6 +18,7 @@ import (
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
+	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/editor"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/results"
@@ -101,6 +102,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 
 	ex := exploreFlow(s)
 	rs := resultsFlow(s)
+	js := jobsFlow(s)
 
 	queued := time.Now()
 
@@ -123,6 +125,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		}
 
 		resultsChecks(rep, rs)
+		jobsChecks(rep, js)
 
 		if err := run(s, dir, rep, done); err != nil {
 			done(err)
@@ -487,6 +490,77 @@ func inspectGrid(s *ui.Shell, run *app.Run, r *resultsResult) {
 
 	// Leave the nested items.* columns in view for screen captures.
 	t.ScrollToColumn("c" + strconv.Itoa(len(g.Columns())-1))
+}
+
+// jobsResult captures what the job-history flow observed.
+type jobsResult struct {
+	JobRows                 int64
+	HistoryMine, HistoryAll int
+	FirstJob, LastRun       string
+	FirstUser               string
+	InspectorTitle          string
+	InspectorRows           int64
+	ReopenedRows            int64
+	ReopenedStatus          string
+}
+
+// jobsFlow exercises Job information, History and reopening past results.
+func jobsFlow(s *ui.Shell) jobsResult {
+	var r jobsResult
+
+	onMain(func() {
+		if run := s.Results.Current(); run != nil && run.Snapshot().Job != nil {
+			r.LastRun = run.Snapshot().Job.JobID
+		}
+
+		s.SelectTab(1)
+	})
+	waitMain(loadTimeout, func() bool { return s.Job.Rows() > 5 })
+	onMain(func() { r.JobRows = s.Job.Rows() })
+
+	onMain(func() { s.SelectTab(2) })
+	waitMain(loadTimeout, func() bool { return len(s.History.Model.Rows()) > 0 && !s.History.Model.Loading() })
+	onMain(func() {
+		rows := s.History.Model.Rows()
+		r.HistoryMine = len(rows)
+		r.FirstJob, r.FirstUser = rows[0].Ref.JobID, rows[0].User
+		s.History.Table.SelectRows(0, 0)
+	})
+
+	waitMain(loadTimeout, func() bool { return s.Inspector.DetailRows() > 3 })
+	onMain(func() {
+		r.InspectorTitle = s.Inspector.Current().Name
+		r.InspectorRows = s.Inspector.DetailRows()
+	})
+
+	// Reopen the newest job's results.
+	var ref bq.JobRef
+
+	onMain(func() { ref = s.History.Model.Rows()[0].Ref })
+
+	if run := waitRun(s, func() { s.Results.Show(s.Runner.OpenJob(ref)) }); run != nil {
+		if g := run.Snapshot().Grid; g != nil {
+			r.ReopenedRows, _, _ = g.Size()
+		}
+	}
+
+	onMain(func() { r.ReopenedStatus = s.Status() })
+
+	// Project-wide history includes other users and pages on.
+	onMain(func() { s.History.SetScope(1) })
+	waitMain(loadTimeout, func() bool { return len(s.History.Model.Rows()) >= app.HistoryPage && !s.History.Model.Loading() })
+	onMain(func() { r.HistoryAll = len(s.History.Model.Rows()) })
+
+	return r
+}
+
+func jobsChecks(rep *Report, r jobsResult) {
+	rep.check("jobs-information", r.JobRows > 5, "%d job information rows", r.JobRows)
+	rep.check("jobs-history", r.HistoryMine > 0 && r.FirstJob == r.LastRun && r.FirstUser == "you@example.com",
+		"%d personal jobs; newest %s by %s (last run %s)", r.HistoryMine, r.FirstJob, r.FirstUser, r.LastRun)
+	rep.check("jobs-inspector", r.InspectorTitle == r.FirstJob && r.InspectorRows > 3, "inspector %q with %d rows", r.InspectorTitle, r.InspectorRows)
+	rep.check("jobs-reopen", r.ReopenedRows == 5000, "reopened %d rows; status %q", r.ReopenedRows, r.ReopenedStatus)
+	rep.check("jobs-project", r.HistoryAll >= app.HistoryPage, "%d project jobs loaded", r.HistoryAll)
 }
 
 func resultsChecks(rep *Report, r resultsResult) {

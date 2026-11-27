@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -24,10 +26,7 @@ const (
 	fakeStages      = 3
 )
 
-var (
-	fakeLimit = regexp.MustCompile(`(?i)\bLIMIT\s+(\d+)`)
-	fakeJobs  int64
-)
+var fakeLimit = regexp.MustCompile(`(?i)\bLIMIT\s+(\d+)`)
 
 var _ QueryBackend = (*FakeBackend)(nil)
 
@@ -51,9 +50,15 @@ func FakeOrdersSchema() *bigquery.TableSchema {
 }
 
 // Query implements QueryBackend.
-func (f *FakeBackend) Query(ctx context.Context, req bq.QueryRequest) (*bq.QueryResult, error) {
-	fakeJobs++
-	job := bq.JobRef{Project: FakeProject, JobID: fmt.Sprintf("job_fake_%d", fakeJobs), Location: "US"}
+func (f *FakeBackend) Query(ctx context.Context, req bq.QueryRequest) (res *bq.QueryResult, err error) {
+	f.mu.Lock()
+	f.nextJob++
+	job := bq.JobRef{Project: FakeProject, JobID: fmt.Sprintf("job_fake_%d", f.nextJob), Location: "US"}
+	f.mu.Unlock()
+
+	started := time.Now()
+
+	defer func() { f.record(job, req.SQL, started, res, err) }()
 
 	if req.OnJob != nil {
 		req.OnJob(job)
@@ -79,7 +84,7 @@ func (f *FakeBackend) Query(ctx context.Context, req bq.QueryRequest) (*bq.Query
 		return nil, fmt.Errorf("%w: Syntax error: Unexpected identifier \"SELEC\" at [1:1]", bq.ErrQueryFailed)
 	}
 
-	res := &bq.QueryResult{Job: &job, JobDetails: fakeJob(job, fakeStages), SlotMs: 1234, BytesProc: 2 << 20, BytesBilled: 10 << 20}
+	res = &bq.QueryResult{Job: &job, JobDetails: fakeJob(job, fakeStages), SlotMs: 1234, BytesProc: 2 << 20, BytesBilled: 10 << 20}
 
 	for _, kw := range []string{"CREATE", "INSERT", "UPDATE", "DELETE", "MERGE", "DROP", "ALTER"} {
 		if strings.HasPrefix(upper, kw) {
@@ -115,9 +120,20 @@ func (f *FakeBackend) ResultPage(ctx context.Context, job bq.JobRef, token strin
 		return nil, err
 	}
 
-	// Tokens are "start/total".
+	// Tokens are "start/total"; "" starts a finished job's results over.
 	var start, total int
-	if _, err := fmt.Sscanf(token, "%d/%d", &start, &total); err != nil || start < 0 || total > fakeMaxRows {
+
+	if token == "" {
+		f.mu.Lock()
+		n, ok := f.totals[job.JobID]
+		f.mu.Unlock()
+
+		if !ok {
+			return nil, fmt.Errorf("%w: results of %s", ErrFakeNotFound, job.JobID)
+		}
+
+		total = n
+	} else if _, err := fmt.Sscanf(token, "%d/%d", &start, &total); err != nil || start < 0 || total > fakeMaxRows {
 		return nil, fmt.Errorf("fake: bad page token %q for %s", token, job.JobID)
 	}
 
@@ -197,4 +213,159 @@ func fakeOrderRows(start, n int) []*bigquery.TableRow {
 	}
 
 	return rows
+}
+
+// fakeUser is the account the fake backend runs as.
+const fakeUser = "you@example.com"
+
+// record stores a finished fake job for ListJobs/GetJob.
+func (f *FakeBackend) record(ref bq.JobRef, sql string, started time.Time, res *bq.QueryResult, err error) {
+	j := &bigquery.Job{
+		JobReference:  &bigquery.JobReference{ProjectId: ref.Project, JobId: ref.JobID, Location: ref.Location},
+		UserEmail:     fakeUser,
+		Configuration: &bigquery.JobConfiguration{JobType: "QUERY", Query: &bigquery.JobConfigurationQuery{Query: sql, Priority: "INTERACTIVE"}},
+		Status:        &bigquery.JobStatus{State: "DONE"},
+		Statistics: &bigquery.JobStatistics{
+			CreationTime: started.UnixMilli(), StartTime: started.UnixMilli(), EndTime: time.Now().UnixMilli(),
+			Query: &bigquery.JobStatistics2{},
+		},
+	}
+
+	switch {
+	case err != nil && errors.Is(err, context.Canceled):
+		j.Status.ErrorResult = &bigquery.ErrorProto{Reason: "stopped", Message: "Job execution was cancelled: User requested cancellation"}
+	case err != nil:
+		j.Status.ErrorResult = &bigquery.ErrorProto{Reason: "invalidQuery", Message: strings.TrimPrefix(err.Error(), "bq: query failed: ")}
+	case res != nil:
+		j.Statistics.TotalSlotMs = res.SlotMs
+		j.Statistics.Query = &bigquery.JobStatistics2{
+			StatementType: res.Statement, TotalBytesProcessed: res.BytesProc, TotalBytesBilled: res.BytesBilled,
+			QueryPlan:        fakeJob(ref, fakeStages).Statistics.Query.QueryPlan,
+			ReferencedTables: []*bigquery.TableReference{{ProjectId: FakeProject, DatasetId: "analytics", TableId: "events"}},
+		}
+
+		if res.Schema != nil {
+			j.Configuration.Query.DestinationTable = &bigquery.TableReference{ProjectId: FakeProject, DatasetId: "_anon", TableId: "anon_" + ref.JobID}
+			f.setTotal(ref.JobID, int(res.TotalRows)) //nolint:gosec // bounded by fakeMaxRows
+		}
+	}
+
+	f.mu.Lock()
+	f.jobs = append(f.jobs, j)
+	f.mu.Unlock()
+}
+
+func (f *FakeBackend) setTotal(jobID string, n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.totals == nil {
+		f.totals = make(map[string]int)
+	}
+
+	f.totals[jobID] = n
+}
+
+// seedJobs adds older jobs by several users so history has content.
+func (f *FakeBackend) seedJobs() {
+	if f.seeded {
+		return
+	}
+
+	f.seeded = true
+	users := []string{fakeUser, "ana@example.com", "bruno@example.com"}
+	base := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
+
+	seed := make([]*bigquery.Job, 0, 120)
+
+	for i := range 120 {
+		created := base.Add(time.Duration(i) * 17 * time.Minute)
+		j := &bigquery.Job{
+			JobReference: &bigquery.JobReference{ProjectId: FakeProject, JobId: fmt.Sprintf("job_seed_%03d", i), Location: "US"},
+			UserEmail:    users[i%len(users)],
+			Configuration: &bigquery.JobConfiguration{JobType: "QUERY", Query: &bigquery.JobConfigurationQuery{
+				Query: fmt.Sprintf("SELECT user_id, COUNT(*) AS n\nFROM `bqui-demo.analytics.events`\nWHERE day = '2026-11-%02d'\nGROUP BY user_id\nLIMIT %d", 1+i%28, 100+i),
+			}},
+			Status: &bigquery.JobStatus{State: "DONE"},
+			Statistics: &bigquery.JobStatistics{
+				CreationTime: created.UnixMilli(), StartTime: created.UnixMilli(), EndTime: created.Add(time.Duration(800+i*37) * time.Millisecond).UnixMilli(),
+				TotalSlotMs: int64(2000 + i*91),
+				Query:       &bigquery.JobStatistics2{StatementType: "SELECT", TotalBytesProcessed: int64(1+i) << 20, CacheHit: i%7 == 0},
+			},
+		}
+
+		if i%13 == 5 {
+			j.Status.ErrorResult = &bigquery.ErrorProto{Reason: "invalidQuery", Message: "Unrecognized name: usr_id at [1:8]"}
+		}
+
+		seed = append(seed, j)
+	}
+
+	f.jobs = append(seed, f.jobs...)
+}
+
+// ListJobs implements JobsBackend (newest first, paged by index tokens).
+func (f *FakeBackend) ListJobs(ctx context.Context, filter bq.JobFilter) (*bq.JobPage, error) {
+	if err := f.wait(ctx); err != nil {
+		return nil, err
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.seedJobs()
+
+	var matched []*bigquery.Job
+
+	for _, j := range slices.Backward(f.jobs) {
+		if filter.AllUsers || j.UserEmail == fakeUser {
+			matched = append(matched, j)
+		}
+	}
+
+	start := 0
+	if filter.PageToken != "" {
+		start, _ = strconv.Atoi(filter.PageToken)
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = HistoryPage
+	}
+
+	end := min(start+limit, len(matched))
+	page := &bq.JobPage{}
+
+	for _, j := range matched[min(start, end):end] {
+		page.Jobs = append(page.Jobs, &bigquery.JobListJobs{
+			JobReference: j.JobReference, UserEmail: j.UserEmail, Configuration: j.Configuration,
+			Statistics: j.Statistics, Status: j.Status, ErrorResult: j.Status.ErrorResult, State: j.Status.State,
+		})
+	}
+
+	if end < len(matched) {
+		page.NextPageToken = strconv.Itoa(end)
+	}
+
+	return page, nil
+}
+
+// GetJob implements JobsBackend.
+func (f *FakeBackend) GetJob(ctx context.Context, ref bq.JobRef) (*bigquery.Job, error) {
+	if err := f.wait(ctx); err != nil {
+		return nil, err
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.seedJobs()
+
+	for _, j := range f.jobs {
+		if j.JobReference.JobId == ref.JobID {
+			return j, nil
+		}
+	}
+
+	return nil, fmt.Errorf("%w: job %s", ErrFakeNotFound, ref.JobID)
 }

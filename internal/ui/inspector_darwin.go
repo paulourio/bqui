@@ -13,6 +13,7 @@ import (
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
+	"github.com/paulourio/bqui/internal/bq"
 	"github.com/paulourio/bqui/internal/objc"
 )
 
@@ -28,8 +29,9 @@ const (
 type InspectorPane struct {
 	View objc.ID
 
-	be  app.Backend
-	fmt app.Formatter
+	be   app.Backend
+	jobs app.JobsBackend
+	fmt  app.Formatter
 
 	title, subtitle, status objc.ID
 	seg                     *appkit.Segmented
@@ -171,6 +173,32 @@ func (p *InspectorPane) SegmentGeometry() string {
 // SegmentView returns the segmented control (smoke diagnostics).
 func (p *InspectorPane) SegmentView() objc.ID { return p.seg.View }
 
+// ShowJob displays a job's details (from the job history).
+func (p *InspectorPane) ShowJob(ref bq.JobRef) {
+	if p.jobs == nil {
+		return
+	}
+
+	p.gen++
+	gen := p.gen
+	info := app.ObjectInfo{Kind: app.KindPlaceholder, Project: ref.Project, Name: ref.JobID}
+	p.current = info
+
+	appkit.SetString(p.title, ref.JobID)
+	appkit.SetString(p.subtitle, "job · "+ref.Project+" · "+ref.Location)
+	appkit.SetString(p.status, "Loading…")
+	p.setState(stateLoading)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), metadataTimeout)
+		defer cancel()
+
+		job, err := p.jobs.GetJob(ctx, ref)
+
+		objc.Main(func() { p.apply(gen, info, job, err) })
+	}()
+}
+
 // Show displays an explorer object, fetching its metadata off the main thread.
 func (p *InspectorPane) Show(info app.ObjectInfo) {
 	p.gen++
@@ -287,6 +315,8 @@ func (p *InspectorPane) apply(gen uint64, info app.ObjectInfo, v any, err error)
 		sections = p.fmt.RoutineSections(x)
 	case *bigquery.Model:
 		sections = p.fmt.ModelSections(x)
+	case *bigquery.Job:
+		sections = p.fmt.JobSections(x)
 	default:
 		sections = []app.Section{{Title: "Project", Rows: []app.Detail{{Key: "Project ID", Value: info.Project, Mono: true}}}}
 	}

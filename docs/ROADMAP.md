@@ -311,6 +311,20 @@ The editor is **Monaco** (MIT, the VS Code editor component) hosted in a `WKWebV
 
 ### M6 — Job history + job details → **MVP release v0.1**
 
+**Status: done.** What shipped, and where it differs from the plan below:
+- **Bottom-pane tabs:** Results, Job information and History. The Execution details and Execution graph tabs join in M8.
+- **History:**
+  - A My jobs / Project jobs scope over `jobs.list` (projection=full), newest first, loading more pages as you scroll.
+  - Columns: state, created, duration, processed ("cached"), statement, user, query and job ID.
+  - Double-click opens the SQL in the editor. The context menu offers Run Again, Show Results, Show Details (in the inspector), Cancel Job (while running), Copy Job ID and Open in BigQuery Console.
+- **Show Results** (`Runner.OpenJob`) reads the job's destination table through the Storage Read API, falling back to `getQueryResults` paging. Expired temporary tables get a clear message.
+- **Job information:** job, user, location, state and timings, parent/child jobs, session, reservation, priority, labels, the byte cap, statistics, destination and referenced tables, errors, and the bqfmt-formatted SQL.
+- **Not done:**
+  - Filters by state, type, time or label beyond the scope switch.
+  - Error locations linked back into the editor.
+  - Local run history in SQLite, which moves to M10 with sessions.
+- **Release:** no tagged release or signed zip yet; that happens with M13 packaging.
+
 **Jobs list**
 - Personal (`jobs.list` with `allUsers=false`) and project-wide (`allUsers=true`), filtered by state, type, time range, label and text.
 - Infinite list with columns: status, job ID, user, created, duration, bytes, slot-ms, statement type.

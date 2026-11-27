@@ -30,6 +30,10 @@ type TableOptions struct {
 	// Menu builds the context menu for the clicked row and column (-1 if none).
 	Menu      func(row int, column string) []MenuItem
 	RowHeight float64
+	// OnDoubleClick receives the double-clicked row.
+	OnDoubleClick func(row int)
+	// OnSelect receives the selected rows after the selection changes.
+	OnSelect func(rows []int)
 }
 
 // Table is a view-based NSTableView for large virtual grids.
@@ -132,6 +136,11 @@ func tableMethods() []objc.Method {
 				t.rebuildMenu(menu)
 			}
 		}},
+		{Sel: "tableViewSelectionDidChange:", Fn: func(self objc.ID, _ objc.SEL, _ objc.ID) {
+			if t, ok := get(self); ok && t.opts.OnSelect != nil {
+				t.opts.OnSelect(t.SelectedRows())
+			}
+		}},
 	}
 }
 
@@ -164,6 +173,16 @@ func NewTable(src TableSource, opts TableOptions) *Table {
 		menu := newMenu("")
 		objc.Msg(menu, "setDelegate:", ctl)
 		objc.Msg(t.View, "setMenu:", menu)
+	}
+
+	if opts.OnDoubleClick != nil {
+		fn := opts.OnDoubleClick
+		objc.Msg(t.View, "setTarget:", objc.NewTarget(func(objc.ID) {
+			if row := objc.Send[int64](t.View, "clickedRow"); row >= 0 {
+				fn(int(row))
+			}
+		}))
+		objc.Msg(t.View, "setDoubleAction:", objc.Sel(objc.ActionSelector))
 	}
 
 	t.Scroll = objc.New("NSScrollView")

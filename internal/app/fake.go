@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strings"
+	"sync"
 	"time"
 
 	bigquery "google.golang.org/api/bigquery/v2"
@@ -37,6 +38,12 @@ var ErrFakeNotFound = errors.New("fake: not found")
 type FakeBackend struct {
 	// Latency is added to every call to exercise loading states.
 	Latency time.Duration
+
+	mu      sync.Mutex
+	nextJob int
+	jobs    []*bigquery.Job // newest last
+	totals  map[string]int  // result rows per job ID
+	seeded  bool
 }
 
 var _ Backend = (*FakeBackend)(nil)
