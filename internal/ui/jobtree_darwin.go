@@ -11,11 +11,12 @@ import (
 	"github.com/paulourio/bqui/internal/objc"
 )
 
-// Job History tree item IDs (after the BigQuery Studio section).
+// Job History tree item IDs, above the per-path workbook and query IDs
+// and below 2^55 (objc.Number tagged-pointer range).
 const (
-	jobsGroupID = studioGroupID + 10
-	jobsEmptyID = studioGroupID + 11
-	jobsMoreID  = studioGroupID + 12
+	jobsGroupID = uint64(1)<<54 + 10
+	jobsEmptyID = jobsGroupID + 1
+	jobsMoreID  = jobsGroupID + 2
 	jobBase     = uint64(1) << 41
 )
 
@@ -59,7 +60,7 @@ func (p *WorkbooksPane) Jobs() []app.JobRow { return p.jobs.shown }
 func (p *WorkbooksPane) JobsLoading() bool { return p.jobs.model != nil && p.jobs.model.Loading() }
 
 func (p *WorkbooksPane) job(id uint64) (app.JobRow, bool) {
-	if id <= jobBase || id >= studioGroupID || id-jobBase > uint64(len(p.jobs.shown)) {
+	if id <= jobBase || id >= jobsGroupID || id-jobBase > uint64(len(p.jobs.shown)) {
 		return app.JobRow{}, false
 	}
 
@@ -176,11 +177,6 @@ func (s *Shell) OpenJobDoc(r app.JobRow) {
 	if strings.TrimSpace(r.SQL) == "" {
 		s.status("Job " + r.Ref.JobID + " has no SQL (" + strings.ToLower(r.Type) + " job).")
 
-		return
-	}
-
-	t := s.Workspace.Tab()
-	if t.File == "" && t.Remote != "" && !s.keepChanges() {
 		return
 	}
 

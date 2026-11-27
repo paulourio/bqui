@@ -84,7 +84,6 @@ func (w *Workspace) OpenJobDoc(ref bq.JobRef, sql string) error {
 
 	w.jobDoc = &ref
 	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = sql, "", ref.JobID, 0, 0
-	w.tab.Remote, w.tab.RemoteHead, w.tab.RemoteText = "", "", ""
 	w.fileText, w.fileID = "", ""
 
 	return nil

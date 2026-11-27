@@ -18,7 +18,6 @@ import (
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
 	"github.com/paulourio/bqui/internal/bq"
-	"github.com/paulourio/bqui/internal/dataform"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/plan"
 	"github.com/paulourio/bqui/internal/results"
@@ -84,10 +83,6 @@ type Options struct {
 	Workspace *app.Workspace
 	// ThemesDir holds user themes (TOML).
 	ThemesDir string
-	// Studio reads and writes BigQuery Studio saved queries (nil hides
-	// them); StudioAuthor names commits (called once, off the main thread).
-	Studio       app.StudioBackend
-	StudioAuthor func() dataform.Author
 }
 
 // Shell is the main window and its panes.
@@ -129,7 +124,6 @@ type Shell struct {
 	prefs       *prefsWindow
 	readOnly    bool // editor read-only (job document)
 	revealGen   int
-	studio      studioState
 
 	exportCancel func()
 	lastExport   app.ExportProgress
@@ -320,7 +314,6 @@ func (s *Shell) SetBillingProject(project string) {
 	s.rebuildProjectPicker()
 
 	if s.Workbooks != nil && s.sideTabs.Selected() == SidebarWorkbooks {
-		s.Workbooks.ReloadStudio()
 		s.Workbooks.ReloadJobs()
 	}
 	s.saveSettings()
@@ -504,9 +497,7 @@ func (s *Shell) menus() []appkit.Menu {
 			{},
 			{Title: "Save", Key: "s", Run: func() { s.SaveQuery() }},
 			{Title: "Save As…", Key: "s", Mods: cmd | shift, Run: func() { s.SaveQueryAs() }},
-			{Title: "Save to BigQuery Studio…", Key: "s", Mods: cmd | opt, Run: s.PublishStudio},
 			{Title: "Save Job SQL to Workbook", Run: func() { s.SaveJobDocToWorkbook() }},
-			{Title: "Reload from BigQuery Studio", Run: s.ReloadStudio},
 			{Title: "New Workbook", Key: "n", Mods: cmd | shift, Run: func() { s.NewWorkbook() }},
 			{Title: "Show Workbooks", Key: "1", Mods: cmd | opt, Run: func() { s.SelectSidebar(SidebarWorkbooks) }},
 			{},

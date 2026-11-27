@@ -10,27 +10,21 @@ import (
 
 	"github.com/paulourio/bqui/internal/app"
 	"github.com/paulourio/bqui/internal/appkit"
-	"github.com/paulourio/bqui/internal/dataform"
 	"github.com/paulourio/bqui/internal/objc"
 	"github.com/paulourio/bqui/internal/store"
 )
 
-// Workbooks tree item IDs. Workbooks and queries get stable IDs per path
-// (so selection and expansion survive reloads); fixed IDs mark the
-// BigQuery Studio section.
-const (
-	studioGroupID = uint64(1) << 54
-	studioEmptyID = studioGroupID + 1
-	studioBase    = uint64(1) << 40
-)
+// Workbooks and queries get stable tree IDs per path (so selection and
+// expansion survive reloads); the Job History section uses fixed IDs
+// above them (see jobtree_darwin.go).
 
 type wbNode struct {
 	workbook *store.Workbook
 	query    *store.Query
 }
 
-// WorkbooksPane is the Library › Workbook › Query tree, plus BigQuery
-// Studio saved queries.
+// WorkbooksPane is the Library › Workbook › Query tree, plus the Job
+// History section.
 type WorkbooksPane struct {
 	View    objc.ID
 	Outline *appkit.Outline
@@ -47,12 +41,6 @@ type WorkbooksPane struct {
 	loadErr error
 
 	jobs jobTree
-
-	studio        []dataform.SavedQuery
-	studioShown   []dataform.SavedQuery
-	studioErr     error
-	studioLoading bool
-	studioGen     int
 }
 
 func newWorkbooksPane(s *Shell) *WorkbooksPane {
@@ -118,10 +106,9 @@ func (p *WorkbooksPane) id(path string) uint64 {
 	return p.next
 }
 
-// Reload rereads the library and refetches BigQuery Studio queries.
+// Reload rereads the library and refetches the job history.
 func (p *WorkbooksPane) Reload() {
 	p.rebuild()
-	p.ReloadStudio()
 	p.ReloadJobs()
 }
 
@@ -133,14 +120,6 @@ func (p *WorkbooksPane) rebuild() {
 		p.loadErr = p.addLibrary(lib)
 	}
 
-	p.studioShown = p.studioShown[:0]
-
-	for _, q := range p.studio {
-		if p.matches(q.Title) {
-			p.studioShown = append(p.studioShown, q)
-		}
-	}
-
 	p.filterJobs()
 	p.Outline.Reload(0)
 
@@ -148,7 +127,6 @@ func (p *WorkbooksPane) rebuild() {
 		p.Outline.Expand(id, false)
 	}
 
-	p.Outline.Expand(studioGroupID, false)
 	p.Outline.Expand(jobsGroupID, false)
 	p.selectCurrent()
 }
@@ -200,35 +178,6 @@ func (p *WorkbooksPane) selectCurrent() {
 			p.selecting = false
 		}
 	}
-}
-
-// ReloadStudio refetches the BigQuery Studio list for the billing project.
-func (p *WorkbooksPane) ReloadStudio() {
-	sb, project := p.s.opts.Studio, p.s.BillingProject()
-	if sb == nil || project == "" {
-		return
-	}
-
-	p.studioGen++
-	gen, region := p.studioGen, p.s.settings.Prefs.Region()
-	p.studioLoading = true
-	p.rebuild()
-
-	go func() {
-		ctx, cancel := app.StudioContext()
-		defer cancel()
-
-		list, err := sb.List(ctx, project, region)
-
-		objc.Main(func() {
-			if gen != p.studioGen {
-				return
-			}
-
-			p.studio, p.studioErr, p.studioLoading = list, err, false
-			p.rebuild()
-		})
-	}()
 }
 
 // Workbooks returns the listed workbooks; Queries a workbook's queries
@@ -292,23 +241,6 @@ func (p *WorkbooksPane) SelectedWorkbook() string {
 	return ""
 }
 
-// StudioQueries returns the listed BigQuery Studio queries (smoke checks).
-func (p *WorkbooksPane) StudioQueries() []dataform.SavedQuery { return p.studioShown }
-
-// StudioLoading reports a Studio fetch in flight (smoke checks).
-func (p *WorkbooksPane) StudioLoading() bool { return p.studioLoading }
-
-// StudioExpanded reports whether the BigQuery Studio group is expanded (smoke checks).
-func (p *WorkbooksPane) StudioExpanded() bool { return p.Outline.IsExpanded(studioGroupID) }
-
-func (p *WorkbooksPane) remote(id uint64) (dataform.SavedQuery, bool) {
-	if id <= studioBase || id >= jobBase || id-studioBase > uint64(len(p.studioShown)) {
-		return dataform.SavedQuery{}, false
-	}
-
-	return p.studioShown[id-studioBase-1], true
-}
-
 // onSelect opens a query when it is selected (one click, like a file
 // browser); selecting the open query again does nothing.
 func (p *WorkbooksPane) onSelect(id uint64) {
@@ -322,10 +254,6 @@ func (p *WorkbooksPane) onSelect(id uint64) {
 }
 
 func (p *WorkbooksPane) open(id uint64) {
-	if q, ok := p.remote(id); ok {
-		p.s.OpenStudioQuery(q)
-	}
-
 	p.jobActivate(id)
 }
 
@@ -335,10 +263,6 @@ func (p *WorkbooksPane) menu(id uint64) []appkit.MenuItem {
 	refresh := appkit.MenuItem{Title: "Refresh", Run: p.Reload}
 
 	if items, ok := p.jobMenu(id); ok {
-		return items
-	}
-
-	if items, ok := p.remoteMenu(id, refresh); ok {
 		return items
 	}
 
@@ -380,9 +304,6 @@ func (s workbooksSource) Children(parent uint64) []uint64 {
 	switch parent {
 	case 0:
 		out := append([]uint64(nil), p.roots...)
-		if p.s.opts.Studio != nil {
-			out = append(out, studioGroupID)
-		}
 
 		if p.jobs.model != nil {
 			out = append(out, jobsGroupID)
@@ -391,24 +312,13 @@ func (s workbooksSource) Children(parent uint64) []uint64 {
 		return out
 	case jobsGroupID:
 		return p.jobChildren()
-	case studioGroupID:
-		if len(p.studioShown) == 0 {
-			return []uint64{studioEmptyID}
-		}
-
-		ids := make([]uint64, len(p.studioShown))
-		for i := range ids {
-			ids[i] = studioBase + 1 + uint64(i)
-		}
-
-		return ids
 	}
 
 	return p.kids[parent]
 }
 
 func (s workbooksSource) Expandable(id uint64) bool {
-	if id == studioGroupID || id == jobsGroupID {
+	if id == jobsGroupID {
 		return true
 	}
 
@@ -422,22 +332,6 @@ func (s workbooksSource) Cell(id uint64) appkit.OutlineCell {
 
 	if cell, ok := p.jobCell(id); ok {
 		return cell
-	}
-
-	switch id {
-	case studioGroupID:
-		return appkit.OutlineCell{Title: "BigQuery Studio", Group: true, ToolTip: p.s.BillingProject() + " · " + p.s.settings.Prefs.Region()}
-	case studioEmptyID:
-		msg := emptyText(p.studioErr, p.filter, "No saved queries in "+p.s.settings.Prefs.Region())
-		if p.studioLoading {
-			msg = "Loading…"
-		}
-
-		return appkit.OutlineCell{Title: msg, Secondary: true, ToolTip: msg}
-	}
-
-	if q, ok := p.remote(id); ok {
-		return appkit.OutlineCell{Title: q.Title, Symbol: "cloud", ToolTip: "Modified " + q.Modified.Local().Format("2006-01-02 15:04")}
 	}
 
 	n, ok := p.nodes[id]
@@ -483,11 +377,6 @@ func (s *Shell) queryTip(q store.Query) string {
 // OpenLibraryQuery switches the editor to a library query (the current one
 // is saved first).
 func (s *Shell) OpenLibraryQuery(path string) {
-	t := s.Workspace.Tab()
-	if t.File == "" && t.Remote != "" && !s.keepChanges() {
-		return
-	}
-
 	sql, err := s.Workspace.Switch(path)
 	if err != nil {
 		s.status("✕ " + err.Error())
@@ -704,24 +593,6 @@ func renameError(err error) string {
 	}
 
 	return err.Error()
-}
-
-// remoteMenu is the context menu of a BigQuery Studio saved query.
-func (p *WorkbooksPane) remoteMenu(id uint64, refresh appkit.MenuItem) ([]appkit.MenuItem, bool) {
-	q, ok := p.remote(id)
-	if !ok {
-		return nil, false
-	}
-
-	return []appkit.MenuItem{
-		{Title: "Open", Run: func() { p.s.OpenStudioQuery(q) }},
-		{},
-		{Title: "Rename…", Run: func() { p.s.RenameStudioQuery(q) }},
-		{Title: "Delete…", Run: func() { p.s.DeleteStudioQuery(q) }},
-		{},
-		{Title: "Copy Resource Name", Run: func() { appkit.CopyToPasteboard(q.Name) }},
-		refresh,
-	}, true
 }
 
 // queryMenu is the context menu of a library query.

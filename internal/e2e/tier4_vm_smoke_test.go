@@ -51,10 +51,6 @@ func TestE2EVMSmokeAndLayoutValidation(t *testing.T) {
 		checkByName[c.Name] = c
 	}
 
-	if c, ok := checkByName["studio-list-open"]; !ok || !strings.Contains(c.Detail, "groupExpanded true") {
-		t.Fatalf("studio-list-open did not verify Studio group expansion: %+v", c)
-	}
-
 	if c, ok := checkByName["narrow-window-900x600"]; !ok ||
 		!strings.Contains(c.Detail, "schema") ||
 		!strings.Contains(c.Detail, "results") ||

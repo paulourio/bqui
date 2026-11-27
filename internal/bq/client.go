@@ -21,8 +21,8 @@ import (
 	"google.golang.org/api/option"
 )
 
-// OAuth scopes bqui requests. cloud-platform covers BigQuery jobs, the
-// Storage Read API and Dataform (BigQuery Studio saved queries).
+// OAuth scopes bqui requests. cloud-platform covers BigQuery jobs and the
+// Storage Read API.
 const (
 	ScopeCloudPlatform = "https://www.googleapis.com/auth/cloud-platform"
 	ScopeBigQuery      = "https://www.googleapis.com/auth/bigquery"

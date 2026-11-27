@@ -73,7 +73,7 @@ func clean(msg string) string {
 	msg = requestPrefix.ReplaceAllString(msg, "")
 	msg = googleapiPrefix.ReplaceAllString(msg, "")
 
-	for _, p := range []string{"bq: query failed: ", "bq: list projects: ", "bq: token: ", "bq: ", "dataform: ", "app: "} {
+	for _, p := range []string{"bq: query failed: ", "bq: list projects: ", "bq: token: ", "bq: ", "app: "} {
 		msg = strings.ReplaceAll(msg, p, "")
 	}
 

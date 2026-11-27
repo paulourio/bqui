@@ -105,7 +105,7 @@ func TestImportQueries(t *testing.T) {
 	root := t.TempDir()
 	old := filepath.Join(root, "queries")
 	_ = os.MkdirAll(old, 0o700)
-	_ = WriteQuery(SavedQuery{Path: filepath.Join(old, "a.sql"), LinkID: "projects/p/locations/l/repositories/r"}, "SELECT 1")
+	_ = WriteQuery(SavedQuery{Path: filepath.Join(old, "a.sql"), Title: "Kept"}, "SELECT 1")
 
 	l, _ := OpenLibrary(filepath.Join(root, "libraries"), DefaultLibrary)
 
@@ -119,8 +119,8 @@ func TestImportQueries(t *testing.T) {
 		t.Fatalf("imported = %v", names(qs))
 	}
 
-	if meta, _, _ := ReadQuery(qs[0].Path); !strings.HasSuffix(meta.LinkID, "/r") {
-		t.Errorf("link lost: %+v", meta)
+	if meta, _, _ := ReadQuery(qs[0].Path); meta.Title != "Kept" {
+		t.Errorf("header lost: %+v", meta)
 	}
 
 	if moved, _ := l.ImportQueries(old); moved {

@@ -928,9 +928,9 @@ func TestShellTabsToolbarSplitThemeAndImmediateJSON(t *testing.T) {
 	})
 }
 
-func TestWorkbooksStudioSentinelIdentityAndShardGuard(t *testing.T) {
+func TestWorkbooksSentinelIdentityAndShardGuard(t *testing.T) {
 	onMain(t, func() {
-		for _, id := range []uint64{studioGroupID, studioEmptyID, studioBase + 1} {
+		for _, id := range []uint64{jobsGroupID, jobsEmptyID, jobsMoreID, jobBase + 1} {
 			if id >= 1<<55 {
 				t.Errorf("sentinel ID %d >= 2^55 violates tagged-pointer contract", id)
 			}
@@ -945,7 +945,6 @@ func TestWorkbooksStudioSentinelIdentityAndShardGuard(t *testing.T) {
 			Backend:       &app.FakeBackend{},
 			Queries:       &stubQueryBackend{schema: nestedTestBQSchema()},
 			Jobs:          &app.FakeBackend{},
-			Studio:        app.NewFakeStudio(app.FakeProject),
 			SpillDir:      t.TempDir(),
 		})
 		if err != nil {
@@ -957,8 +956,8 @@ func TestWorkbooksStudioSentinelIdentityAndShardGuard(t *testing.T) {
 		s.SelectSidebar(SidebarWorkbooks)
 		s.Workbooks.rebuild()
 
-		if !s.Workbooks.StudioExpanded() {
-			t.Error("expected WorkbooksPane BigQuery Studio group to be expanded after rebuild")
+		if !s.Workbooks.Outline.IsExpanded(jobsGroupID) {
+			t.Error("expected WorkbooksPane Job History group to be expanded after rebuild")
 		}
 
 		// GAP-3: KindShardGroup with empty Shards must not panic.
@@ -1028,7 +1027,6 @@ func TestRevealObjectDomainScopedProject(t *testing.T) {
 			Backend:       &app.FakeBackend{},
 			Queries:       &stubQueryBackend{schema: nestedTestBQSchema()},
 			Jobs:          &app.FakeBackend{},
-			Studio:        app.NewFakeStudio(app.FakeProject),
 			SpillDir:      t.TempDir(),
 		})
 		if err != nil {

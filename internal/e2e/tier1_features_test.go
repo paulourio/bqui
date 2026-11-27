@@ -1187,7 +1187,6 @@ func TestTier1F9HistoryThemePrefsAndDB(t *testing.T) {
 			MaxBytesBilled: "10 GB",
 			CostWarningUSD: "$2.50",
 			MaxSpillBytes:  "512 MiB",
-			StudioRegion:   "us",
 		}
 
 		prefs, err := in.Parse()
@@ -1195,7 +1194,7 @@ func TestTier1F9HistoryThemePrefsAndDB(t *testing.T) {
 			t.Fatalf("Parse: %v", err)
 		}
 
-		if prefs.Region() != store.DefaultStudioRegion || prefs.MaxBytesBilled != 10_000_000_000 || prefs.CostWarningUSD != 2.5 {
+		if prefs.MaxBytesBilled != 10_000_000_000 || prefs.CostWarningUSD != 2.5 {
 			t.Fatalf("parsed prefs = %+v", prefs)
 		}
 

@@ -1296,19 +1296,6 @@ func TestTier2F9PrefsThemeHistoryBoundaries(t *testing.T) {
 		}
 	})
 
-	t.Run("Prefs_StudioRegion_eu_rejected_us_normalized", func(t *testing.T) {
-		t.Parallel()
-
-		if _, err := (store.PreferenceText{StudioRegion: "eu"}).Parse(); err == nil {
-			t.Fatal("expected eu studio region error")
-		}
-
-		p, err := (store.PreferenceText{StudioRegion: "US"}).Parse()
-		if err != nil || p.StudioRegion != store.DefaultStudioRegion {
-			t.Fatalf("US normalization = (%+v, %v)", p, err)
-		}
-	})
-
 	t.Run("Theme_Invalid_Color_And_Missing_Name_Rejected", func(t *testing.T) {
 		t.Parallel()
 

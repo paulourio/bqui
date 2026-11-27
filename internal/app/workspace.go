@@ -106,7 +106,7 @@ func OpenWorkspace(opts WorkspaceOptions) (*Workspace, error) {
 
 // adopt makes the restored tab a library query: an existing library file is
 // reopened; otherwise its text becomes a new query (the first launch
-// creates workbook-YYYY-MM-DD/Untitled-1). Studio-only tabs stay as they are.
+// creates workbook-YYYY-MM-DD/Untitled-1).
 func (w *Workspace) adopt() error {
 	l := w.opts.Library
 	if l == nil {
@@ -119,10 +119,6 @@ func (w *Workspace) adopt() error {
 
 			return err
 		}
-	}
-
-	if w.tab.Remote != "" && w.tab.File == "" {
-		return nil
 	}
 
 	q, err := l.EnsureStarted(w.tab.SQL, time.Now())
@@ -307,10 +303,7 @@ func (w *Workspace) Dirty() bool {
 		return false
 	}
 
-	switch {
-	case w.tab.File == "" && w.tab.Remote != "":
-		return !sameSQL(w.tab.SQL, w.tab.RemoteText)
-	case w.tab.File == "":
+	if w.tab.File == "" {
 		return strings.TrimSpace(w.tab.SQL) != "" && w.tab.SQL != w.opts.InitialSQL
 	}
 
@@ -322,7 +315,7 @@ func (w *Workspace) Title() string {
 	t := w.Tab()
 
 	title := t.Title
-	if t.File == "" && t.Remote == "" {
+	if t.File == "" {
 		title = "Untitled"
 	}
 
@@ -334,7 +327,7 @@ func (w *Workspace) Title() string {
 		title = JobHistoryTitle + " / " + ref.JobID
 	}
 
-	if w.Dirty() && (t.File != "" || t.Remote != "") {
+	if w.Dirty() && t.File != "" {
 		title += " — Edited"
 	}
 
@@ -348,7 +341,6 @@ func (w *Workspace) New() {
 
 	w.clearJobDocLocked()
 	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = "", "", "Untitled", 0, 0
-	w.tab.Remote, w.tab.RemoteHead, w.tab.RemoteText = "", "", ""
 	w.fileText = ""
 	w.scheduleLocked()
 }
@@ -377,7 +369,6 @@ func (w *Workspace) Open(path string) (string, error) {
 	w.clearJobDocLocked()
 	w.tab.SQL, w.tab.File, w.tab.Title, w.tab.CursorLine, w.tab.CursorCol = body, path, title, 0, 0
 	w.fileText, w.fileID = body, id
-	w.linkFromFile(q, body)
 	w.scheduleLocked()
 
 	return body, nil
@@ -409,7 +400,7 @@ func (w *Workspace) SaveAs(path, title, project string) error {
 
 	t := w.Tab()
 
-	return w.write(store.SavedQuery{Path: path, Title: title, Project: project, LinkID: t.Remote}, t.SQL)
+	return w.write(store.SavedQuery{Path: path, Title: title, Project: project}, t.SQL)
 }
 
 func (w *Workspace) write(q store.SavedQuery, sql string) error {

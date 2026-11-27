@@ -32,14 +32,14 @@ func TestParseBytes(t *testing.T) {
 }
 
 func TestPreferencesRoundTrip(t *testing.T) {
-	text := PreferenceText{Location: " EU ", DefaultDataset: "p.d", MaxBytesBilled: "10 GB", CostWarningUSD: "$1.50", MaxSpillBytes: "20GB", StudioRegion: "US"}
+	text := PreferenceText{Location: " EU ", DefaultDataset: "p.d", MaxBytesBilled: "10 GB", CostWarningUSD: "$1.50", MaxSpillBytes: "20GB"}
 
 	p, err := text.Parse()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if p.Location != "EU" || p.MaxBytesBilled != 10e9 || p.CostWarningUSD != 1.5 || p.MaxSpillBytes != 20e9 || p.Region() != "us-central1" {
+	if p.Location != "EU" || p.MaxBytesBilled != 10e9 || p.CostWarningUSD != 1.5 || p.MaxSpillBytes != 20e9 {
 		t.Fatalf("prefs = %+v", p)
 	}
 
