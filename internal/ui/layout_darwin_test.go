@@ -266,21 +266,23 @@ func TestInspectorDetailsAndSchemaWrapping(t *testing.T) {
 	onMain(t, func() {
 		assertNoOutlineHorizontalOverflow(t, p.schema, "schema-pageviews@300")
 
-		// natality schema (key column hidden -> description claims space, child_race multi-line wraps).
+		// natality schema (only modes in Attr -> a narrow Attr column, description claims space, child_race multi-line wraps).
 		natInfo := app.ObjectInfo{Kind: app.KindTable, Project: "bigquery-public-data", Dataset: "samples", Name: "natality"}
 		p.current = natInfo
 		p.apply(p.gen, natInfo, natTbl, nil)
 		p.SelectSegment(segSchema)
 		appkit.WindowResize(win, 440, 640)
 
-		keyCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("key"))
-		if !objc.Send[bool](keyCol, "isHidden") {
-			t.Error("expected natality schema key column to be hidden")
+		attrCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("attr"))
+		if objc.Send[bool](attrCol, "isHidden") {
+			t.Error("expected natality schema Attr column (REQUIRED fields) to be visible")
+		} else if w := objc.Send[float64](attrCol, "width"); w > 50 {
+			t.Errorf("natality Attr column width = %v, want it narrow (modes only)", w)
 		}
 
 		descCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("description"))
 		if w := objc.Send[float64](descCol, "width"); w <= 120 {
-			t.Errorf("natality schema description width = %v, expected > 120 when key hidden", w)
+			t.Errorf("natality schema description width = %v, expected > 120 with a narrow Attr column", w)
 		}
 
 		assertNoOutlineHorizontalOverflow(t, p.schema, "schema-natality@440")
@@ -1006,9 +1008,9 @@ func TestInspectorSchemaPartitionedClustered300(t *testing.T) {
 	onMain(t, func() {
 		defer objc.Msg(win, "close")
 
-		keyCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("key"))
-		if objc.Send[bool](keyCol, "isHidden") {
-			t.Error("expected key column to be visible for partitioned+clustered pageviews_2024")
+		attrCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("attr"))
+		if objc.Send[bool](attrCol, "isHidden") {
+			t.Error("expected Attr column to be visible for partitioned+clustered pageviews_2024")
 		}
 
 		assertNoOutlineHorizontalOverflow(t, p.schema, "pageviews@300")

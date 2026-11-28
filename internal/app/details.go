@@ -509,27 +509,109 @@ type SchemaField struct {
 	Default     string
 	Collation   string
 	PolicyTags  []string
-	Partition   bool // the time/range partitioning column
-	ClusterRank int  // 1-based position in the clustering spec; 0 if not clustered
+	Partition   bool   // the time/range partitioning column
+	PartitionBy string // its granularity: DAY, HOUR, MONTH, YEAR or RANGE
+	ClusterRank int    // 1-based position in the clustering spec; 0 if not clustered
+	Clustered   int    // number of clustering columns
+	PKRank      int    // 1-based position in the primary key; 0 if not part of it
+	PKSize      int    // number of primary key columns
+	ForeignKeys []ForeignKeyRef
 	Children    []SchemaField
 }
 
-// Badges returns short markers shown next to the name ("partition", "cluster 1").
-func (f SchemaField) Badges() []string {
-	var b []string
+// ForeignKeyRef is one foreign key a column takes part in.
+type ForeignKeyRef struct {
+	Name   string // constraint name ("" if unnamed)
+	Table  string // referenced table, project.dataset.table
+	Column string // referenced column
+}
+
+// Codes are the field's compact attributes for the schema's Attr column,
+// in a fixed order: mode (R required, A repeated/array; nullable has
+// none), PK, FK, P (partitioning), C1… (clustering order), T (policy tag).
+func (f SchemaField) Codes() []string {
+	var c []string
+
+	switch f.Mode {
+	case "REQUIRED":
+		c = append(c, "R")
+	case "REPEATED":
+		c = append(c, "A")
+	}
+
+	if f.PKRank > 0 {
+		c = append(c, "PK")
+	}
+
+	if len(f.ForeignKeys) > 0 {
+		c = append(c, "FK")
+	}
+
 	if f.Partition {
-		b = append(b, "partition")
+		c = append(c, "P")
 	}
 
 	if f.ClusterRank > 0 {
-		b = append(b, "cluster "+strconv.Itoa(f.ClusterRank))
+		c = append(c, "C"+strconv.Itoa(f.ClusterRank))
 	}
 
 	if len(f.PolicyTags) > 0 {
-		b = append(b, "policy tag")
+		c = append(c, "T")
 	}
 
-	return b
+	return c
+}
+
+// Attr joins Codes with "+" ("R+P+C1"; "" when there are none).
+func (f SchemaField) Attr() string { return strings.Join(f.Codes(), "+") }
+
+// AttrDetail spells out Codes, one per line, for the Attr tooltip.
+func (f SchemaField) AttrDetail() string {
+	var lines []string
+
+	switch f.Mode {
+	case "REQUIRED":
+		lines = append(lines, "R: REQUIRED, never NULL")
+	case "REPEATED":
+		lines = append(lines, "A: REPEATED, an array of values")
+	}
+
+	if f.PKRank > 0 {
+		pk := "PK: primary key"
+		if f.PKSize > 1 {
+			pk += fmt.Sprintf(" (column %d of %d)", f.PKRank, f.PKSize)
+		}
+
+		lines = append(lines, pk)
+	}
+
+	for _, fk := range f.ForeignKeys {
+		line := "FK: foreign key"
+		if fk.Name != "" {
+			line += " " + fk.Name
+		}
+
+		lines = append(lines, line+" → "+fk.Table+"."+fk.Column)
+	}
+
+	if f.Partition {
+		p := "P: partitioning column"
+		if f.PartitionBy != "" {
+			p += " (" + f.PartitionBy + ")"
+		}
+
+		lines = append(lines, p)
+	}
+
+	if f.ClusterRank > 0 {
+		lines = append(lines, fmt.Sprintf("C%d: clustering column %d of %d", f.ClusterRank, f.ClusterRank, max(f.Clustered, f.ClusterRank)))
+	}
+
+	if len(f.PolicyTags) > 0 {
+		lines = append(lines, "T: policy tags "+strings.Join(f.PolicyTags, ", "))
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // SchemaTree converts a table schema into display rows, marking the
@@ -540,26 +622,73 @@ func SchemaTree(t *bigquery.Table) []SchemaField {
 		return nil
 	}
 
-	partition := ""
+	k := tableKeys{cluster: map[string]int{}, pk: map[string]int{}, fks: map[string][]ForeignKeyRef{}}
+
 	if t.TimePartitioning != nil {
-		partition = t.TimePartitioning.Field
+		k.partition, k.partitionBy = t.TimePartitioning.Field, t.TimePartitioning.Type
 	}
 
 	if t.RangePartitioning != nil {
-		partition = t.RangePartitioning.Field
+		k.partition, k.partitionBy = t.RangePartitioning.Field, "RANGE"
 	}
 
-	cluster := make(map[string]int)
 	if t.Clustering != nil {
+		k.clustered = len(t.Clustering.Fields)
 		for i, c := range t.Clustering.Fields {
-			cluster[strings.ToLower(c)] = i + 1
+			k.cluster[strings.ToLower(c)] = i + 1
 		}
 	}
 
-	return schemaFields(t.Schema.Fields, "", partition, cluster)
+	k.addConstraints(t.TableConstraints)
+
+	return schemaFields(t.Schema.Fields, "", &k)
 }
 
-func schemaFields(fields []*bigquery.TableFieldSchema, prefix, partition string, cluster map[string]int) []SchemaField {
+// tableKeys holds what marks top-level columns: partitioning, clustering
+// and the primary and foreign keys (by lower-case column name).
+type tableKeys struct {
+	partition, partitionBy string
+	cluster                map[string]int
+	clustered              int
+	pk                     map[string]int
+	pkSize                 int
+	fks                    map[string][]ForeignKeyRef
+}
+
+func (k *tableKeys) addConstraints(c *bigquery.TableConstraints) {
+	if c == nil {
+		return
+	}
+
+	if c.PrimaryKey != nil {
+		k.pkSize = len(c.PrimaryKey.Columns)
+		for i, col := range c.PrimaryKey.Columns {
+			k.pk[strings.ToLower(col)] = i + 1
+		}
+	}
+
+	for _, fk := range c.ForeignKeys {
+		if fk == nil {
+			continue
+		}
+
+		table := ""
+		if r := fk.ReferencedTable; r != nil {
+			table = r.ProjectId + "." + r.DatasetId + "." + r.TableId
+		}
+
+		for _, cr := range fk.ColumnReferences {
+			if cr == nil {
+				continue
+			}
+
+			col := strings.ToLower(cr.ReferencingColumn)
+			k.fks[col] = append(k.fks[col], ForeignKeyRef{Name: fk.Name, Table: table, Column: cr.ReferencedColumn})
+		}
+	}
+}
+
+func schemaFields(fields []*bigquery.TableFieldSchema, prefix string, k *tableKeys) []SchemaField {
 	out := make([]SchemaField, 0, len(fields))
 
 	for _, f := range fields {
@@ -574,11 +703,25 @@ func schemaFields(fields []*bigquery.TableFieldSchema, prefix, partition string,
 			mode = "NULLABLE"
 		}
 
+		top := prefix == ""
 		sf := SchemaField{
 			Name: f.Name, Type: FieldType(f), Mode: mode, Description: f.Description,
 			Default: f.DefaultValueExpression, Collation: f.Collation,
-			Partition:   prefix == "" && partition != "" && strings.EqualFold(f.Name, partition),
-			ClusterRank: cluster[path],
+			Partition:   top && k.partition != "" && strings.EqualFold(f.Name, k.partition),
+			ClusterRank: k.cluster[path],
+			Clustered:   k.clustered,
+		}
+
+		if sf.Partition {
+			sf.PartitionBy = k.partitionBy
+		}
+
+		// Keys and constraints name top-level columns only.
+		if top {
+			sf.PKRank, sf.ForeignKeys = k.pk[path], k.fks[path]
+			if sf.PKRank > 0 {
+				sf.PKSize = k.pkSize
+			}
 		}
 
 		if f.PolicyTags != nil {
@@ -586,7 +729,7 @@ func schemaFields(fields []*bigquery.TableFieldSchema, prefix, partition string,
 		}
 
 		if len(f.Fields) > 0 {
-			sf.Children = schemaFields(f.Fields, prefix+f.Name+".", partition, cluster)
+			sf.Children = schemaFields(f.Fields, prefix+f.Name+".", k)
 		}
 
 		out = append(out, sf)

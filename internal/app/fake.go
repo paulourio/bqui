@@ -240,7 +240,7 @@ func syntheticTable(ref bq.TableRef) *bigquery.Table {
 		}
 	}
 
-	return &bigquery.Table{
+	t := &bigquery.Table{
 		TableReference: &bigquery.TableReference{ProjectId: ref.Project, DatasetId: ref.Dataset, TableId: ref.Table},
 		Type:           "TABLE",
 		Location:       "US",
@@ -253,6 +253,24 @@ func syntheticTable(ref bq.TableRef) *bigquery.Table {
 			{Name: "payload", Type: "JSON"},
 		}},
 	}
+
+	// users declares keys (unenforced in BigQuery): a primary key and a
+	// foreign key to accounts, for the schema's Attr column.
+	if ref.Table == "users" {
+		t.Schema.Fields = append(t.Schema.Fields, &bigquery.TableFieldSchema{Name: "account_id", Type: "INTEGER"})
+		t.TableConstraints = &bigquery.TableConstraints{
+			PrimaryKey: &bigquery.TableConstraintsPrimaryKey{Columns: []string{"id"}},
+			ForeignKeys: []*bigquery.TableConstraintsForeignKeys{{
+				Name:            "fk_account",
+				ReferencedTable: &bigquery.TableConstraintsForeignKeysReferencedTable{ProjectId: ref.Project, DatasetId: ref.Dataset, TableId: "accounts"},
+				ColumnReferences: []*bigquery.TableConstraintsForeignKeysColumnReferences{
+					{ReferencingColumn: "account_id", ReferencedColumn: "id"},
+				},
+			}},
+		}
+	}
+
+	return t
 }
 
 // GetRoutine implements Backend.

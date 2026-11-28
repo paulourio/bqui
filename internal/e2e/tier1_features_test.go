@@ -796,12 +796,12 @@ func TestTier1F5OutlineWrappingContract(t *testing.T) {
 			t.Fatalf("SchemaTree len = %d", len(sf))
 		}
 
-		if !slices.Contains(sf[0].Badges(), "partition") {
-			t.Errorf("sf[0] badges = %v, want partition", sf[0].Badges())
+		if !slices.Contains(sf[0].Codes(), "P") {
+			t.Errorf("sf[0] codes = %v, want P", sf[0].Codes())
 		}
 
-		if b := sf[1].Badges(); !slices.Contains(b, "cluster 1") || !slices.Contains(b, "policy tag") {
-			t.Errorf("sf[1] badges = %v, want cluster 1 & policy tag", b)
+		if c := sf[1].Codes(); !slices.Contains(c, "C1") || !slices.Contains(c, "T") {
+			t.Errorf("sf[1] codes = %v, want C1 & T", c)
 		}
 	})
 

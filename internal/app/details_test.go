@@ -113,14 +113,67 @@ func TestSchemaTreeNestedAndBadges(t *testing.T) {
 
 	wiki := SchemaTree(fakeTable(t, "bigquery-public-data.wikipedia.pageviews_2024"))
 
-	var badges []string
+	var attrs []string
 	for _, f := range wiki {
-		badges = append(badges, f.Name+"="+strings.Join(f.Badges(), "+"))
+		attrs = append(attrs, f.Name+"="+f.Attr())
 	}
 
-	joined := strings.Join(badges, " ")
-	if !strings.Contains(joined, "datehour=partition") || !strings.Contains(joined, "cluster 1") {
-		t.Errorf("badges = %s", joined)
+	joined := strings.Join(attrs, " ")
+	if !strings.Contains(joined, "datehour=R+P") && !strings.Contains(joined, "datehour=P") || !strings.Contains(joined, "C1") {
+		t.Errorf("attrs = %s", joined)
+	}
+}
+
+func TestSchemaAttrCodes(t *testing.T) {
+	tbl := &bigquery.Table{
+		Schema: &bigquery.TableSchema{Fields: []*bigquery.TableFieldSchema{
+			{Name: "order_id", Type: "INTEGER", Mode: "REQUIRED"},
+			{Name: "line", Type: "INTEGER", Mode: "REQUIRED"},
+			{Name: "customer_id", Type: "INTEGER"},
+			{Name: "created_at", Type: "TIMESTAMP", Mode: "REQUIRED"},
+			{Name: "email", Type: "STRING", PolicyTags: &bigquery.TableFieldSchemaPolicyTags{Names: []string{"pii"}}},
+			{Name: "items", Type: "RECORD", Mode: "REPEATED", Fields: []*bigquery.TableFieldSchema{{Name: "order_id", Type: "INTEGER"}}},
+		}},
+		TimePartitioning: &bigquery.TimePartitioning{Field: "created_at", Type: "DAY"},
+		Clustering:       &bigquery.Clustering{Fields: []string{"created_at", "customer_id"}},
+		TableConstraints: &bigquery.TableConstraints{
+			PrimaryKey: &bigquery.TableConstraintsPrimaryKey{Columns: []string{"order_id", "line"}},
+			ForeignKeys: []*bigquery.TableConstraintsForeignKeys{{
+				Name:             "fk_customer",
+				ReferencedTable:  &bigquery.TableConstraintsForeignKeysReferencedTable{ProjectId: "p", DatasetId: "d", TableId: "customers"},
+				ColumnReferences: []*bigquery.TableConstraintsForeignKeysColumnReferences{{ReferencingColumn: "customer_id", ReferencedColumn: "id"}},
+			}},
+		},
+	}
+
+	tree := SchemaTree(tbl)
+	want := map[string]string{
+		"order_id": "R+PK", "line": "R+PK", "customer_id": "FK+C2", "created_at": "R+P+C1", "email": "T", "items": "A",
+	}
+
+	for _, f := range tree {
+		if got := f.Attr(); got != want[f.Name] {
+			t.Errorf("%s attr = %q, want %q", f.Name, got, want[f.Name])
+		}
+	}
+
+	// Constraints name top-level columns: a nested field of the same name is not a key.
+	if nested := tree[5].Children[0]; nested.Attr() != "" {
+		t.Errorf("nested order_id attr = %q", nested.Attr())
+	}
+
+	details := map[string]string{
+		"line":        "R: REQUIRED, never NULL\nPK: primary key (column 2 of 2)",
+		"customer_id": "FK: foreign key fk_customer → p.d.customers.id\nC2: clustering column 2 of 2",
+		"created_at":  "R: REQUIRED, never NULL\nP: partitioning column (DAY)\nC1: clustering column 1 of 2",
+		"email":       "T: policy tags pii",
+		"items":       "A: REPEATED, an array of values",
+	}
+
+	for _, f := range tree {
+		if want, ok := details[f.Name]; ok && f.AttrDetail() != want {
+			t.Errorf("%s detail = %q, want %q", f.Name, f.AttrDetail(), want)
+		}
 	}
 }
 

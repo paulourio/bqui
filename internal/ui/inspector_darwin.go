@@ -67,6 +67,7 @@ type InspectorPane struct {
 	previewFor    string // FullID whose preview is loaded or offered
 	wantSeg       int    // tab the user last picked (kept across objects)
 
+	attrWidth       float64 // Attr column width (0 = hidden)
 	schemaResizeObs objc.ID
 	fittingSchema   bool
 	lastSchemaW     float64
@@ -89,8 +90,7 @@ func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
 		Columns: []appkit.Column{
 			{ID: "name", Title: "Field name", Width: 118, MinWidth: 80},
 			{ID: "type", Title: "Type", Width: 62, MinWidth: 48},
-			{ID: "mode", Title: "Mode", Width: 66, MinWidth: 62},
-			{ID: "key", Title: "Key", Width: 56, MinWidth: 42},
+			{ID: "attr", Title: "Attr", Width: attrMinWidth, MinWidth: attrMinWidth},
 			{ID: "description", Title: "Description", Width: 126, MinWidth: 48},
 		},
 		Alternating:         true,
@@ -405,12 +405,12 @@ func (p *InspectorPane) fitSchemaColumns(invalidate bool) {
 
 	p.lastSchemaW = avail
 
-	keyCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("key"))
-	showKey := keyCol != objc.Nil && !objc.Send[bool](keyCol, "isHidden")
+	attrCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("attr"))
+	showAttr := attrCol != objc.Nil && !objc.Send[bool](attrCol, "isHidden")
 
-	visibleCols := 4
-	if showKey {
-		visibleCols = 5
+	visibleCols := 3
+	if showAttr {
+		visibleCols = 4
 	}
 
 	spacing := objc.Send[appkit.Size](p.schema.View, "intercellSpacing").Width
@@ -424,10 +424,10 @@ func (p *InspectorPane) fitSchemaColumns(invalidate bool) {
 	specs := []colSpec{
 		{id: "name", min: 80, wide: 118},
 		{id: "type", min: 48, wide: 62},
-		{id: "mode", min: 62, wide: 66},
 	}
-	if showKey {
-		specs = append(specs, colSpec{id: "key", min: 42, wide: 56})
+	if showAttr {
+		// Exactly as wide as its widest code (or its header), never more.
+		specs = append(specs, colSpec{id: "attr", min: p.attrWidth, wide: p.attrWidth})
 	}
 
 	const descMin, descWide = 48.0, 126.0
@@ -764,11 +764,12 @@ func (p *InspectorPane) apply(gen uint64, info app.ObjectInfo, v any, err error)
 	p.schemaSrc.set(fields)
 	p.detailsSrc.set(sections)
 
-	// The Key column only earns its space when some field has a badge.
+	// The Attr column only earns its space when some field has a code.
 	// Reload before unhiding so NSOutlineView does not query stale handles.
 	p.schema.Reload(0)
-	keyCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("key"))
-	objc.Msg(keyCol, "setHidden:", !anyBadges(fields))
+	p.attrWidth = attrWidth(fields)
+	attrCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("attr"))
+	objc.Msg(attrCol, "setHidden:", p.attrWidth == 0)
 	p.fitSchemaColumns(true)
 	p.details.Reload(0)
 	p.details.Expand(0, true)
@@ -829,15 +830,35 @@ func (p *InspectorPane) detailsMenu(item uint64) []appkit.MenuItem {
 	return items
 }
 
-func anyBadges(fields []app.SchemaField) bool {
-	for _, f := range fields {
-		if len(f.Badges()) > 0 || anyBadges(f.Children) {
-			return true
-		}
+// attrWidth is the Attr column's width: its widest code string or its
+// header, plus cell padding; 0 when no field has a code (column hidden).
+func attrWidth(fields []app.SchemaField) float64 {
+	widest := widestAttr(fields)
+	if widest == 0 {
+		return 0
 	}
 
-	return false
+	return math.Ceil(max(widest, appkit.TextWidth("Attr", appkit.FontHeader))) + attrPadding
 }
+
+func widestAttr(fields []app.SchemaField) float64 {
+	var w float64
+
+	for _, f := range fields {
+		if a := f.Attr(); a != "" {
+			w = max(w, appkit.TextWidth(a, appkit.FontRegular))
+		}
+
+		w = max(w, widestAttr(f.Children))
+	}
+
+	return w
+}
+
+const (
+	attrMinWidth = 30.0
+	attrPadding  = 12.0
+)
 
 // schemaSource flattens a SchemaField tree into outline handles.
 type schemaSource struct {
@@ -899,10 +920,15 @@ func (s *schemaSource) CellText(item uint64, column string) appkit.CellText {
 	switch column {
 	case "type":
 		return appkit.CellText{Text: f.Type, Mono: true, Wrap: true, CharWrap: needsCharWrap(f.Type)}
-	case "mode":
-		return appkit.CellText{Text: f.Mode, Secondary: f.Mode == "NULLABLE"}
-	case "key":
-		return appkit.CellText{Text: strings.Join(f.Badges(), ", "), Secondary: true}
+	case "attr":
+		// Keys stand out in the accent color; other codes stay quiet. The
+		// tooltip spells every code out.
+		cell := appkit.CellText{Text: f.Attr(), Secondary: true, ToolTip: f.AttrDetail()}
+		if f.PKRank > 0 || len(f.ForeignKeys) > 0 {
+			cell.Color = appkit.SystemColor("controlAccentColor")
+		}
+
+		return cell
 	case "description":
 		return appkit.CellText{Text: f.Description, Secondary: true, Wrap: true, CharWrap: needsCharWrap(f.Description), ToolTip: f.Description}
 	}

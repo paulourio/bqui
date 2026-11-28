@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -608,9 +609,9 @@ func checkInspectorPageviewsSchema(s *ui.Shell) []string {
 
 	onMain(func() {
 		schema := s.Inspector.SchemaOutline()
-		keyCol := objc.Msg(schema.View, "tableColumnWithIdentifier:", objc.String("key"))
-		if objc.Send[bool](keyCol, "isHidden") {
-			errs = append(errs, "pageviews@440 key column unexpectedly hidden")
+		attrCol := objc.Msg(schema.View, "tableColumnWithIdentifier:", objc.String("attr"))
+		if objc.Send[bool](attrCol, "isHidden") {
+			errs = append(errs, "pageviews@440 Attr column unexpectedly hidden")
 		}
 
 		if ok, d := checkOutlineNoHorizontalOverflow(schema); !ok {
@@ -631,17 +632,18 @@ func checkInspectorPageviewsSchema(s *ui.Shell) []string {
 			errs = append(errs, fmt.Sprintf("pageviews@300 Field name header truncated: colW=%.1f textW=%.1f found=%v", colW, textW, found))
 		}
 
-		keyCol := objc.Msg(schema.View, "tableColumnWithIdentifier:", objc.String("key"))
-		if objc.Send[bool](keyCol, "isHidden") {
-			errs = append(errs, "pageviews@300 key column unexpectedly hidden")
-		} else if kw := objc.Send[float64](keyCol, "width"); kw < 36 {
-			errs = append(errs, fmt.Sprintf("pageviews@300 key column width = %.1f < 36", kw))
+		attrCol := objc.Msg(schema.View, "tableColumnWithIdentifier:", objc.String("attr"))
+		if objc.Send[bool](attrCol, "isHidden") {
+			errs = append(errs, "pageviews@300 Attr column unexpectedly hidden")
 		}
 
+		// The Attr column fits its widest code exactly and never truncates it.
 		if dateRow := findOutlineRow(schema, "name", "datehour"); dateRow < 0 {
 			errs = append(errs, "pageviews@300 missing datehour row")
-		} else if g := appkit.OutlineRowGeometry(schema, dateRow, "key"); !g.Found || !strings.Contains(g.Text, "partition") {
-			errs = append(errs, fmt.Sprintf("pageviews@300 datehour key badge = %+v, want partition", g))
+		} else if g := appkit.OutlineRowGeometry(schema, dateRow, "attr"); !g.Found || !slices.Contains(strings.Split(g.Text, "+"), "P") {
+			errs = append(errs, fmt.Sprintf("pageviews@300 datehour attr = %+v, want a P code", g))
+		} else if aw := objc.Send[float64](attrCol, "width"); aw < appkit.TextWidth(g.Text, appkit.FontRegular) || aw > appkit.TextWidth(g.Text, appkit.FontRegular)+40 {
+			errs = append(errs, fmt.Sprintf("pageviews@300 Attr width %.1f for %q: truncated or too wide", aw, g.Text))
 		}
 
 		setInspectorWidth(s, layoutInspectorWide)
