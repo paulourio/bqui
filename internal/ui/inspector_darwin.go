@@ -68,6 +68,7 @@ type InspectorPane struct {
 	wantSeg       int    // tab the user last picked (kept across objects)
 
 	attrWidth       float64 // Attr column width (0 = hidden)
+	typeWidth       float64 // Type column's preferred width
 	schemaResizeObs objc.ID
 	fittingSchema   bool
 	lastSchemaW     float64
@@ -82,7 +83,7 @@ type cached struct {
 }
 
 func newInspectorPane(s *Shell, be app.Backend) *InspectorPane {
-	p := &InspectorPane{s: s, be: be, cache: make(map[string]cached)}
+	p := &InspectorPane{s: s, be: be, cache: make(map[string]cached), typeWidth: typeWide}
 	p.schemaSrc = &schemaSource{}
 	p.detailsSrc = &detailsSource{}
 
@@ -423,7 +424,7 @@ func (p *InspectorPane) fitSchemaColumns(invalidate bool) {
 
 	specs := []colSpec{
 		{id: "name", min: 80, wide: 118},
-		{id: "type", min: 48, wide: 62},
+		{id: "type", min: 48, wide: p.typeWidth},
 	}
 	if showAttr {
 		// Exactly as wide as its widest code (or its header), never more.
@@ -768,6 +769,7 @@ func (p *InspectorPane) apply(gen uint64, info app.ObjectInfo, v any, err error)
 	// Reload before unhiding so NSOutlineView does not query stale handles.
 	p.schema.Reload(0)
 	p.attrWidth = attrWidth(fields)
+	p.typeWidth = typeWidth(fields)
 	attrCol := objc.Msg(p.schema.View, "tableColumnWithIdentifier:", objc.String("attr"))
 	objc.Msg(attrCol, "setHidden:", p.attrWidth == 0)
 	p.fitSchemaColumns(true)
@@ -855,9 +857,28 @@ func widestAttr(fields []app.SchemaField) float64 {
 	return w
 }
 
+// typeWidth is the Type column's preferred width: its widest type, so
+// TIMESTAMP and NUMERIC(10, 2) fit on one line when the pane has room,
+// within typeWide…typeWidest.
+func typeWidth(fields []app.SchemaField) float64 {
+	return min(typeWidest, max(typeWide, math.Ceil(widestType(fields))+attrPadding))
+}
+
+func widestType(fields []app.SchemaField) float64 {
+	var w float64
+
+	for _, f := range fields {
+		w = max(w, appkit.TextWidth(f.Type, appkit.FontMono), widestType(f.Children))
+	}
+
+	return w
+}
+
 const (
 	attrMinWidth = 30.0
 	attrPadding  = 12.0
+	typeWide     = 62.0
+	typeWidest   = 120.0
 )
 
 // schemaSource flattens a SchemaField tree into outline handles.
