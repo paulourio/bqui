@@ -133,6 +133,8 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 	mn := menuFlow(s, dir)
 	phase("paging")
 	pg := pagingFlow(s)
+	phase("attr")
+	at := attrFlow(s, dir)
 	phase("copy")
 	cp := copyFlow(s)
 	phase("sql errors")
@@ -180,6 +182,7 @@ func Start(s *ui.Shell, dir, version string, done func(error)) {
 		activeChecks(rep, ac)
 		renameChecks(rep, rn)
 		pagingChecks(rep, pg)
+		attrChecks(rep, at)
 		copyChecks(rep, cp)
 
 		if err := run(s, dir, rep, done); err != nil {

@@ -25,6 +25,7 @@ type RowCellGeom struct {
 	LineBreakMode  int
 	MaxLines       int
 	UsesSingleLine bool
+	ToolTip        string
 }
 
 // RenderedCellInfo describes a live rendered cell in a Table.
@@ -166,7 +167,17 @@ func OutlineRowGeometry(o *Outline, row int, colID string) RowCellGeom {
 		LineBreakMode:  lineBreak,
 		MaxLines:       int(objc.Send[int64](tf, "maximumNumberOfLines")),
 		UsesSingleLine: objc.Send[bool](tf, "usesSingleLineMode"),
+		ToolTip:        cellToolTip(cv, tf),
 	}
+}
+
+// cellToolTip is the tooltip set on a cell view or on its text field.
+func cellToolTip(cell, field objc.ID) string {
+	if t := objc.GoString(objc.Msg(cell, "toolTip")); t != "" {
+		return t
+	}
+
+	return objc.GoString(objc.Msg(field, "toolTip"))
 }
 
 // OutlineHeaderGeometry returns the live column width and measured header
