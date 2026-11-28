@@ -655,6 +655,10 @@ func textCell(ov objc.ID, c CellText, auto bool) objc.ID {
 	SetString(tf, c.Text)
 	setSecondary(tf, c.Secondary)
 
+	if c.Color != objc.Nil {
+		objc.Msg(tf, "setTextColor:", c.Color)
+	}
+
 	font := objc.Msg(objc.Cls("NSFont"), "systemFontOfSize:", objc.Send[float64](objc.Cls("NSFont"), "systemFontSize"))
 	if c.Mono {
 		font = objc.Msg(objc.Cls("NSFont"), "monospacedSystemFontOfSize:weight:", monoFontSize, 0.0)
